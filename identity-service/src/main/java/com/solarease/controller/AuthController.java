@@ -3,6 +3,7 @@ package com.solarease.controller;
 import com.solarease.dto.AuthResponse;
 import com.solarease.dto.LoginRequest;
 import com.solarease.dto.RegisterRequest;
+import com.solarease.dto.VerifyOtpRequest;
 import com.solarease.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @Slf4j
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
@@ -21,11 +23,9 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("POST /api/auth/login - User login request");
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("Identity Service is running");
     }
 
     @PostMapping("/register")
@@ -35,8 +35,17 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Identity Service is running");
+    @PostMapping("/verify-otp")
+    public ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        log.info("POST /api/auth/verify-otp - OTP verification request");
+        AuthResponse response = authService.verifyOtp(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        log.info("POST /api/auth/login - User login request");
+        AuthResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
     }
 }

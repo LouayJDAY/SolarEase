@@ -15,6 +15,8 @@ public class AuthResponse {
     private String tokenType = "Bearer";
     private Long expiresIn;
     private UserDto user;
+    private String message;
+    private String email;
 
     @Data
     @NoArgsConstructor

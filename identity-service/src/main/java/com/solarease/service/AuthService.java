@@ -3,6 +3,7 @@ package com.solarease.service;
 import com.solarease.dto.AuthResponse;
 import com.solarease.dto.LoginRequest;
 import com.solarease.dto.RegisterRequest;
+import com.solarease.dto.VerifyOtpRequest;
 import com.solarease.entity.User;
 import com.solarease.exception.BadRequestException;
 import com.solarease.exception.ResourceNotFoundException;
@@ -21,13 +22,19 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final OtpService otpService;
+    private final EmailService emailService;
 
     public AuthService(UserRepository userRepository, 
                       PasswordEncoder passwordEncoder,
-                      JwtTokenProvider jwtTokenProvider) {
+                      JwtTokenProvider jwtTokenProvider,
+                      OtpService otpService,
+                      EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.otpService = otpService;
+        this.emailService = emailService;
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -42,6 +49,10 @@ public class AuthService {
 
         if (!user.getIsActive()) {
             throw new BadRequestException("User account is inactive");
+        }
+
+        if (!user.getIsEmailVerified()) {
+            throw new BadRequestException("Email not verified. Please verify your email first.");
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail());
@@ -84,18 +95,37 @@ public class AuthService {
 
         User savedUser = userRepository.save(newUser);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(savedUser.getUuid(), savedUser.getEmail());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(savedUser.getUuid(), savedUser.getEmail());
+        // Generate and send OTP
+        otpService.generateAndSendOtp(savedUser);
 
-        AuthResponse.UserDto userDto = buildUserDto(savedUser);
-
-        log.info("User {} registered successfully", savedUser.getEmail());
+        log.info("User {} registered. OTP sent to email", savedUser.getEmail());
         
         return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .expiresIn(jwtTokenProvider.getExpirationTime())
-                .user(userDto)
+                .message("User registered successfully. Please verify your email with the OTP code sent.")
+                .build();
+    }
+
+    public AuthResponse verifyOtp(VerifyOtpRequest request) {
+        log.info("OTP verification attempt for email: {}", request.getEmail());
+
+        // Validate OTP
+        otpService.validateOtp(request.getEmail(), request.getOtpCode());
+
+        // Mark email as verified
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setIsEmailVerified(true);
+        userRepository.save(user);
+
+        // Send welcome email
+        emailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());
+
+        log.info("Email verified for user: {}", request.getEmail());
+
+        return AuthResponse.builder()
+                .message("Email verified successfully! You can now login.")
+                .email(request.getEmail())
                 .build();
     }
 
