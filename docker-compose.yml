@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: solarease-postgres
+    environment:
+      - POSTGRES_USER=louay
+      - POSTGRES_PASSWORD=SolarEase2026!
+      - POSTGRES_DB=postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - solarease-network
+    restart: always
+
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - identity-service
+      - project-service
+    networks:
+      - solarease-network
+    restart: on-failure
+
+  identity-service:
+    build: ./identity-service
+    container_name: identity-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/solarease_identity
+      - SPRING_DATASOURCE_USERNAME=louay
+      - SPRING_DATASOURCE_PASSWORD=SolarEase2026!
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - postgres
+    networks:
+      - solarease-network
+    restart: on-failure
+
+  project-service:
+    build: ./project-service
+    container_name: project-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/solarease_projects
+      - SPRING_DATASOURCE_USERNAME=louay
+      - SPRING_DATASOURCE_PASSWORD=SolarEase2026!
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - postgres
+    networks:
+      - solarease-network
+    restart: on-failure
+
+networks:
+  solarease-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
