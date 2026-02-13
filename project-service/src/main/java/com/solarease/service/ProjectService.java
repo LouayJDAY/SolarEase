@@ -71,6 +71,32 @@ public class ProjectService {
         return mapToResponse(projectRepository.save(project));
     }
 
+    @Transactional
+    public ProjectResponse updateProject(Long id, ProjectRequest request) {
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
+
+        project.setName(request.getName());
+        project.setDescription(request.getDescription());
+        
+        // Optionally update client if needed, but usually project transfer is a separate process
+        if (request.getClientId() != null && !request.getClientId().equals(project.getClientId())) {
+             if (!clientRepository.existsById(request.getClientId())) {
+                throw new ResourceNotFoundException("Client not found with id: " + request.getClientId());
+            }
+            project.setClientId(request.getClientId());
+        }
+
+        return mapToResponse(projectRepository.save(project));
+    }
+
+    public void deleteProject(Long id) {
+        if (!projectRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Project not found with id: " + id);
+        }
+        projectRepository.deleteById(id);
+    }
+
     private ProjectResponse mapToResponse(Project project) {
         return ProjectResponse.builder()
                 .id(project.getId())

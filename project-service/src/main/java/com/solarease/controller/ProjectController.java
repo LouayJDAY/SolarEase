@@ -42,4 +42,15 @@ public class ProjectController {
     public ProjectResponse updateProjectStatus(@PathVariable Long id, @RequestParam String status) {
         return projectService.updateProjectStatus(id, status);
     }
+
+    @PutMapping("/{id}")
+    public ProjectResponse updateProject(@PathVariable Long id, @RequestBody @Valid ProjectRequest request) {
+        return projectService.updateProject(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteProject(@PathVariable Long id) {
+        projectService.deleteProject(id);
+    }
 }
