@@ -157,6 +157,7 @@ npm run dev
 - [Architecture](./docs/ARCHITECTURE.md)
 - [API Documentation](./docs/API.md)
 - [Database Schema](./docs/SCHEMA.md)
+- [User Stories & Cahier des Charges](./USER_STORIES.md)
 - [Git Workflow](./CONTRIBUTING.md)
 
 ---

@@ -59,6 +59,23 @@ services:
       - solarease-network
     restart: on-failure
 
+  dimensioning-service:
+    build: ./dimensioning-service
+    container_name: dimensioning-service
+    ports:
+      - "8083:8083" # Expose the service port
+    restart: always
+    networks:
+      - solarease-network
+    environment:
+      # Connection to Postgres via internal Docker network (service name: "postgres")
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/solarease_dimensioning
+      SPRING_DATASOURCE_USERNAME: louay
+      SPRING_DATASOURCE_PASSWORD: SolarEase2026!
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      # Connection to Ollama on host machine via Docker Desktop DNS
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+
 networks:
   solarease-network:
     driver: bridge

@@ -17,6 +17,7 @@ public class ProjectResponse {
     private Long id;
     private String name;
     private String description;
+    private String location;
     private ProjectStatus status;
     private Long clientId;
     private LocalDateTime createdAt;

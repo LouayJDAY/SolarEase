@@ -18,6 +18,8 @@ public class ProjectRequest {
     
     private String description;
     
+    private String location;
+    
     @NotNull(message = "Client ID is required")
     private Long clientId;
 }

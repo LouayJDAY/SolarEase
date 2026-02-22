@@ -26,6 +26,8 @@ public class Project {
     private String name;
 
     private String description;
+    
+    private String location;
 
     @Enumerated(EnumType.STRING)
     private ProjectStatus status;

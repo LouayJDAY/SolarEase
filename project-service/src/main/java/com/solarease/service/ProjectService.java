@@ -29,6 +29,7 @@ public class ProjectService {
         Project project = Project.builder()
                 .name(request.getName())
                 .description(request.getDescription())
+                .location(request.getLocation())
                 .clientId(request.getClientId())
                 .status(ProjectStatus.CREATED)
                 .build();
@@ -78,6 +79,7 @@ public class ProjectService {
 
         project.setName(request.getName());
         project.setDescription(request.getDescription());
+        project.setLocation(request.getLocation());
         
         // Optionally update client if needed, but usually project transfer is a separate process
         if (request.getClientId() != null && !request.getClientId().equals(project.getClientId())) {
@@ -102,6 +104,7 @@ public class ProjectService {
                 .id(project.getId())
                 .name(project.getName())
                 .description(project.getDescription())
+                .location(project.getLocation())
                 .status(project.getStatus())
                 .clientId(project.getClientId())
                 .createdAt(project.getCreatedAt())
