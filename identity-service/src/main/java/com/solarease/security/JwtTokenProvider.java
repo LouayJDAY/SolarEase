@@ -23,20 +23,22 @@ public class JwtTokenProvider {
     @Value("${app.jwt.refresh-expiration:604800000}")
     private long refreshTokenExpiration;
 
-    public String generateAccessToken(String userId, String email) {
-        return generateToken(userId, email, jwtExpiration);
+    public String generateAccessToken(String userId, String email, String role) {
+        return generateToken(userId, email, role, jwtExpiration, "ACCESS");
     }
 
-    public String generateRefreshToken(String userId, String email) {
-        return generateToken(userId, email, refreshTokenExpiration);
+    public String generateRefreshToken(String userId, String email, String role) {
+        return generateToken(userId, email, role, refreshTokenExpiration, "REFRESH");
     }
 
-    private String generateToken(String userId, String email, long expirationTime) {
+    private String generateToken(String userId, String email, String role, long expirationTime, String tokenType) {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         
         return Jwts.builder()
                 .setSubject(userId)
                 .claim("email", email)
+                .claim("role", role)
+                .claim("type", tokenType)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -59,16 +61,30 @@ public class JwtTokenProvider {
     }
 
     public String getEmailFromToken(String token) {
+        Claims claims = getAllClaims(token);
+        return claims != null ? claims.get("email", String.class) : null;
+    }
+
+    public String getRoleFromToken(String token) {
+        Claims claims = getAllClaims(token);
+        return claims != null ? claims.get("role", String.class) : null;
+    }
+
+    public String getTokenType(String token) {
+        Claims claims = getAllClaims(token);
+        return claims != null ? claims.get("type", String.class) : null;
+    }
+
+    private Claims getAllClaims(String token) {
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
         try {
-            Claims claims = Jwts.parserBuilder()
+            return Jwts.parserBuilder()
                     .setSigningKey(key)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            return claims.get("email", String.class);
         } catch (JwtException | IllegalArgumentException e) {
-            log.error("Error getting email from token: {}", e.getMessage());
+            log.error("Error parsing token claims: {}", e.getMessage());
             return null;
         }
     }

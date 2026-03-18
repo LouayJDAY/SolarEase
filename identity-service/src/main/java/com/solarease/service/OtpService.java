@@ -8,8 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +18,7 @@ public class OtpService {
 
     private final OtpTokenRepository otpTokenRepository;
     private final EmailService emailService;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Value("${app.otp.expiration:300}")
     private long otpExpirationSeconds;
@@ -68,8 +69,7 @@ public class OtpService {
     }
 
     private String generateOtpCode() {
-        Random random = new Random();
-        int otp = 100000 + random.nextInt(900000);
+        int otp = 100000 + SECURE_RANDOM.nextInt(900000);
         return String.valueOf(otp);
     }
 }

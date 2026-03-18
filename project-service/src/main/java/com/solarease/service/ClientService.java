@@ -6,19 +6,20 @@ import com.solarease.entity.Client;
 import com.solarease.exception.ResourceNotFoundException;
 import com.solarease.repository.ClientRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ClientService {
 
     private final ClientRepository clientRepository;
 
-    public ClientResponse createClient(ClientRequest request) {
+    public ClientResponse createClient(String installerId, ClientRequest request) {
         if (clientRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already in use");
         }
@@ -27,7 +28,11 @@ public class ClientService {
                 .lastName(request.getLastName())
                 .email(request.getEmail())
                 .phoneNumber(request.getPhoneNumber())
+                .address(request.getAddress())
+                .installerId(installerId)
                 .build();
+
+        log.info("Creating client '{}' for installer {}", request.getEmail(), installerId);
         return mapToResponse(clientRepository.save(client));
     }
 
@@ -37,10 +42,10 @@ public class ClientService {
         return mapToResponse(client);
     }
 
-    public List<ClientResponse> getAllClients() {
-        return clientRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public Page<ClientResponse> getClientsByInstaller(String installerId, String search, Pageable pageable) {
+        log.debug("Fetching clients for installer {} with search={}", installerId, search);
+        return clientRepository.findByInstallerIdWithSearch(installerId, search, pageable)
+                .map(this::mapToResponse);
     }
 
     @Transactional
@@ -51,6 +56,7 @@ public class ClientService {
         client.setFirstName(request.getFirstName());
         client.setLastName(request.getLastName());
         client.setPhoneNumber(request.getPhoneNumber());
+        client.setAddress(request.getAddress());
         
         // Only update email if it's different and not taken
         if (!client.getEmail().equals(request.getEmail())) {
@@ -60,6 +66,7 @@ public class ClientService {
             client.setEmail(request.getEmail());
         }
 
+        log.info("Updated client {}", id);
         return mapToResponse(clientRepository.save(client));
     }
 
@@ -68,6 +75,7 @@ public class ClientService {
             throw new ResourceNotFoundException("Client not found with id: " + id);
         }
         clientRepository.deleteById(id);
+        log.info("Deleted client {}", id);
     }
 
     private ClientResponse mapToResponse(Client client) {
@@ -77,6 +85,9 @@ public class ClientService {
                 .lastName(client.getLastName())
                 .email(client.getEmail())
                 .phoneNumber(client.getPhoneNumber())
+                .address(client.getAddress())
+                .createdAt(client.getCreatedAt())
+                .updatedAt(client.getUpdatedAt())
                 .build();
     }
 }

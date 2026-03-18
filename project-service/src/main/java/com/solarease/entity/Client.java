@@ -8,8 +8,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
-@Table(name = "items_client") // Using items_client to avoid reserved keyword 'client' in some DBs or just convention
+@Table(name = "items_client")
 @Data
 @Builder
 @NoArgsConstructor
@@ -32,4 +34,25 @@ public class Client {
     private String email;
 
     private String phoneNumber;
+
+    private String address;
+
+    @Column(name = "installer_id")
+    private String installerId;
+
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

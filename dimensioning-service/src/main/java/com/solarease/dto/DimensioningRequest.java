@@ -36,4 +36,12 @@ public class DimensioningRequest {
 
     @NotNull(message = "Roof type is required")
     private RoofType roofType;
+
+    private Long panelId;
+    private Long inverterId;
+
+    // ── Night Panel support ──
+    private String panelType; // "CLASSIC" or "NIGHT_PANEL" (default: CLASSIC)
+    private Long nightPanelId; // ID of the night panel equipment (optional)
+    private Double dailyConsumptionKwh; // Client's daily consumption in kWh (for self-consumption calc)
 }

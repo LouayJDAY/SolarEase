@@ -1,5 +1,6 @@
 package com.solarease.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.solarease.enums.Orientation;
 import com.solarease.enums.RoofType;
 import jakarta.persistence.*;
@@ -33,6 +34,7 @@ public class RoofCharacteristic {
     @Enumerated(EnumType.STRING)
     private RoofType type; // Type de toit
 
+    @JsonIgnore
     @OneToOne(mappedBy = "roofCharacteristic")
     private Dimensioning dimensioning;
 }

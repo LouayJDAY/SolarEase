@@ -23,4 +23,6 @@ public class DimensioningResponse {
     private DimensioningStatus status;
     private LocalDateTime createdAt;
     private String aiRecommendation;
+    private String panelType; // "CLASSIC" or "NIGHT_PANEL"
+    private FinancialMetrics financials; // Financial projections for the project
 }

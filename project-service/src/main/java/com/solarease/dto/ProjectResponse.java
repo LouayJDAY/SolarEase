@@ -18,8 +18,27 @@ public class ProjectResponse {
     private String name;
     private String description;
     private String location;
+    private Double latitude;
+    private Double longitude;
+    private Double peakPower;
+    private Double availableArea;
+    private Double inclination;
+    private Double orientation;
+    private Double budget;
     private ProjectStatus status;
     private Long clientId;
+    private String installerId;
+    private ClientInfo client;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ClientInfo {
+        private Long id;
+        private String firstName;
+        private String lastName;
+    }
 }

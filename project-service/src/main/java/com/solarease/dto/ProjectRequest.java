@@ -19,6 +19,14 @@ public class ProjectRequest {
     private String description;
     
     private String location;
+
+    private Double latitude;
+    private Double longitude;
+    private Double peakPower;
+    private Double availableArea;
+    private Double inclination;
+    private Double orientation;
+    private Double budget;
     
     @NotNull(message = "Client ID is required")
     private Long clientId;

@@ -5,10 +5,12 @@ import com.solarease.dto.ClientResponse;
 import com.solarease.service.ClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/clients")
@@ -19,8 +21,10 @@ public class ClientController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ClientResponse createClient(@RequestBody @Valid ClientRequest request) {
-        return clientService.createClient(request);
+    public ClientResponse createClient(
+            @RequestHeader("X-User-Id") String installerId,
+            @RequestBody @Valid ClientRequest request) {
+        return clientService.createClient(installerId, request);
     }
 
     @GetMapping("/{id}")
@@ -29,8 +33,20 @@ public class ClientController {
     }
 
     @GetMapping
-    public List<ClientResponse> getAllClients() {
-        return clientService.getAllClients();
+    public Page<ClientResponse> getMyClients(
+            @RequestHeader("X-User-Id") String installerId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        return clientService.getClientsByInstaller(installerId, search, pageable);
     }
 
     @PutMapping("/{id}")

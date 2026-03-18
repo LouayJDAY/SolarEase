@@ -29,11 +29,22 @@ public class Project {
     
     private String location;
 
+    private Double latitude;
+    private Double longitude;
+    private Double peakPower;       // kWc
+    private Double availableArea;   // m²
+    private Double inclination;     // degrees
+    private Double orientation;     // degrees
+    private Double budget;          // TND
+
     @Enumerated(EnumType.STRING)
     private ProjectStatus status;
 
     @Column(name = "client_id")
     private Long clientId;
+
+    @Column(name = "installer_id")
+    private String installerId;
     
     @Column(updatable = false)
     private LocalDateTime createdAt;

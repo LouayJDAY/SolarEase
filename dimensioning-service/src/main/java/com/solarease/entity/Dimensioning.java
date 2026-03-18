@@ -40,6 +40,17 @@ public class Dimensioning {
     @Column(columnDefinition = "TEXT")
     private String aiRecommendation;
 
+    @ManyToOne
+    @JoinColumn(name = "panel_id")
+    private Equipment panel;
+
+    @ManyToOne
+    @JoinColumn(name = "inverter_id")
+    private Equipment inverter;
+
+    @Column(length = 20)
+    private String panelType; // "CLASSIC" or "NIGHT_PANEL"
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

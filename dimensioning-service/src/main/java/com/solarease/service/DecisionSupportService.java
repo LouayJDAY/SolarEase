@@ -1,6 +1,7 @@
 package com.solarease.service;
 
 import com.solarease.dto.DimensioningResponse;
+import com.solarease.dto.FinancialMetrics;
 import com.solarease.entity.SolarInstallation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ public class DecisionSupportService {
         List<String> contextDocuments = retrieveContext(installation.getTotalCapacityKw());
 
         // 2. GENERATION STEP (Real LLM Call via Ollama)
-        return generateAdviceFromLlm(installation, contextDocuments);
+        return generateAdviceFromLlm(installation, dimensioning.getFinancials(), contextDocuments);
     }
 
     private List<String> retrieveContext(Double capacityKw) {
@@ -75,13 +76,21 @@ public class DecisionSupportService {
         return text.substring(start, end).trim();
     }
 
-    private String generateAdviceFromLlm(SolarInstallation installation, List<String> context) {
+    private String generateAdviceFromLlm(SolarInstallation installation, FinancialMetrics financials, List<String> context) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Tu es un expert en énergie solaire en Tunisie. Analyse ce projet et donne des conseils techniques et financiers concis.\n\n");
         prompt.append("DONNÉES DU PROJET :\n");
         prompt.append(String.format("- Puissance: %.2f kWc\n", installation.getTotalCapacityKw()));
         prompt.append(String.format("- Production estimée: %.2f kWh/an\n", installation.getEstimatedAnnualProductionKwh()));
-        prompt.append(String.format("- Économie estimée: %.2f TND/mois\n", installation.getMonthlySavings()));
+        
+        if (financials != null) {
+            prompt.append(String.format("- Investissement Initial: %.2f TND\n", financials.getTotalInvestmentCost()));
+            prompt.append(String.format("- Retour sur Investissement (ROI): %.2f%%\n", financials.getRoiPercentage()));
+            prompt.append(String.format("- Temps de Retour: %.1f ans\n", financials.getPaybackPeriodYears()));
+            prompt.append(String.format("- Économies sur 25 ans: %.2f TND\n", financials.getNetSavings25Years()));
+        } else {
+            prompt.append(String.format("- Économie estimée: %.2f TND/mois\n", installation.getMonthlySavings()));
+        }
         
         prompt.append("\nCONTEXTE RÉGLEMENTAIRE (RAG) :\n");
         for (String doc : context) {
