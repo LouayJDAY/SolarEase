@@ -1,5 +1,6 @@
 package com.solarease.filter;
 
+import io.jsonwebtoken.Claims;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -17,6 +18,9 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
             "/api/auth/register",
             "/api/auth/verify-otp",
             "/api/auth/login",
+            "/api/auth/refresh",
+            "/api/auth/resend-otp",
+            "/api/auth/health",
             "/health"
     };
 
@@ -58,6 +62,18 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
             if (!jwtTokenValidator.validateToken(token)) {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
+            }
+
+            // Extract claims and forward user info as headers to downstream services
+            Claims claims = jwtTokenValidator.getClaimsFromToken(token);
+            if (claims != null) {
+                ServerHttpRequest modifiedRequest = request.mutate()
+                        .header("X-User-Id", claims.getSubject())
+                        .header("X-User-Email", claims.get("email", String.class))
+                        .header("X-User-Role", claims.get("role", String.class))
+                        .build();
+
+                return chain.filter(exchange.mutate().request(modifiedRequest).build());
             }
 
             return chain.filter(exchange);

@@ -2,6 +2,7 @@ package com.solarease.filter;
 
 import javax.crypto.SecretKey;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import io.jsonwebtoken.Claims;
@@ -12,28 +13,29 @@ import io.jsonwebtoken.security.Keys;
 @Component
 public class JwtTokenValidator {
 
-    private static final String SECRET_KEY = "SolarEaseSecretKeyFor256BitHS256AlgorithmThatMustBeLong";
+    @Value("${jwt.secret:SolarEaseSecretKeyFor256BitHS256AlgorithmThatMustBeLong}")
+    private String secretKey;
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
+    }
 
     public boolean validateToken(String token) {
         try {
-            SecretKey key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
             Jwts.parserBuilder()
-                    .setSigningKey(key)
+                    .setSigningKey(getSigningKey())
                     .build()
                     .parseClaimsJws(token);
             return true;
-        } catch (JwtException e) {
-            return false;
-        } catch (IllegalArgumentException e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
 
     public Claims getClaimsFromToken(String token) {
         try {
-            SecretKey key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
             return Jwts.parserBuilder()
-                    .setSigningKey(key)
+                    .setSigningKey(getSigningKey())
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
