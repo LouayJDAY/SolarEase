@@ -1,9 +1,6 @@
 package com.solarease.service;
 
-import com.solarease.dto.AuthResponse;
-import com.solarease.dto.LoginRequest;
-import com.solarease.dto.RegisterRequest;
-import com.solarease.dto.VerifyOtpRequest;
+import com.solarease.dto.*;
 import com.solarease.entity.User;
 import com.solarease.exception.BadRequestException;
 import com.solarease.exception.ResourceNotFoundException;
@@ -51,12 +48,8 @@ public class AuthService {
             throw new BadRequestException("User account is inactive");
         }
 
-        if (!user.getIsEmailVerified()) {
-            throw new BadRequestException("Email not verified. Please verify your email first.");
-        }
-
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUuid(), user.getEmail());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail(), user.getRole().name());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUuid(), user.getEmail(), user.getRole().name());
 
         AuthResponse.UserDto userDto = buildUserDto(user);
 
@@ -88,17 +81,14 @@ public class AuthService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .phone(request.getPhone())
-                .role(User.UserRole.CLIENT)
+                .role(User.UserRole.INSTALLER)
                 .isActive(true)
-                .isEmailVerified(false)
+                .isEmailVerified(true)
                 .build();
 
         User savedUser = userRepository.save(newUser);
 
-        // Generate and send OTP
-        otpService.generateAndSendOtp(savedUser);
-
-        log.info("User {} registered. OTP sent to email", savedUser.getEmail());
+        log.info("User {} registered successfully (auto-verified)", savedUser.getEmail());
         
         return AuthResponse.builder()
                 .message("User registered successfully. Please verify your email with the OTP code sent.")
@@ -137,7 +127,134 @@ public class AuthService {
                 .username(user.getUsername())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .phone(user.getPhone())
                 .role(user.getRole().toString())
+                .isEmailVerified(user.getIsEmailVerified())
+                .isActive(user.getIsActive())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    // ==================== PROFILE MANAGEMENT ====================
+
+    public AuthResponse.UserDto getProfile(String userUuid) {
+        log.info("Fetching profile for user: {}", userUuid);
+        User user = userRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
+        return buildUserDto(user);
+    }
+
+    @Transactional
+    public AuthResponse.UserDto updateProfile(String userUuid, UpdateProfileRequest request) {
+        log.info("Updating profile for user: {}", userUuid);
+        User user = userRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
+
+        if (request.getFirstName() != null) {
+            user.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            user.setLastName(request.getLastName());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getCompany() != null) {
+            user.setCompanyId(null); // For now just log company name usage
+        }
+
+        User updated = userRepository.save(user);
+        log.info("Profile updated for user: {}", userUuid);
+        return buildUserDto(updated);
+    }
+
+    // ==================== PASSWORD MANAGEMENT ====================
+
+    @Transactional
+    public AuthResponse changePassword(String userUuid, ChangePasswordRequest request) {
+        log.info("Password change attempt for user: {}", userUuid);
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("Les mots de passe ne correspondent pas");
+        }
+
+        User user = userRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Le mot de passe actuel est incorrect");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Le nouveau mot de passe doit être différent de l'ancien");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        log.info("Password changed for user: {}", userUuid);
+        return AuthResponse.builder()
+                .message("Mot de passe modifié avec succès")
+                .build();
+    }
+
+    // ==================== TOKEN MANAGEMENT ====================
+
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+        log.info("Token refresh attempt");
+
+        String refreshToken = request.getRefreshToken();
+
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new BadRequestException("Refresh token invalide ou expiré");
+        }
+
+        String tokenType = jwtTokenProvider.getTokenType(refreshToken);
+        if (!"REFRESH".equals(tokenType)) {
+            throw new BadRequestException("Le token fourni n'est pas un refresh token");
+        }
+
+        String userUuid = jwtTokenProvider.getUserIdFromToken(refreshToken);
+        String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+
+        User user = userRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
+
+        if (!user.getIsActive()) {
+            throw new BadRequestException("Le compte est désactivé");
+        }
+
+        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail(), user.getRole().name());
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getUuid(), user.getEmail(), user.getRole().name());
+
+        log.info("Tokens refreshed for user: {}", email);
+
+        return AuthResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .expiresIn(jwtTokenProvider.getExpirationTime())
+                .user(buildUserDto(user))
+                .build();
+    }
+
+    // ==================== OTP MANAGEMENT ====================
+
+    public AuthResponse resendOtp(ResendOtpRequest request) {
+        log.info("Resend OTP request for email: {}", request.getEmail());
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec cet email"));
+
+        if (user.getIsEmailVerified()) {
+            throw new BadRequestException("L'email est déjà vérifié");
+        }
+
+        otpService.generateAndSendOtp(user);
+
+        log.info("OTP resent to: {}", request.getEmail());
+        return AuthResponse.builder()
+                .message("Un nouveau code OTP a été envoyé à votre email")
+                .email(request.getEmail())
                 .build();
     }
 }
