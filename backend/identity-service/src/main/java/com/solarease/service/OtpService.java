@@ -1,0 +1,75 @@
+package com.solarease.service;
+
+import com.solarease.entity.OtpToken;
+import com.solarease.entity.User;
+import com.solarease.repository.OtpTokenRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class OtpService {
+
+    private final OtpTokenRepository otpTokenRepository;
+    private final EmailService emailService;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @Value("${app.otp.expiration:300}")
+    private long otpExpirationSeconds;
+
+    public String generateAndSendOtp(User user) {
+        // Générer code OTP aléatoire (6 chiffres)
+        String otpCode = generateOtpCode();
+
+        // Créer OtpToken
+        OtpToken otpToken = OtpToken.builder()
+                .user(user)
+                .otpCode(otpCode)
+                .expiresAt(LocalDateTime.now().plusSeconds(otpExpirationSeconds))
+                .isUsed(false)
+                .build();
+
+        otpTokenRepository.save(otpToken);
+
+        // Envoyer email avec OTP
+        try {
+            emailService.sendOtpEmail(user.getEmail(), otpCode);
+        } catch (Exception e) {
+            log.error("Failed to send email (simulated for dev): {}", e.getMessage());
+        }
+
+        log.info("OTP generated for {}: {}", user.getEmail(), otpCode);
+        return otpCode;
+    }
+
+    public boolean validateOtp(String email, String otpCode) {
+        OtpToken otpToken = otpTokenRepository.findByOtpCode(otpCode)
+                .orElseThrow(() -> new RuntimeException("OTP invalide"));
+
+        if (!otpToken.getUser().getEmail().equals(email)) {
+            throw new RuntimeException("Email ne correspond pas au OTP");
+        }
+
+        if (!otpToken.isValid()) {
+            throw new RuntimeException("OTP expiré ou déjà utilisé");
+        }
+
+        // Marquer OTP comme utilisé
+        otpToken.setIsUsed(true);
+        otpTokenRepository.save(otpToken);
+
+        log.info("OTP validated for: {}", email);
+        return true;
+    }
+
+    private String generateOtpCode() {
+        int otp = 100000 + SECURE_RANDOM.nextInt(900000);
+        return String.valueOf(otp);
+    }
+}
