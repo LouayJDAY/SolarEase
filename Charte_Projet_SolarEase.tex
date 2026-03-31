@@ -1,0 +1,916 @@
+\documentclass[12pt,a4paper,french]{report}
+
+\usepackage[utf-8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{listings}
+\usepackage{array}
+\usepackage{datetime}
+\usepackage{float}
+
+% Configuration de la géométrie
+\geometry{
+    left=2cm,
+    right=2cm,
+    top=2.5cm,
+    bottom=2.5cm,
+    headheight=15pt
+}
+
+% Couleurs du projet
+\definecolor{SolarBlue}{RGB}{0, 112, 192}
+\definecolor{SolarGreen}{RGB}{34, 139, 34}
+\definecolor{SolarOrange}{RGB}{255, 140, 0}
+\definecolor{DarkGray}{RGB}{64, 64, 64}
+\definecolor{LightGray}{RGB}{240, 240, 240}
+
+% Configuration du header et footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Charte du Projet SolarEase}
+\fancyhead[R]{\small Version 1.0}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0.5pt}
+
+% Configuration des sections
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]{\Large\bfseries\color{SolarBlue}}{\thechapter.}{10pt}{}
+\titleformat{\section}[hang]{\large\bfseries\color{SolarBlue}}{\thesection.}{10pt}{}
+\titleformat{\subsection}[hang]{\normalsize\bfseries\color{DarkGray}}{\thesubsection.}{10pt}{}
+
+% Configuration des listes
+\usepackage{enumitem}
+\setlist[itemize]{label=\textbullet, leftmargin=2em}
+\setlist[enumerate]{leftmargin=2em}
+
+% Configuration du code
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    breakatwhitespace=true,
+    frame=single,
+    backgroundcolor=\color{LightGray},
+    keywordstyle=\color{SolarBlue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{SolarGreen},
+    columns=flexible,
+    numbers=left,
+    numberstyle=\tiny,
+    tabsize=4
+}
+
+% Nouvelle commande pour les boîtes de contenu
+\newcommand{\boitetitre}[1]{
+    \colorbox{SolarBlue}{\begin{minipage}{\textwidth}
+    \textcolor{white}{\textbf{#1}}
+    \end{minipage}}
+}
+
+\newcommand{\boxcontent}[2]{
+    \begin{table}[H]
+    \centering
+    \begin{tabularx}{\textwidth}{|X|}
+    \hline
+    \rowcolor{LightGray}
+    \textbf{#1} \\
+    \hline
+    #2 \\
+    \hline
+    \end{tabularx}
+    \end{table}
+}
+
+%================= DÉBUT DU DOCUMENT =================
+
+\begin{document}
+
+% =========== PAGE DE TITRE ===========
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    % Logo ou titre principal
+    \begin{tikzpicture}
+        \draw[fill=SolarBlue,draw=SolarGreen, line width=2pt] (0,0) rectangle (6,2);
+        \node at (3,1) {\huge\textcolor{white}{\textbf{SOLAREASE}}};
+    \end{tikzpicture}
+    
+    \vspace{1.5cm}
+    
+    {\Large \textbf{\textcolor{SolarBlue}{CHARTE DE PROJET}}}
+    
+    \vspace{2cm}
+    
+    {\LARGE \textbf{Plateforme de Gestion Intelligente}}
+    
+    \vspace{0.5cm}
+    
+    {\LARGE \textbf{de l'Énergie Solaire}}
+    
+    \vspace{3cm}
+    
+    \begin{tabularx}{\textwidth}{|X|X|}
+    \hline
+    \rowcolor{LightGray}
+    \textbf{Version} & 1.0 \\
+    \hline
+    \textbf{Date} & \today \\
+    \hline
+    \textbf{Statut} & Approuvé \\
+    \hline
+    \textbf{Classification} & Confidentiel \\
+    \hline
+    \end{tabularx}
+    
+    \vspace{3cm}
+    
+    \begin{tabularx}{\textwidth}{|l|X|}
+    \hline
+    \rowcolor{LightGray}
+    \multicolumn{2}{|c|}{\textbf{INFORMATIONS DE CONTACT}} \\
+    \hline
+    \textbf{Chef de Projet} & À compléter \\
+    \hline
+    \textbf{Sponsor} & À compléter \\
+    \hline
+    \textbf{Responsable Technique} & À compléter \\
+    \hline
+    \end{tabularx}
+    
+    \vfill
+    
+    {\small Année Académique : 2025-2026}
+\end{titlepage}
+
+% =========== TABLE DES MATIÈRES ===========
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+
+% =========== CHAPITRE 1: INTRODUCTION ===========
+\chapter{Introduction}
+
+\section{Contexte du Projet}
+
+SolarEase est une plateforme intégrée de gestion intelligente de l'énergie solaire, conçue pour optimiser l'utilisation des installations photovoltaïques. Le projet répond à une demande croissante de solutions numériques dans le secteur des énergies renouvelables, en particulier pour la gestion, le dimensionnement et le suivi des projets solaires.
+
+\subsection{Présentation du Projet PFE}
+
+Mon projet principal est SolarEase, réalisé dans le cadre de mon PFE. C'est une plateforme de dimensionnement solaire construite en architecture microservices avec Spring Boot côté backend et React/TypeScript côté frontend. J'y ai travaillé sur l'authentification, les APIs REST, la logique métier de dimensionnement, et l'expérience utilisateur entre espace client et espace installateur. J'ai aussi contribué à l'intégration de l'IA avec une approche RAG, pour enrichir les recommandations techniques et financières à partir d'une base de connaissances. L'objectif était d'aider à la décision avec des réponses plus pertinentes et contextualisées.
+
+\textbf{Déploiement en production} : Le frontend a été déployé avec \textbf{Vercel}, offrant une distribution globale et des performances optimales. Le backend et la base de données ont été déployés sur \textbf{Railway}, assurant une infrastructure cloud stable et scalable pour les services microservices.
+
+\subsection{Enjeux}
+
+\begin{itemize}
+    \item \textbf{Énergétique} : Optimiser la production et la consommation d'énergie solaire
+    \item \textbf{Économique} : Réduire les coûts opérationnels et améliorer le ROI
+    \item \textbf{Environnemental} : Promouvoir l'adoption des énergies renouvelables
+    \item \textbf{Technologique} : Fournir une solution moderne et scalable
+\end{itemize}
+
+\section{Vision et Objectifs du Projet}
+
+\subsection{Vision}
+
+Devenir la plateforme de référence pour la gestion intelligente et intégrée des installations solaires, offrant des outils puissants et intuitifs aux professionnels et aux gestionnaires d'énergie.
+
+\subsection{Objectifs Globaux}
+
+\begin{enumerate}
+    \item Créer une application web moderne et ergonomique
+    \item Développer des services microservices robustes et scalables
+    \item Implémenter des fonctionnalités avancées de dimensionnement solaire
+    \item Assurer la sécurité et l'authenticité des utilisateurs
+    \item Permettre la gestion complète du cycle de vie des projets solaires
+\end{enumerate}
+
+% =========== CHAPITRE 2: DÉFINITION DU PROJET ===========
+\chapter{Définition du Projet}
+
+\section{Périmètre du Projet}
+
+\subsection{Inclusions}
+
+\boitetitre{Composants Inclus}
+
+\begin{itemize}
+    \item \textbf{Frontend} : Application web React avec interface utilisateur moderne
+    \item \textbf{Backend} : Architecture microservices (4 services + Gateway)
+    \item \textbf{Authentification} : Système d'authentification JWT sécurisé
+    \item \textbf{Base de données} : PostgreSQL pour la persistance des données
+    \item \textbf{Infrastructure} : Dockerisation et déploiement containerisé
+    \item \textbf{Documentation} : API REST, guides utilisateurs, documentation technique
+\end{itemize}
+
+\subsection{Exclusions}
+
+\begin{itemize}
+    \item Installation physique des panneaux solaires
+    \item Support hardware des capteurs IoT en phase 1
+    \item Intégration avec des systèmes tiers (calendrier, facturations externes, etc.)
+    \item Formation avancée pour utilisateurs externes (phase 2)
+\end{itemize}
+
+\section{Description des Composantes}
+
+\subsection{Architecture Technique}
+
+SolarEase est basée sur une architecture microservices moderne avec les composantes suivantes :
+
+\subsubsection{1. Frontend - React Application}
+
+\begin{itemize}
+    \item \textbf{Framework} : React 18+ avec Vite
+    \item \textbf{Design System} : Material-UI (MUI) + Radix UI
+    \item \textbf{Styling} : Tailwind CSS, PostCSS
+    \item \textbf{Gestion d'État} : Context API avec React Hooks
+    \item \textbf{Type Safety} : TypeScript
+    \item \textbf{Build Tool} : Vite pour performances optimales
+\end{itemize}
+
+\subsubsection{2. Services Microservices (Java Spring Boot)}
+
+\paragraph{a) Gateway Service}
+\begin{itemize}
+    \item Point d'entrée unique pour tous les appels API
+    \item Gestion du routage vers les différents services
+    \item Contrôle des autorisations et middleware
+    \item Version : 1.0.0
+\end{itemize}
+
+\paragraph{b) Identity Service}
+\begin{itemize}
+    \item Gestion de l'authentification et autorisation
+    \item Gestion des utilisateurs et des rôles
+    \item Génération et validation des tokens JWT
+    \item Version : 1.0.0
+\end{itemize}
+
+\paragraph{c) Dimensioning Service}
+\begin{itemize}
+    \item Calculs avancés de dimensionnement solaire
+    \item Analyse des toitures et orientations
+    \item Estimations de production énergétique
+    \item Optimisation des configurations
+    \item Version : 1.0.0
+\end{itemize}
+
+\paragraph{d) Project Service}
+\begin{itemize}
+    \item Gestion du cycle de vie des projets
+    \item Gestion des équipements et installations
+    \item Suivi des clients et contrats
+    \item Gestion des statuts et historique
+    \item Version : 1.0.0
+\end{itemize}
+
+\subsubsection{3. Infrastructure}
+
+\begin{itemize}
+    \item \textbf{Containerization} : Docker et Docker Compose
+    \item \textbf{Base de données} : PostgreSQL
+    \item \textbf{Runtime} : Java 17 (services backend)
+    \item \textbf{Node.js} : v18+ (frontend)
+\end{itemize}
+
+\section{Livrables Principaux}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{\textwidth}{|l|l|X|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{N°} & \textbf{Livrable} & \textbf{Description} & \textbf{Statut} \\
+\hline
+1 & Application Frontend & Interface web complète SolarEase & En cours \\
+\hline
+2 & Gateway Service & Service de routage API & Complété \\
+\hline
+3 & Identity Service & Service d'authentification & Complété \\
+\hline
+4 & Dimensioning Service & Service de calcul solaire & Complété \\
+\hline
+5 & Project Service & Service de gestion de projets & Complété \\
+\hline
+6 & Base de données & Schéma PostgreSQL complet & Complété \\
+\hline
+7 & Documentation API & Spécifications OpenAPI/Swagger & En cours \\
+\hline
+8 & Documentation Technique & Guides d'installation et déploiement & Complété \\
+\hline
+9 & Tests d'Intégration & Suite complète de tests unitaires & Complété \\
+\hline
+10 & Guide Utilisateur & Documentation fonctionnelle & Planifié \\
+\hline
+\end{tabularx}
+}
+\end{table}
+
+% =========== CHAPITRE 3: ORGANISATION ===========
+\chapter{Organisation du Projet}
+
+\section{Structure Organisationnelle}
+
+\subsection{Rôles et Responsabilités}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\rowcolor{LightGray}
+\textbf{Rôle} & \textbf{Responsabilités} & \textbf{Titulaire} \\
+\hline
+\textbf{Chef de Projet} & Pilotage général, gestion des risques, coordination & À désigner \\
+\hline
+\textbf{Sponsor Exécutif} & Approbation des décisions majeures, budget & À désigner \\
+\hline
+\textbf{Architecte Technique} & Architecture, décisions techniques majeures & Équipe Dev \\
+\hline
+\textbf{Lead Developer Frontend} & Supervision frontend, qualité code UI/UX & Équipe Frontend \\
+\hline
+\textbf{Lead Developer Backend} & Supervision services, architecture microservices & Équipe Backend \\
+\hline
+\textbf{Responsable QA} & Tests, qualité, documentation tests & Équipe QA \\
+\hline
+\textbf{DevOps Engineer} & Déploiement, infrastructure, CI/CD & Équipe Ops \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Structure du Projet}
+
+\subsection{Packages et Dépendances}
+
+Le projet est organisé selon cette structure :
+
+\begin{lstlisting}[language=bash]
+projetPfe/
+├── Design Authentication Flow/         # Prototype authentification
+│   └── src/app/pages/
+├── SolarEase Web App Design/           # Application React principale
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── app/
+│   │   │   ├── components/
+│   │   │   ├── pages/
+│   │   │   ├── services/
+│   │   │   └── context/
+│   │   └── styles/
+│   └── package.json
+├── gateway-service/                     # API Gateway Spring Boot
+│   └── pom.xml
+├── identity-service/                    # Service d'authentification
+│   └── pom.xml
+├── dimensioning-service/                # Service de dimensionnement
+│   └── pom.xml
+├── project-service/                     # Service de gestion projets
+│   └── pom.xml
+└── init.sql/                            # Initialisation DB PostgreSQL
+\end{lstlisting}
+
+% =========== CHAPITRE 4: PLANNING ===========
+\chapter{Planning et Échéancier}
+
+\section{Phases du Projet}
+
+\subsection{Phase 1 : Préparation et Setup (Semaines 1-2)}
+
+\begin{itemize}
+    \item Mise en place de l'environnement de développement
+    \item Configuration des outils et infrastructure
+    \item Réunion de lancement et alignement
+    \item Définition des conventions de code
+\end{itemize}
+
+\subsection{Phase 2 : Développement Backend (Semaines 2-6)}
+
+\begin{itemize}
+    \item Implémentation de Gateway Service
+    \item Implémentation de Identity Service
+    \item Implémentation de Dimensioning Service
+    \item Implémentation de Project Service
+    \item Tests unitaires et d'intégration
+\end{itemize}
+
+\subsection{Phase 3 : Développement Frontend (Semaines 4-8)}
+
+\begin{itemize}
+    \item Implémentation des pages d'authentification
+    \item Développement de l'interface utilisateur
+    \item Intégration avec les APIs backend
+    \item Tests de l'interface et UX
+\end{itemize}
+
+\subsection{Phase 4 : Intégration et Tests (Semaines 7-9)}
+
+\begin{itemize}
+    \item Tests d'intégration système complets
+    \item Tests de performance et charge
+    \item Corrective des bugs identifiés
+    \item Tests de sécurité
+\end{itemize}
+
+\subsection{Phase 5 : Déploiement et Livraison (Semaines 9-10)}
+
+\begin{itemize}
+    \item Mise en production de l'application
+    \item Documentation finale
+    \item Formation utilisateurs
+    \item Support initial
+\end{itemize}
+
+\section{Calendrier Détaillé}
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabularx}{\textwidth}{|l|l|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Jalons} & \textbf{Dates} & \textbf{Livrables} & \textbf{Statut} \\
+\hline
+Kick-off & Week 1 & Charter approuvée & ✓ \\
+\hline
+Setup Environnement & Week 2 & Stack complète opérationnelle & ✓ \\
+\hline
+Backend v1 & Week 6 & Services testés et documentés & ✓ \\
+\hline
+Frontend v1 & Week 8 & Pages principales intégrées & En cours \\
+\hline
+Intégration Complète & Week 9 & Tests d'intégration passés & Planifié \\
+\hline
+Mise en Production & Week 10 & Application en production & Planifié \\
+\hline
+\end{tabularx}
+}
+\end{table}
+
+% =========== CHAPITRE 5: RESSOURCES ===========
+\chapter{Ressources et Budget}
+
+\section{Ressources Humaines}
+
+\subsection{Équipe}
+
+\begin{itemize}
+    \item \textbf{1 Chef de Projet} : Pilotage et suivi
+    \item \textbf{2 Développeurs Frontend} : React, TypeScript, UI/UX
+    \item \textbf{2 Développeurs Backend} : Java, Spring Boot, Microservices
+    \item \textbf{1 DevOps} : Docker, déploiement, infrastructure
+    \item \textbf{1 Testeur QA} : Tests et validation
+    \item \textbf{1 Architecte Technique} : Conseil et validation architectural
+\end{itemize}
+
+\subsection{Compétences Requises}
+
+\begin{itemize}
+    \item \textbf{Frontend} : React, TypeScript, Material-UI, Tailwind CSS
+    \item \textbf{Backend} : Java 17, Spring Boot, Spring Cloud, JPA/Hibernate
+    \item \textbf{DevOps} : Docker, Docker Compose, PostgreSQL
+    \item \textbf{Tests} : JUnit, Mockito, Selenium (si nécessaire)
+    \item \textbf{Méthodologies} : Agile, Git/GitHub, CI/CD
+\end{itemize}
+
+\section{Ressources Technologiques}
+
+\subsection{Stack Technique}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Domaine} & \textbf{Technologie} & \textbf{Version} \\
+\hline
+\textbf{Frontend} & React & 18.x \\
+\hline
+ & TypeScript & 5.x \\
+\hline
+ & Material-UI & 7.3.5 \\
+\hline
+ & Tailwind CSS & Latest \\
+\hline
+ & Vite & Latest \\
+\hline
+\textbf{Backend} & Java & 17 \\
+\hline
+ & Spring Boot & 3.2.1 \\
+\hline
+ & Spring Cloud & 2023.0.0 \\
+\hline
+\textbf{Database} & PostgreSQL & 13+ \\
+\hline
+\textbf{DevOps} & Docker & 24.x \\
+\hline
+ & Docker Compose & 2.x \\
+\hline
+\textbf{Outils} & Maven & 3.8+ \\
+\hline
+ & npm & 10.x \\
+\hline
+ & Git & 2.40+ \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Budget Estimé}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Catégorie} & \textbf{Description} & \textbf{Coût Unitaire} & \textbf{Total} \\
+\hline
+\textbf{Ressources Humaines} & 8 personnes × 10 semaines & Variable & Voir détails \\
+\hline
+\textbf{Infrastructure} & Serveurs, hosting cloud & À définir & À définir \\
+\hline
+\textbf{Outils Logiciels} & Licences, services cloud & À définir & À définir \\
+\hline
+\textbf{Formation} & Formation équipe & À définir & À définir \\
+\hline
+\textbf{Contingence} & Réserve (15\%) & À définir & À définir \\
+\hline
+\textbf{TOTAL} & & & À définir \\
+\hline
+\end{tabularx}
+\end{table}
+
+% =========== CHAPITRE 6: RISQUES ===========
+\chapter{Gestion des Risques}
+
+\section{Identification des Risques}
+
+\subsection{Risques Techniques}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Risque} & \textbf{Probabilité} & \textbf{Impact} & \textbf{Mitigation} \\
+\hline
+Problèmes de performance & Moyenne & Élevé & Optimisation, load testing \\
+\hline
+Sécurité des données & Moyenne & Critique & Audit sécu, chiffrement \\
+\hline
+Incompatibilité API & Faible & Moyen & Tests d'intégration précoce \\
+\hline
+Scalabilité insuffisante & Faible & Élevé & Architecture microservices \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Risques Organisationnels}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Risque} & \textbf{Probabilité} & \textbf{Impact} & \textbf{Mitigation} \\
+\hline
+Manque de ressources & Faible & Élevé & Planification claire, buffer \\
+\hline
+Retards d'équipe & Moyenne & Moyen & Suivi régulier, Agile \\
+\hline
+Communication insuffisante & Moyenne & Moyen & Réunions régulières \\
+\hline
+Turnover d'équipe & Faible & Critique & Engagement, documentation \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Stratégies d'Atténuation}
+
+\begin{itemize}
+    \item \textbf{Technique} : Code reviews, tests automatisés, documentation
+    \item \textbf{Processus} : Sprints courts, retrospectives, amélioration continue
+    \item \textbf{Communication} : Daily standups, sprint reviews, stakeholder updates
+    \item \textbf{Qualité} : QA rigoureuse, performance tests, security audits
+\end{itemize}
+
+% =========== CHAPITRE 7: QUALITÉ ===========
+\chapter{Assurance Qualité}
+
+\section{Critères de Qualité}
+
+\subsection{Code}
+
+\begin{itemize}
+    \item \textbf{Coverage} : Minimum 80\% de couverture de tests
+    \item \textbf{Complexité} : Cyclomatic complexity < 10
+    \item \textbf{Duplication} : < 5\% code dupliqué
+    \item \textbf{Standards} : Respect des conventions de code
+\end{itemize}
+
+\subsection{Performance}
+
+\begin{itemize}
+    \item \textbf{Temps de réponse} : < 500ms pour la majorité des requests
+    \item \textbf{Disponibilité} : SLA 99.5\%
+    \item \textbf{Scalabilité} : Support de 1000+ utilisateurs simultanés
+\end{itemize}
+
+\subsection{Sécurité}
+
+\begin{itemize}
+    \item \textbf{Authentification} : JWT tokens sécurisés
+    \item \textbf{Autorisation} : RBAC (Role-Based Access Control)
+    \item \textbf{Encryption} : HTTPS/TLS, données chiffrées en transit et au repos
+    \item \textbf{Validation} : Validation des inputs, protection SQL injection
+\end{itemize}
+
+\section{Stratégie de Tests}
+
+\subsection{Tests Unitaires}
+
+\begin{itemize}
+    \item Chaque composant React testé avec Jest et React Testing Library
+    \item Chaque service Java testé avec JUnit et Mockito
+    \item Objectif : 80\%+ coverage
+\end{itemize}
+
+\subsection{Tests d'Intégration}
+
+\begin{itemize}
+    \item Tests des flux complets API
+    \item Tests de l'intégration frontend-backend
+    \item Tests de la base de données
+\end{itemize}
+
+\subsection{Tests de Performance}
+
+\begin{itemize}
+    \item Load testing avec JMeter
+    \item Profiling des endpoints critiques
+    \item Optimisation des requêtes DB
+\end{itemize}
+
+\subsection{Tests de Sécurité}
+
+\begin{itemize}
+    \item Audit de sécurité du code
+    \item Tests de pénétration
+    \item Validation des tokens JWT
+    \item Tests d'autorisation
+\end{itemize}
+
+% =========== CHAPITRE 8: COMMUNICATION ===========
+\chapter{Communication et Gouvernance}
+
+\section{Plan de Communication}
+
+\subsection{Réunions Régulières}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|l|X|}
+\hline
+\rowcolor{LightGray}
+\textbf{Réunion} & \textbf{Fréquence} & \textbf{Durée} & \textbf{Participants} \\
+\hline
+Daily Standup & Quotidienne & 15 min & Équipe complète \\
+\hline
+Sprint Planning & Bi-hebdomadaire & 2h & Équipe + PM \\
+\hline
+Sprint Review & Bi-hebdomadaire & 1h & Équipe + Stakeholders \\
+\hline
+Sprint Retrospective & Bi-hebdomadaire & 1h & Équipe \\
+\hline
+Status Report & Hebdomadaire & 30 min & PM + Sponsor \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Escalade des Problèmes}
+
+\begin{enumerate}
+    \item \textbf{Niveau 1} : Équipe de développement (résolution dans 24h)
+    \item \textbf{Niveau 2} : Chef de Projet + Tech Lead (résolution dans 48h)
+    \item \textbf{Niveau 3} : Sponsor + Architecte (résolution immédiate)
+\end{enumerate}
+
+\section{Documentation}
+
+\begin{itemize}
+    \item \textbf{Wiki du projet} : Confluence ou GitHub Wiki
+    \item \textbf{API Documentation} : Swagger/OpenAPI
+    \item \textbf{Code Documentation} : Javadoc, JSDoc, README
+    \item \textbf{Guides utilisateurs} : Manuels PDF et vidéos
+    \item \textbf{Architecture Documentation} : Diagrammes C4, ADRs
+\end{itemize}
+
+% =========== CHAPITRE 9: SUCCÈS ===========
+\chapter{Critères de Succès}
+
+\section{Objectifs Mesurables}
+
+\subsection{Fonctionnalité}
+
+\begin{itemize}
+    \item ✓ Tous les user stories planifiés implémentés
+    \item ✓ API conformes aux spécifications OpenAPI
+    \item ✓ Authentification fonctionnelle et sécurisée
+    \item ✓ Dimensionnement solaire opérationnel
+    \item ✓ Gestion de projets complète
+\end{itemize}
+
+\subsection{Qualité}
+
+\begin{itemize}
+    \item ✓ 80\%+ couverture de tests
+    \item ✓ 0 bugs critiques en production
+    \item ✓ Performance < 500ms en moyenne
+    \item ✓ Disponibilité 99.5\%
+\end{itemize}
+
+\subsection{Délais}
+
+\begin{itemize}
+    \item ✓ Livraison en production dans les 10 semaines
+    \item ✓ Respect du budget alloué
+    \item ✓ Aucun dépassement majeur
+\end{itemize}
+
+\subsection{Satisfaction}
+
+\begin{itemize}
+    \item ✓ Satisfaction utilisateur ≥ 8/10
+    \item ✓ Aucune blocage critique signalé
+    \item ✓ Documentation complète et satisfaisante
+\end{itemize}
+
+% =========== CHAPITRE 10: SIGNATURE ===========
+\chapter*{Approbations}
+
+\vspace{2cm}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|l|}
+\hline
+\rowcolor{LightGray}
+\textbf{Rôle} & \textbf{Signature} & \textbf{Date} \\
+\hline
+Chef de Projet & & \\
+\hline
+ & & \\
+\hline
+Sponsor Exécutif & & \\
+\hline
+ & & \\
+\hline
+Architecte Technique & & \\
+\hline
+ & & \\
+\hline
+Responsable QA & & \\
+\hline
+ & & \\
+\hline
+\end{tabularx}
+\end{table}
+
+\vspace{1cm}
+
+\noindent Date d'approbation finale : \underline{\hspace{4cm}}
+
+% =========== ANNEXES ===========
+\appendix
+
+\chapter{Glossaire}
+
+\begin{description}
+    \item[API] Application Programming Interface
+    \item[JWT] JSON Web Token
+    \item[REST] Representational State Transfer
+    \item[RBAC] Role-Based Access Control
+    \item[QA] Quality Assurance
+    \item[SLA] Service Level Agreement
+    \item[DevOps] Development and Operations
+    \item[CI/CD] Continuous Integration/Continuous Deployment
+    \item[ROI] Return on Investment
+    \item[UI/UX] User Interface/User Experience
+\end{description}
+
+\chapter{Références et Documentation}
+
+\section{Documentation Technique}
+
+\begin{itemize}
+    \item Spring Boot Official Documentation : \url{https://spring.io/projects/spring-boot}
+    \item React Documentation : \url{https://react.dev}
+    \item Material-UI Documentation : \url{https://mui.com}
+    \item PostgreSQL Documentation : \url{https://www.postgresql.org/docs}
+    \item Docker Documentation : \url{https://docs.docker.com}
+\end{itemize}
+
+\section{Fichiers de Projet}
+
+\begin{itemize}
+    \item Repository GitHub : À compléter
+    \item Figma Design : \url{https://www.figma.com/design/8OrQuigMzGUMzQadYRmksk/SolarEase-Web-App-Design}
+    \item Jira/Trello Board : À compléter
+    \item Wiki/Confluence : À compléter
+\end{itemize}
+
+\chapter{API REST Endpoints}
+
+\section{Gateway Service}
+
+\begin{lstlisting}[language=bash]
+BASE_URL: http://localhost:8080/api
+
+Authentication:
+  POST   /auth/login          - Connexion utilisateur
+  POST   /auth/register       - Inscription nouvel utilisateur
+  POST   /auth/refresh        - Rafraîchir token JWT
+  POST   /auth/verify-otp     - Vérifier code OTP
+
+Identity Service:
+  GET    /users/{id}          - Récupérer profil utilisateur
+  PUT    /users/{id}          - Mettre à jour profil
+  GET    /users               - Lister tous les utilisateurs
+  POST   /roles               - Créer nouveau rôle
+
+Dimensioning Service:
+  POST   /dimensioning/calculate        - Calculer dimensionnement
+  GET    /dimensioning/project/{id}     - Récupérer dimensionnements d'un projet
+  GET    /dimensioning/{id}             - Récupérer dimensionnement spécifique
+
+Project Service:
+  POST   /projects            - Créer nouveau projet
+  GET    /projects            - Lister tous les projets
+  GET    /projects/{id}       - Détails d'un projet
+  PUT    /projects/{id}       - Mettre à jour projet
+  GET    /clients             - Lister les clients
+  POST   /clients             - Ajouter nouveau client
+  GET    /equipment           - Lister les équipements
+\end{lstlisting}
+
+\chapter{Exigences Non-Fonctionnelles}
+
+\section{Performance}
+
+\begin{itemize}
+    \item Temps de chargement initial de l'app < 3 secondes
+    \item Temps de réponse API < 500ms (95e percentile)
+    \item Support concurrent : 1000+ utilisateurs simultanés
+    \item Throughput : 500+ requests/seconde
+\end{itemize}
+
+\section{Disponibilité}
+
+\begin{itemize}
+    \item SLA : 99.5\% uptime
+    \item RTO (Recovery Time Objective) : < 1 heure
+    \item RPO (Recovery Point Objective) : < 15 minutes
+    \item Backup automatique : Quotidien
+\end{itemize}
+
+\section{Maintenabilité}
+
+\begin{itemize}
+    \item Code modulaire et découplé
+    \item Convention de nommage consistent
+    \item Documentation en ligne
+    \item Tests automatisés
+\end{itemize}
+
+\section{Évolutivité}
+
+\begin{itemize}
+    \item Architecture microservices horizontalement scalable
+    \item Base de données optimisée pour croissance
+    \item Caching stratégique (Redis si nécessaire)
+    \item Load balancing en place
+\end{itemize}
+
+\section{Intégration de la Gestion des Ressources d'Architecture (RAG)}
+
+L'intégration de la gestion des ressources d'architecture (RAG) dans le service de dimensionnement permet d'optimiser l'utilisation des ressources tout au long du processus de dimensionnement solaire. Cela inclut :
+
+\begin{itemize}
+    \item \textbf{Planification des Ressources} : Évaluation des besoins en ressources pour chaque projet de dimensionnement.
+    \item \textbf{Suivi des Ressources} : Outils pour suivre l'utilisation des ressources en temps réel.
+    \item \textbf{Optimisation des Ressources} : Stratégies pour maximiser l'efficacité des ressources allouées.
+    \item \textbf{Rapports et Analyses} : Génération de rapports réguliers sur l'état des ressources et leur utilisation.
+\end{itemize}
+
+Cette intégration vise à garantir que les projets de dimensionnement sont réalisés de manière efficace et avec un minimum de gaspillage de ressources.
+
+\end{document}
