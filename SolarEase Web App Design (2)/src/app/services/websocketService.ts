@@ -1,7 +1,9 @@
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "http://localhost:8080/ws";
+const WS_URL =
+  import.meta.env.VITE_WS_URL ??
+  (import.meta.env.DEV ? "http://localhost:8080/ws" : `${window.location.origin}/ws`);
 
 let stompClient: Client | null = null;
 /** Subscriptions created after STOMP CONNECTED — cleared on disconnect */
