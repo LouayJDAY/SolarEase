@@ -1,0 +1,51 @@
+@startuml seq-recommandations-ia
+title Diagramme de séquence -- Recommandations IA (RAG hybride pgvector)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Installateur"                  as User
+participant "Frontend"                as FE
+participant "API Gateway"             as GW
+participant "DecisionSupportService"  as DSS
+participant "EquipmentSelectionService\n+ CompatibilityRuleEngine" as ESV
+participant "EmbeddingService\n(Ollama nomic-embed-text)" as ES
+database    "PostgreSQL\n+ pgvector"  as PG
+participant "Ollama LLM\n(local:11434)" as LLM
+
+User -> FE  : Cliquer « Recommandations IA »
+FE   -> GW  : POST /api/dimensioning/{id}/ai/regenerate (JWT)
+GW   -> DSS : Forward
+
+DSS  -> ESV : Sélection déterministe\n(kWc, monophasé/triphasé)
+ESV --> DSS : Onduleur Solax/Sungrow\n+ câbles + disjoncteurs Schneider\n+ score / verdict
+
+DSS  -> ES  : embed(\"installation 5 kWc\nmonophasé Tunis ...\")
+ES  --> DSS : vector[768]
+
+DSS  -> PG  : SELECT content, metadata\nORDER BY embedding <=> $1\nLIMIT 5
+PG  --> DSS : Top-K chunks\n(catalogue société, NFC 33-209,\nSTEG/ANME)
+
+DSS  -> LLM : POST /api/generate\n(prompt = kit + chunks + JSON schema)
+LLM --> DSS : JSON {alerts, clientArguments,\nterrainChecklist, narrative}
+
+DSS  -> DSS : Fusion verdict déterministe\n+ enrichissement LLM
+DSS --> GW  : 200 OK + InstallerRecommendationDto
+GW  --> FE  : 200 + JSON structuré
+FE  --> User : Afficher kit, score,\nalertes, arguments client
+
+alt Ollama indisponible
+    LLM --> DSS : timeout / erreur
+    DSS --> GW  : 200 OK\n(fallback déterministe, fallback=true)
+    GW  --> FE  : 200 + kit sans narratif IA
+    FE  --> User : Afficher kit + bandeau\n« Mode hors-ligne »
+end
+
+@enduml

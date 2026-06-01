@@ -1,0 +1,74 @@
+@startuml uc-client-sinscrire
+title Diagramme de cas d'utilisation -- Client s'inscrit (Sprint 1)
+
+left to right direction
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+    BackgroundColor    #FAFAFA
+    BorderColor        #2C5282
+    ArrowColor         #2C5282
+    FontName           "Helvetica"
+}
+skinparam actor {
+    BackgroundColor    #E8F0FE
+    BorderColor        #2C5282
+}
+skinparam note {
+    BackgroundColor    #FFF8DC
+    BorderColor        #B0BEC5
+}
+
+actor "Visiteur / Client"      as Client
+actor "Service\nE-mail (SMTP)" as Mailer <<système>>
+
+rectangle "Identity Service -- Inscription Client" {
+    usecase "S'inscrire"                       as UC_Register
+    usecase "Vérifier le code OTP"             as UC_VerifyOtp
+    usecase "Demander le renvoi\nd'un OTP"     as UC_ResendOtp
+    usecase "Se connecter"                     as UC_Login
+}
+
+Client --> UC_Register
+Client --> UC_VerifyOtp
+Client --> UC_ResendOtp
+Client --> UC_Login
+
+UC_Register  --> Mailer
+UC_ResendOtp --> Mailer
+
+note right of UC_Register
+  POST /api/auth/register
+  Champs : firstName, lastName,
+  email, phone, password.
+  Le service valide les données,
+  vérifie l'unicité de l'e-mail,
+  hashe le mot de passe (BCrypt),
+  affecte le rôle CLIENT,
+  génère un OTP et l'envoie
+  par e-mail.
+end note
+
+note right of UC_VerifyOtp
+  POST /api/auth/verify-otp
+  Précondition : OTP non expiré (TTL 10 min).
+  Postcondition : compte activé,
+  redirection vers /login.
+end note
+
+note bottom of UC_ResendOtp
+  POST /api/auth/resend-otp
+  Anti-flood : 1 demande / 60 s.
+  Invalide l'ancien OTP et en envoie
+  un nouveau par e-mail.
+end note
+
+note bottom of UC_Login
+  POST /api/auth/login
+  Le compte doit avoir été activé via
+  la vérification de l'OTP, sinon
+  la connexion est refusée.
+end note
+
+@enduml

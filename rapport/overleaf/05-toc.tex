@@ -1,0 +1,61 @@
+% ============================================================
+%  05-toc.tex  —  Sommaire + Listes + Abréviations
+% ============================================================
+
+% Sommaire automatique
+\tableofcontents
+\cleardoublepage
+
+% Liste des figures
+\listoffigures
+\addcontentsline{toc}{chapter}{Liste des figures}
+\cleardoublepage
+
+% Liste des tableaux
+\listoftables
+\addcontentsline{toc}{chapter}{Liste des tableaux}
+\cleardoublepage
+
+% Liste des abréviations
+\chapterstar{Liste des Abréviations}
+\thispagestyle{fancy}
+
+\vspace*{-0.5cm}
+{\small
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.1}
+
+\begin{tabular}{p{1.8cm} p{11cm}}
+\toprule
+\textbf{Sigle} & \textbf{Signification} \\
+\midrule
+API    & Application Programming Interface \\
+CRUD   & Create, Read, Update, Delete \\
+DB     & Database (Base de données) \\
+DTO    & Data Transfer Object \\
+DSI    & Développement des Systèmes d'Information \\
+HTTP   & HyperText Transfer Protocol \\
+IA     & Intelligence Artificielle \\
+ISET   & Institut Supérieur des Études Technologiques \\
+JSON   & JavaScript Object Notation \\
+JWT    & JSON Web Token \\
+kWh    & Kilowatt-heure \\
+kWp    & Kilowatt-crête \\
+LLM    & Large Language Model \\
+OTP    & One-Time Password \\
+PDF    & Portable Document Format \\
+PFE    & Projet de Fin d'Études \\
+PVGIS  & Photovoltaic Geographical Information System \\
+REST   & Representational State Transfer \\
+ROI    & Return on Investment \\
+SQL    & Structured Query Language \\
+STEG   & Société Tunisienne de l'Électricité et du Gaz \\
+TND    & Dinar Tunisien \\
+UI     & User Interface \\
+UML    & Unified Modeling Language \\
+WIP    & Work In Progress \\
+\bottomrule
+\end{tabular}
+}
+
+\cleardoublepage

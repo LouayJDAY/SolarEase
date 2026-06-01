@@ -6,5 +6,7 @@ public enum EquipmentType {
     INVERTER,
     BATTERY,
     MOUNTING_SYSTEM,
-    CABLE
+    CABLE,
+    CIRCUIT_BREAKER_DC,
+    CIRCUIT_BREAKER_AC
 }

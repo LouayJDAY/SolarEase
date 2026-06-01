@@ -47,6 +47,11 @@ public class DimensioningController {
         return dimensioningService.getDimensioningById(id);
     }
 
+    @PostMapping("/{id}/ai/regenerate")
+    public DimensioningResponse regenerateAi(@PathVariable Long id) {
+        return dimensioningService.regenerateRecommendation(id);
+    }
+
     @GetMapping("/{id}/pdf")
     public ResponseEntity<Resource> downloadPdf(@PathVariable Long id) {
         ByteArrayInputStream pdfStream = dimensioningService.getDimensioningPdfReport(id);

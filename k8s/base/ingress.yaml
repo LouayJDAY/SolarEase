@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solarease-ingress
+  namespace: solarease
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/websocket-services: "gateway-service"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: solarease.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port: { number: 8080 }
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port: { number: 8080 }

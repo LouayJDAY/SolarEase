@@ -1,0 +1,55 @@
+@startuml seq-dimensionnement
+title Diagramme de séquence -- Lancer le dimensionnement
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Installateur"    as User
+participant "Frontend\n(React)"            as FE
+participant "API Gateway"                   as GW
+participant "DimensioningController"        as DC
+participant "DimensioningService"           as DS
+participant "PvgisClient"                   as PV
+participant "NightPanelCalculator"          as NP
+participant "DimensioningRepository"        as DR
+database  "PostgreSQL"                      as DB
+participant "PVGIS\n(external)"            as PVGIS
+
+User -> FE : Saisir consommation\n(appareils, kWh/j)
+User -> FE : Choisir localisation
+FE   -> GW : POST /api/calculations (JWT)
+GW   -> DC : Forward + X-User-Role
+DC   -> DS : computeDimensioning(req)
+DS   -> PV : fetchSolarData(lat, lon)
+PV   -> PVGIS : GET /v5/series?lat=&lon=
+PVGIS --> PV : GHI mensuel + kWh/kWc/j
+PV  --> DS : PvgisResponse
+
+DS   -> NP : calculate(kWh/j, ghi, efficiency)
+NP  --> DS : (kWc, nbPanels, surface, coût)
+
+DS   -> DR : save(Dimensioning)
+DR   -> DB : INSERT INTO dimensionings
+DB  --> DR : Dimensioning(id)
+DR  --> DS : entité persistée
+DS  --> DC : DimensioningResponse
+DC  --> GW : 200 OK + JSON
+GW  --> FE : 200 + résultat
+FE  --> User : Afficher graphes\nNight Panel + carte
+
+alt PVGIS indisponible
+    PV --> DS : TimeoutException
+    DS --> DC : ServiceUnavailableException
+    DC --> GW : 503
+    GW --> FE : 503
+    FE --> User : "Service météo indisponible"
+end
+
+@enduml

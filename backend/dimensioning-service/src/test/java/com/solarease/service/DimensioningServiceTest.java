@@ -1,13 +1,18 @@
 package com.solarease.service;
 
+import com.solarease.client.PvgisClient;
 import com.solarease.dto.DimensioningRequest;
 import com.solarease.dto.DimensioningResponse;
+import com.solarease.dto.FinancialMetrics;
 import com.solarease.entity.Dimensioning;
+import com.solarease.entity.Equipment;
 import com.solarease.entity.RoofCharacteristic;
 import com.solarease.entity.SolarInstallation;
 import com.solarease.enums.DimensioningStatus;
+import com.solarease.enums.EquipmentType;
 import com.solarease.enums.Orientation;
 import com.solarease.enums.RoofType;
+import com.solarease.rag.InstallerRecommendationDto;
 import com.solarease.repository.DimensioningRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,8 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -31,11 +36,23 @@ class DimensioningServiceTest {
 
     @Mock
     private DimensioningRepository dimensioningRepository;
+    @Mock
+    private PvgisClient pvgisClient;
+    @Mock
+    private EquipmentService equipmentService;
+    @Mock
+    private DecisionSupportService decisionSupportService;
+    @Mock
+    private FinancialService financialService;
+    @Mock
+    private PdfGenerationService pdfGenerationService;
 
     @InjectMocks
     private DimensioningService dimensioningService;
 
     private DimensioningRequest request;
+    private Equipment panel;
+    private Equipment inverter;
 
     @BeforeEach
     void setUp() {
@@ -45,23 +62,67 @@ class DimensioningServiceTest {
         request.setInclination(30.0);
         request.setOrientation(Orientation.SOUTH);
         request.setRoofType(RoofType.FLAT);
+        request.setLatitude(36.8);
+        request.setLongitude(10.18);
+
+        panel = Equipment.builder()
+                .id(1L)
+                .name("Solareo Mono-400")
+                .type(EquipmentType.SOLAR_PANEL)
+                .brand("Solareo")
+                .model("Mono-400")
+                .nominalPower(400.0)
+                .area(1.9)
+                .price(BigDecimal.valueOf(800))
+                .build();
+        inverter = Equipment.builder()
+                .id(2L)
+                .name("Sungrow SG5K-S")
+                .type(EquipmentType.INVERTER)
+                .brand("Sungrow")
+                .model("SG5K-S")
+                .nominalPower(5000.0)
+                .price(BigDecimal.valueOf(2500))
+                .specifications("{\"phase\":\"MONO\"}")
+                .build();
+
+        // Common stubs (lenient because not every test path uses every collaborator).
+        lenient().when(equipmentService.getEquipmentByType(EquipmentType.SOLAR_PANEL))
+                .thenReturn(List.of(panel));
+        lenient().when(equipmentService.getEquipmentByType(EquipmentType.INVERTER))
+                .thenReturn(List.of(inverter));
+        lenient().when(equipmentService.getEquipmentByType(EquipmentType.NIGHT_PANEL))
+                .thenReturn(Collections.emptyList());
+
+        lenient().when(financialService.calculateMetrics(any(SolarInstallation.class)))
+                .thenAnswer(inv -> FinancialMetrics.builder()
+                        .totalInvestmentCost(0.0)
+                        .annualSavings(0.0)
+                        .roiPercentage(0.0)
+                        .paybackPeriodYears(0.0)
+                        .netSavings25Years(0.0)
+                        .build());
+
+        lenient().when(decisionSupportService.generate(any(), any(), any()))
+                .thenReturn(new DecisionSupportService.Result(
+                        InstallerRecommendationDto.builder()
+                                .verdict("OK")
+                                .compatibilityScore(90)
+                                .build(),
+                        "Recommandation générée."));
     }
 
     @Test
     void calculate_ShouldReturnValidResponse_WhenInputIsCorrect() {
-        // Arrange
         when(dimensioningRepository.save(any(Dimensioning.class))).thenAnswer(invocation -> {
             Dimensioning d = invocation.getArgument(0);
             d.setId(1L);
             d.setCreatedAt(LocalDateTime.now());
-            // The service calculates BEFORE save, so 'd' already has installation
             return d;
         });
 
-        // Act
         DimensioningResponse response = dimensioningService.calculateDimensioning(request);
 
-        // Assert
         assertNotNull(response);
         assertNotNull(response.getInstallation());
         assertTrue(response.getInstallation().getPanelCount() > 0);
@@ -71,57 +132,38 @@ class DimensioningServiceTest {
 
     @Test
     void calculate_ShouldAccountForOrientationEfficiency() {
-        // Arrange
-        DimensioningRequest southRequest = new DimensioningRequest();
-        southRequest.setProjectId(1L);
-        southRequest.setArea(50.0);
-        southRequest.setInclination(30.0);
-        southRequest.setOrientation(Orientation.SOUTH); // Best
-        southRequest.setRoofType(RoofType.FLAT);
+        DimensioningRequest southRequest = cloneRequest(Orientation.SOUTH);
+        DimensioningRequest northRequest = cloneRequest(Orientation.NORTH);
 
-        DimensioningRequest northRequest = new DimensioningRequest();
-        northRequest.setProjectId(2L);
-        northRequest.setArea(50.0);
-        northRequest.setInclination(30.0);
-        northRequest.setOrientation(Orientation.NORTH); // Less efficient
-        northRequest.setRoofType(RoofType.FLAT);
-
-        // We capture arguments or just rely on the return value which is mapped from the saved entity
         when(dimensioningRepository.save(any(Dimensioning.class))).thenAnswer(i -> {
-             Dimensioning d = i.getArgument(0);
-             d.setId(100L);
-             return d;
+            Dimensioning d = i.getArgument(0);
+            d.setId(100L);
+            return d;
         });
 
-        // Act
         DimensioningResponse southResponse = dimensioningService.calculateDimensioning(southRequest);
         DimensioningResponse northResponse = dimensioningService.calculateDimensioning(northRequest);
 
-        // Assert
         assertNotNull(southResponse.getInstallation());
         assertNotNull(northResponse.getInstallation());
-        
-        // South facing should generally produce MORE than North facing
-        // North orientation factor is 0.6, South is 1.0
-        assertTrue(southResponse.getInstallation().getEstimatedAnnualProductionKwh() > 
-                   northResponse.getInstallation().getEstimatedAnnualProductionKwh(),
-                   "South facing should have higher production");
+        assertTrue(southResponse.getInstallation().getEstimatedAnnualProductionKwh()
+                        > northResponse.getInstallation().getEstimatedAnnualProductionKwh(),
+                "South facing should have higher production");
     }
 
     @Test
     void getDimensioningByProject_ShouldReturnResult_WhenExists() {
-        // Arrange
         Dimensioning dimensioning = new Dimensioning();
         dimensioning.setId(1L);
         dimensioning.setProjectId(1L);
         dimensioning.setStatus(DimensioningStatus.COMPLETED);
-        
-        when(dimensioningRepository.findByProjectId(1L)).thenReturn(Collections.singletonList(dimensioning));
+        dimensioning.setSolarInstallation(SolarInstallation.builder().build());
 
-        // Act
+        when(dimensioningRepository.findByProjectId(1L))
+                .thenReturn(Collections.singletonList(dimensioning));
+
         List<DimensioningResponse> result = dimensioningService.getDimensioningByProjectId(1L);
 
-        // Assert
         assertNotNull(result);
         assertFalse(result.isEmpty());
         assertEquals(1L, result.get(0).getProjectId());
@@ -129,10 +171,20 @@ class DimensioningServiceTest {
 
     @Test
     void getDimensioningById_ShouldThrowException_WhenNotFound() {
-        // Arrange
         when(dimensioningRepository.findById(99L)).thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(RuntimeException.class, () -> dimensioningService.getDimensioningById(99L));
+    }
+
+    private DimensioningRequest cloneRequest(Orientation orientation) {
+        DimensioningRequest r = new DimensioningRequest();
+        r.setProjectId(orientation == Orientation.SOUTH ? 1L : 2L);
+        r.setArea(50.0);
+        r.setInclination(30.0);
+        r.setOrientation(orientation);
+        r.setRoofType(RoofType.FLAT);
+        r.setLatitude(36.8);
+        r.setLongitude(10.18);
+        return r;
     }
 }

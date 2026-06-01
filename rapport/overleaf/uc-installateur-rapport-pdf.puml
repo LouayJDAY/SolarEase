@@ -1,0 +1,37 @@
+@startuml uc-installateur-rapport-pdf
+title Raffinement -- Télécharger le rapport PDF
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+
+rectangle "Rapport technique PDF" {
+    usecase "Télécharger le\nrapport PDF" as Download
+    usecase "Prévisualiser le\nrapport" as Preview
+    usecase "Visualiser les\ngraphiques" as Charts
+    usecase "Partager le rapport\navec le client" as Share
+    usecase "Régénérer le PDF\n(après modification)" as Regen
+}
+
+Installer --> Download
+Installer --> Preview
+Installer --> Charts
+Installer --> Share
+Installer --> Regen
+
+Preview ..> Download : <<extend>>
+Charts  ..> Preview  : <<extend>>
+Share   ..> Download : <<extend>>
+Regen   ..> Download : <<extend>>
+
+@enduml

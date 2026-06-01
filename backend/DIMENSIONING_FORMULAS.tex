@@ -1,0 +1,223 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\geometry{margin=2.5cm}
+
+\title{Formules de dimensionnement SolarEase}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Introduction}
+Ce document regroupe les principales formules utilisées dans le service de dimensionnement SolarEase, ainsi que les paramètres à valider avec la société afin d'améliorer la précision des projets.
+
+\section{Surface utile}
+\[
+\text{usableArea} = \text{roofArea} \times 0.7
+\]
+Le coefficient $0.7$ représente la surface réellement exploitable.
+
+\section{Nombre de panneaux}
+\[
+\text{panelCount} = \left\lfloor \frac{\text{usableArea}}{\text{panelAreaM2}} \right\rfloor
+\]
+Cette formule dépend de la surface d'un panneau et de la surface utile disponible.
+
+\section{Puissance totale installée}
+\[
+\text{totalCapacityKw} = \frac{\text{panelCount} \times \text{panelPowerW}}{1000}
+\]
+
+\section{Production annuelle}
+\subsection{Avec PVGIS}
+\[
+\text{estimatedProduction} = \text{PVGIS}(lat, lon, peakpower, angle, aspect)
+\]
+
+\subsection{Sans PVGIS}
+\[
+\text{estimatedProduction} = \text{totalCapacityKw} \times 1600 \times \text{orientationFactor} \times \text{inclinationFactor}
+\]
+
+\section{Facteur d'orientation}
+\begin{itemize}[leftmargin=1.5cm]
+    \item Sud = $1.0$
+    \item Sud-Est / Sud-Ouest = $0.95$
+    \item Est / Ouest = $0.85$
+    \item Nord-Est / Nord-Ouest = $0.70$
+    \item Nord = $0.60$
+\end{itemize}
+
+\section{Facteur d'inclinaison}
+\[
+\text{inclinationFactor} = 1 - \left|30 - \text{inclination}\right| \times 0.005
+\]
+avec :
+\[
+\text{inclinationFactor} \ge 0.5
+\]
+
+\section{Conversion orientation métier vers PVGIS}
+\begin{itemize}[leftmargin=1.5cm]
+    \item South = $0^\circ$
+    \item South-East = $-45^\circ$
+    \item East = $-90^\circ$
+    \item North-East = $-135^\circ$
+    \item North = $180^\circ$
+    \item North-West = $135^\circ$
+    \item West = $90^\circ$
+    \item South-West = $45^\circ$
+\end{itemize}
+
+\section{Coût matériel}
+\[
+\text{materialCost} = (\text{panelCount} \times \text{panelPrice}) + \text{inverterPrice}
+\]
+
+\section{Main-d'œuvre}
+\[
+\text{installationLabor} = \text{materialCost} \times 0.15
+\]
+
+\section{Coût total du projet}
+\[
+\text{totalProjectCost} = \text{materialCost} + \text{installationLabor}
+\]
+
+\section{Économies annuelles}
+\[
+\text{annualSavings} = \text{estimatedProduction} \times 0.28
+\]
+
+\section{Économies mensuelles}
+\[
+\text{monthlySavings} = \frac{\text{annualSavings}}{12}
+\]
+
+\section{CO2 évité}
+\[
+\text{co2Savings} = \text{estimatedProduction} \times 0.6
+\]
+
+\section{Investissement initial financier}
+\[
+\text{initialInvestment} =
+\begin{cases}
+\text{estimatedCost} & \text{si disponible} \\
+\text{totalCapacityKw} \times 2500 & \text{sinon}
+\end{cases}
+\]
+
+\section{Dégradation annuelle des panneaux}
+\[
+\text{currentProduction}_{n+1} = \text{currentProduction}_n \times (1 - 0.005)
+\]
+
+\section{Hausse annuelle du prix de l'électricité}
+\[
+\text{currentElectricityPrice}_{n+1} = \text{currentElectricityPrice}_n \times (1 + 0.04)
+\]
+
+\section{Cash flow cumulé}
+\[
+\text{cashFlow}_0 = -\text{initialInvestment}
+\]
+\[
+\text{cashFlow}_n = \text{cashFlow}_{n-1} + \text{yearSavings}
+\]
+
+\section{Temps de retour sur investissement}
+Quand le cash flow devient positif :
+\[
+\text{payback} = (n-1) + \frac{|\text{previousCashFlow}|}{\text{yearSavings}}
+\]
+
+\section{ROI}
+\[
+\text{ROI} = \frac{\text{totalNetSavings}}{\text{initialInvestment}} \times 100
+\]
+
+\section{Formules Night Panel}
+\subsection{Stockage total}
+\[
+\text{totalStorageKwh} = \text{panelCount} \times \text{storagePerPanel}
+\]
+
+\subsection{Production journalière}
+\[
+\text{dailyProductionKwh} = \frac{\text{annualProduction}}{365}
+\]
+
+\subsection{Consommation de jour}
+\[
+\text{daytimeConsumption} = \text{dailyConsumption} \times 0.4
+\]
+
+\subsection{Consommation de nuit}
+\[
+\text{nighttimeConsumption} = \text{dailyConsumption} \times 0.6
+\]
+
+\subsection{Surplus de jour}
+\[
+\text{daytimeSurplus} = \max(0, \text{dailyProductionKwh} - \text{daytimeConsumption})
+\]
+
+\subsection{Énergie stockée réellement}
+\[
+\text{actualStored} = \min(\text{daytimeSurplus}, \text{totalStorageKwh})
+\]
+
+\subsection{Couverture nocturne}
+\[
+\text{nightCoverage} = \min(\text{actualStored}, \text{nighttimeConsumption})
+\]
+
+\subsection{Taux d'autoconsommation}
+\[
+\text{selfConsumptionRate} = \min\left(1, \frac{\text{totalSelfConsumed}}{\text{dailyConsumption}}\right)
+\]
+
+\subsection{Taux de couverture nocturne}
+\[
+\text{nightCoverageRate} = \min\left(1, \frac{\text{nightCoverage}}{\text{nighttimeConsumption}}\right)
+\]
+
+\subsection{Économies annuelles améliorées}
+\[
+\text{enhancedAnnualSavings} = \text{totalSelfConsumed} \times 365 \times 0.280
+\]
+
+\subsection{Économies liées au surplus réseau}
+\[
+\text{gridSavings} = \text{gridSurplus} \times 365 \times 0.10
+\]
+
+\subsection{Économies annuelles totales}
+\[
+\text{totalAnnualSavings} = \text{enhancedAnnualSavings} + \text{gridSavings}
+\]
+
+\section{Paramètres à valider avec la société}
+\begin{itemize}[leftmargin=1.5cm]
+    \item Coefficient de surface utile
+    \item Productivité moyenne kWh/kWp/an
+    \item Facteurs d'orientation
+    \item Facteurs d'inclinaison
+    \item Prix moyen par kW installé
+    \item Prix du kWh économisé
+    \item Taux de dégradation annuel
+    \item Taux d'inflation de l'électricité
+    \item Taux de main-d'œuvre
+    \item Facteur CO2
+\end{itemize}
+
+\end{document}

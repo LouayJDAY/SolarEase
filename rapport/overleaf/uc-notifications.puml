@@ -1,0 +1,44 @@
+@startuml uc-notifications
+title Raffinement -- Recevoir une notification
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Utilisateur\n(Installateur / Admin / Client)" as User
+actor "Système"        as System
+
+rectangle "Notifications temps réel (WebSocket)" {
+    usecase "Se connecter au\nWebSocket"     as Connect
+    usecase "Recevoir une\nnotification push" as Receive
+    usecase "Consulter la liste\ndes notifications" as List
+    usecase "Marquer une notification\ncomme lue" as MarkOne
+    usecase "Marquer tout\ncomme lu"   as MarkAll
+    usecase "Filtrer par type"         as Filter
+    usecase "Émettre une notification\n(événement)" as Emit
+}
+
+User -> Connect
+User -> Receive
+User -> List
+User -> MarkOne
+User -> MarkAll
+User -> Filter
+
+System -> Emit
+
+Receive ..> Connect : <<include>>
+MarkOne ..> List    : <<extend>>
+MarkAll ..> List    : <<extend>>
+Filter  ..> List    : <<extend>>
+Receive ..> Emit    : <<include>>
+
+@enduml

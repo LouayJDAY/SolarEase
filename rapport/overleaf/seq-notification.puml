@@ -1,0 +1,61 @@
+@startuml seq-notification
+title Diagramme de séquence -- Recevoir une notification
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Utilisateur" as User
+participant "Frontend"               as FE
+participant "WebSocket Client\n(SockJS+STOMP)" as WSC
+participant "API Gateway"            as GW
+participant "STOMP Broker"           as BROKER
+participant "Service métier\n(émetteur)" as SRC
+participant "NotificationWebSocketService" as NWS
+participant "NotificationRepository" as NR
+database  "PostgreSQL"               as DB
+
+== Connexion initiale ==
+User -> FE : Se connecter à l'application
+FE   -> WSC : Initialiser WebSocket
+WSC  -> GW : CONNECT /ws (JWT)
+GW   -> BROKER : Établir session
+BROKER --> WSC : CONNECTED
+WSC  -> BROKER : SUBSCRIBE\n/user/{userId}/queue/notifications
+
+== Émission asynchrone d'une notification ==
+SRC -> NWS : notifyUser(userId, title, message)
+NWS  -> NR  : save(NotificationEntity)
+NR   -> DB  : INSERT INTO notifications
+DB  --> NR  : Notification(id)
+NR  --> NWS : entité persistée
+
+NWS  -> BROKER : convertAndSendToUser(\n  userId, "/queue/notifications", payload)
+BROKER --> WSC : push notification
+WSC  --> FE   : onMessage(notification)
+FE   -> FE   : Incrémenter badge\n+ afficher toast
+
+== Consultation et lecture ==
+User -> FE : Cliquer sur l'icône cloche
+FE   -> GW : GET /api/notifications
+GW   -> NWS : list(userId)
+NWS  -> NR  : findByUserId(userId)
+NR   -> DB  : SELECT * FROM notifications
+DB  --> NR  : List<Notification>
+NR  --> NWS : list
+NWS --> GW  : 200 OK
+GW  --> FE  : Liste
+FE  --> User : Affichage des notifications
+
+User -> FE : Marquer comme lu
+FE   -> GW : PATCH /api/notifications/{id}/read
+GW   -> NR  : updateReadFlag(id, true)
+NR   -> DB  : UPDATE notifications
+
+@enduml

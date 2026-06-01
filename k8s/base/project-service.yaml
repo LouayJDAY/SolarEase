@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-service
+  namespace: solarease
+  labels:
+    app: project-service
+    app.kubernetes.io/part-of: solarease
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: project-service
+  template:
+    metadata:
+      labels:
+        app: project-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8082"
+    spec:
+      containers:
+        - name: project-service
+          image: ghcr.io/louayjday/solarease/project-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+              name: http
+          env:
+            - name: PORT
+              value: "8082"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-project:5432/solarease_projects
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: POSTGRES_USER }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: solarease-secrets, key: POSTGRES_PASSWORD }
+            - name: APP_FRONTEND_URL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: APP_FRONTEND_URL }
+            - name: SPRING_MAIL_HOST
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: SPRING_MAIL_HOST }
+            - name: SPRING_MAIL_PORT
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: SPRING_MAIL_PORT }
+            - name: SPRING_MAIL_USERNAME
+              valueFrom:
+                secretKeyRef: { name: solarease-secrets, key: SPRING_MAIL_USERNAME }
+            - name: SPRING_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: solarease-secrets, key: SPRING_MAIL_PASSWORD }
+            - name: SOLAREASE_DEMO_SEED
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: SOLAREASE_DEMO_SEED }
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: SPRING_JPA_HIBERNATE_DDL_AUTO }
+          startupProbe:
+            httpGet: { path: /actuator/health, port: 8082 }
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8082 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8082 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 200m, memory: 384Mi }
+            limits: { cpu: 1000m, memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-service
+  namespace: solarease
+  labels:
+    app: project-service
+spec:
+  selector:
+    app: project-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+      name: http

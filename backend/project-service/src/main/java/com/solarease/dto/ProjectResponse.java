@@ -28,6 +28,13 @@ public class ProjectResponse {
     private ProjectStatus status;
     private Long clientId;
     private String installerId;
+    private String installerEmail;
+    private String assignedByAdminId;
+    private String assignedByAdminEmail;
+    private Integer currentProgress;
+    private String currentFieldStatus;
+    private String currentPhase;
+    private String currentPhaseLabel;
     private ClientInfo client;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -1,0 +1,32 @@
+@startuml seq-creer-client
+title Diagramme de séquence -- Créer une fiche client
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor                 #2C5282
+    LifeLineBorderColor        #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor     #2C5282
+    ActorBackgroundColor       #FAFAFA
+    ActorBorderColor           #2C5282
+}
+
+actor Admin
+participant "Frontend"        as FE
+participant "Project Service" as PS
+database  "Base de données" as DB
+
+Admin -> FE : Saisir formulaire client
+FE    -> PS : POST /api/clients
+PS    -> DB : Vérifier email\n+ Enregistrer le client
+DB   --> PS : Client enregistré
+PS   --> FE : 201 Created
+FE   --> Admin : Client créé avec succès
+
+alt Email déjà utilisé
+    DB   --> PS : Email existant
+    PS   --> FE : 409 Conflict
+    FE   --> Admin : "Email déjà utilisé"
+end
+
+@enduml

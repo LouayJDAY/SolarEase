@@ -1,0 +1,44 @@
+# =============================================================================
+# Prometheus configuration -- scrapes /actuator/prometheus on each SolarEase service
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: solarease
+    environment: dev
+
+scrape_configs:
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "gateway-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["gateway-service:8080"]
+        labels:
+          service: gateway
+
+  - job_name: "identity-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["identity-service:8081"]
+        labels:
+          service: identity
+
+  - job_name: "project-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["project-service:8082"]
+        labels:
+          service: project
+
+  - job_name: "dimensioning-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["dimensioning-service:8083"]
+        labels:
+          service: dimensioning

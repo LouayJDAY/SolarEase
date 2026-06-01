@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -37,15 +38,16 @@ public class OtpService {
 
         otpTokenRepository.save(otpToken);
 
-        // Envoyer email avec OTP
-        try {
-            emailService.sendOtpEmail(user.getEmail(), otpCode);
-        } catch (Exception e) {
-            log.error("Failed to send email (simulated for dev): {}", e.getMessage());
-        }
+        // Envoyer email avec OTP (si échec SMTP, on remonte l'erreur)
+        emailService.sendOtpEmail(user.getEmail(), otpCode);
 
         log.info("OTP generated for {}: {}", user.getEmail(), otpCode);
         return otpCode;
+    }
+
+    public Optional<String> findLatestOtpCode(User user) {
+        return otpTokenRepository.findByUserAndIsUsedFalse(user)
+                .map(OtpToken::getOtpCode);
     }
 
     public boolean validateOtp(String email, String otpCode) {

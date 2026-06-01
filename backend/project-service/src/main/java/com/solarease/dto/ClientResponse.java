@@ -19,6 +19,9 @@ public class ClientResponse {
     private String email;
     private String phoneNumber;
     private String address;
+    private String installerId;
+    private String userId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long projectCount;
 }

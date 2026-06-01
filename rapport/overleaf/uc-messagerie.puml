@@ -1,0 +1,38 @@
+@startuml uc-messagerie
+title Raffinement -- Messagerie projet
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+actor "Admin"        as Admin
+actor "Client"       as Client
+
+rectangle "Messagerie projet (temps réel)" {
+    usecase "Ouvrir la conversation\ndu projet"     as Open
+    usecase "Envoyer un message"                    as Send
+    usecase "Consulter l'historique\ndes messages"  as History
+}
+
+Installer --> Open
+Installer --> Send
+Installer --> History
+
+Admin --> Open
+Admin --> Send
+Admin --> History
+
+Client --> Open
+Client --> Send
+Client --> History
+
+@enduml

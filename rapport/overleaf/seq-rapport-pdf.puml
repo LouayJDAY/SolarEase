@@ -1,0 +1,54 @@
+@startuml seq-rapport-pdf
+title Diagramme de séquence -- Télécharger le rapport PDF
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Installateur"    as User
+participant "Frontend"               as FE
+participant "API Gateway"            as GW
+participant "DimensioningController" as DC
+participant "PdfGenerationService"   as PDF
+participant "DimensioningRepository" as DR
+database  "PostgreSQL"               as DB
+participant "iText 8\n(library)"     as IT
+
+User -> FE : Cliquer "Télécharger\nle rapport PDF"
+FE   -> GW : GET /api/calculations/{id}/pdf\n(JWT)
+GW   -> DC : Forward + X-User-Role
+DC   -> PDF : generatePdf(id)
+PDF  -> DR : findById(id)
+DR   -> DB : SELECT * FROM dimensionings
+DB  --> DR : Dimensioning + client + projet
+DR  --> PDF : entité complète
+
+PDF  -> IT : new Document()
+PDF  -> IT : addHeader(logo, titre)
+PDF  -> IT : addClientInfo(client)
+PDF  -> IT : addPvgisChart(GHI mensuel)
+PDF  -> IT : addNightPanelTable(kWc, panneaux)
+PDF  -> IT : addCostEstimation(budget)
+PDF  -> IT : addAiRecommendations(reco)
+IT  --> PDF : byte[] PDF
+
+PDF --> DC : byte[] + headers\n(Content-Type: application/pdf)
+DC  --> GW : 200 OK + binary
+GW  --> FE : 200 + PDF stream
+FE  --> User : Téléchargement\nsolarease-report-{id}.pdf
+
+alt Calcul inexistant
+    DR  --> PDF : empty
+    PDF --> DC  : NotFoundException
+    DC  --> GW  : 404
+    GW  --> FE  : 404
+    FE  --> User : "Rapport introuvable"
+end
+
+@enduml

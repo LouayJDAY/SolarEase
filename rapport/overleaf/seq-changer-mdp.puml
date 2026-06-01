@@ -1,0 +1,99 @@
+@startuml seq-changer-mdp
+title Diagramme de séquence -- Changer son mot de passe (Sprint 1)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor          #2C5282
+    LifeLineBackgroundColor #FAFAFA
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #E8F0FE
+    ActorBorderColor          #2C5282
+}
+
+actor       "Utilisateur authentifié" as User
+participant "Frontend\n(React)"        as Front
+participant "API Gateway"              as GW
+participant "JWT Filter"               as Filter
+participant "AuthController"           as Ctrl
+participant "AuthService"              as Svc
+participant "UserRepository"           as URepo
+participant "RefreshTokenRepository"   as RRepo
+participant "EmailService\n(SMTP)"     as Mailer
+database    "Base de données"          as DB
+
+User -> Front : Saisit ancien mdp + nouveau mdp
+activate Front
+
+Front -> GW    : PUT /api/auth/me/password\nHeader: Authorization: Bearer <JWT>
+activate GW
+
+GW -> Filter   : valide JWT
+activate Filter
+Filter -> Filter : extractClaims()
+alt JWT invalide ou expiré
+    Filter --> GW   : HTTP 401
+    GW --> Front    : 401
+    Front --> User  : "Session expirée, reconnectez-vous"
+else JWT valide
+    Filter --> GW : OK + X-User-Id
+    deactivate Filter
+
+    GW -> Ctrl     : forward + userId
+    activate Ctrl
+
+    Ctrl -> Svc    : changePassword(userId, oldPwd, newPwd)
+    activate Svc
+
+    Svc -> URepo   : findById(userId)
+    URepo -> DB    : SELECT * FROM users
+    DB --> URepo   : User
+    URepo --> Svc  : User
+
+    Svc -> Svc : BCrypt.matches(oldPwd, user.passwordHash)
+
+    alt Ancien mot de passe incorrect
+        Svc --> Ctrl  : throw BadCredentialsException
+        Ctrl --> GW   : HTTP 401
+        GW --> Front  : 401
+        Front --> User: "Ancien mot de passe incorrect"
+    else Ancien mot de passe valide
+        Svc -> Svc : validate(newPwd)\n(longueur, complexité)
+
+        alt Nouveau mdp trop faible
+            Svc --> Ctrl : ValidationException
+            Ctrl --> GW  : HTTP 400
+            GW --> Front : 400
+            Front --> User : "Mot de passe trop faible"
+        else Nouveau mdp valide
+            Svc -> Svc   : BCrypt.hash(newPwd, 10)
+            Svc -> URepo : updatePassword(userId, hash)
+            URepo -> DB  : UPDATE users SET password=...
+            DB --> URepo : OK
+
+            Svc -> RRepo : revokeAllByUserId(userId)
+            RRepo -> DB  : UPDATE refresh_tokens\nSET revoked=true WHERE user_id=?
+            DB --> RRepo : OK
+            RRepo --> Svc: OK
+
+            Svc -> Mailer : sendPasswordChangedAlert(user.email)
+            activate Mailer
+            Mailer --> Svc : OK
+            deactivate Mailer
+
+            Svc --> Ctrl  : OK
+            Ctrl --> GW   : HTTP 200
+            GW --> Front  : 200
+            Front -> Front : Efface le store JWT
+            Front --> User : "Mot de passe modifié\nReconnectez-vous"
+        end
+    end
+
+    deactivate Svc
+    deactivate Ctrl
+end
+deactivate GW
+deactivate Front
+
+@enduml

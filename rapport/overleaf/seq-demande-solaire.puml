@@ -1,0 +1,72 @@
+@startuml seq-demande-solaire
+title Diagramme de séquence -- Soumettre une demande solaire
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Prospect /\nClient" as Client
+actor "Admin"             as Admin
+participant "Frontend public"     as FE
+participant "API Gateway"          as GW
+participant "DemandController"     as DC
+participant "DemandService"        as DS
+participant "EmailService"         as ES
+participant "NotificationService"  as NS
+database  "PostgreSQL"             as DB
+
+== Soumission ==
+Client -> FE : Remplir formulaire public\n(nom, email, téléphone, description)
+FE     -> GW : POST /api/demands/public
+GW     -> DC : Forward (route publique)
+DC     -> DS : create(req)
+DS     -> DB : INSERT INTO demands\n(status=NOUVELLE)
+DB    --> DS : Demand(id)
+DS     -> ES : sendDemandConfirmation(email)
+DS     -> NS : notifyAdmins("Nouvelle demande")
+DS    --> DC : DemandDTO
+DC    --> GW : 201 Created
+GW    --> FE : 201 + DTO
+FE    --> Client : "Demande envoyée\navec succès"
+
+== Traitement ==
+Admin -> FE : Consulter la liste\ndes demandes
+FE    -> GW : GET /api/demands
+GW    -> DC : Forward
+DC    -> DS : listAll()
+DS    -> DB : SELECT * FROM demands
+DB   --> DS : List<Demand>
+DS   --> DC : List<DemandDTO>
+DC   --> FE : 200 + JSON
+
+Admin -> FE : Sélectionner une demande\net cliquer "Valider"
+FE   -> GW : POST /api/demands/{id}/convert-to-project
+GW   -> DC : Forward + role=ADMIN
+DC   -> DS : convertToProject(id)
+DS   -> DB : INSERT INTO projects (auto)
+DS   -> DB : UPDATE demand SET status=VALIDEE
+DS   -> NS : notifyClient("Projet créé")
+DS  --> DC : ProjectDTO
+DC  --> GW : 200 OK
+GW  --> FE : 200 + projet
+FE  --> Admin : "Demande convertie\nen projet"
+
+alt Demande à compléter
+    Admin -> FE : Demander des infos
+    FE   -> GW : PATCH /demands/{id} status=A_COMPLETER
+    DS   -> ES : sendCompletionEmail()
+end
+
+alt Demande rejetée
+    Admin -> FE : Refuser avec motif
+    FE   -> GW : PATCH /demands/{id} status=REJETEE
+    DS   -> ES : sendRejectionEmail(motif)
+end
+
+@enduml

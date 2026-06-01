@@ -1,0 +1,38 @@
+@startuml uc-admin-devis
+title Raffinement -- Créer et envoyer un devis
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+actor "Admin"        as Admin
+actor "Client"       as Client
+
+rectangle "Devis & facturation" {
+    usecase "Créer / modifier\nun devis"          as Manage
+    usecase "Envoyer le devis\nau client"         as Send
+    usecase "Accepter ou refuser\nle devis"       as Decide
+    usecase "Consulter la facture"                as Invoice
+}
+
+Installer --> Manage
+Installer --> Send
+Installer --> Invoice
+
+Admin --> Manage
+Admin --> Send
+Admin --> Invoice
+
+Client --> Decide
+Client --> Invoice
+
+@enduml

@@ -30,4 +30,7 @@ public class ProjectRequest {
     
     @NotNull(message = "Client ID is required")
     private Long clientId;
+
+    private String installerId;
+    private String installerEmail;
 }

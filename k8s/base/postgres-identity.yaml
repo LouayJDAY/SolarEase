@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-identity-pvc
+  namespace: solarease
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-identity
+  namespace: solarease
+  labels:
+    app: postgres-identity
+spec:
+  serviceName: postgres-identity
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-identity
+  template:
+    metadata:
+      labels:
+        app: postgres-identity
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: solarease_identity
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: solarease-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: solarease-secrets
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "solarease_identity"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pg-identity-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-identity
+  namespace: solarease
+spec:
+  clusterIP: None
+  selector:
+    app: postgres-identity
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres

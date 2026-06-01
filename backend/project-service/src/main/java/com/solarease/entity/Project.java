@@ -1,5 +1,7 @@
 package com.solarease.entity;
 
+import com.solarease.enums.InstallationPhase;
+import com.solarease.enums.InstallerFieldStatus;
 import com.solarease.enums.ProjectStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +27,7 @@ public class Project {
     @NotBlank(message = "Project name is required")
     private String name;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
     
     private String location;
@@ -45,6 +48,26 @@ public class Project {
 
     @Column(name = "installer_id")
     private String installerId;
+
+    @Column(name = "installer_email")
+    private String installerEmail;
+
+    @Column(name = "assigned_by_admin_id")
+    private String assignedByAdminId;
+
+    @Column(name = "assigned_by_admin_email")
+    private String assignedByAdminEmail;
+
+    @Column(name = "current_progress")
+    private Integer currentProgress;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "current_field_status")
+    private InstallerFieldStatus currentFieldStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "current_phase")
+    private InstallationPhase currentPhase;
     
     @Column(updatable = false)
     private LocalDateTime createdAt;

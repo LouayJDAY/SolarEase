@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Deploy to STAGING on every push to `develop`
+  # ---------------------------------------------------------------------------
+  staging:
+    name: Deploy staging (Railway)
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy services to Railway (staging)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          for svc in gateway-service identity-service project-service dimensioning-service; do
+            echo "::group::Deploying $svc"
+            (cd backend/$svc && railway up --service $svc --detach) || exit 1
+            echo "::endgroup::"
+          done
+
+  # ---------------------------------------------------------------------------
+  # Deploy to PRODUCTION on git tag v*.*.*
+  # ---------------------------------------------------------------------------
+  production:
+    name: Deploy production (Railway)
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy services to Railway (production)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_PROD_TOKEN }}
+        run: |
+          for svc in gateway-service identity-service project-service dimensioning-service; do
+            echo "::group::Deploying $svc"
+            (cd backend/$svc && railway up --service $svc --detach) || exit 1
+            echo "::endgroup::"
+          done
+
+      - name: Create GitHub Release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

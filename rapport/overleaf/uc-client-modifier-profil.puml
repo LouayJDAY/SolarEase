@@ -1,0 +1,115 @@
+@startuml uc-client-modifier-profil
+title Diagramme de cas d'utilisation -- Client modifie son profil (Sprint 1)
+
+left to right direction
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+    BackgroundColor    #FAFAFA
+    BorderColor        #2C5282
+    ArrowColor         #2C5282
+    FontName           "Helvetica"
+}
+skinparam actor {
+    BackgroundColor    #E8F0FE
+    BorderColor        #2C5282
+}
+skinparam note {
+    BackgroundColor    #FFF8DC
+    BorderColor        #B0BEC5
+}
+
+' ────────────────────────────────────────────
+'  ACTEURS
+' ────────────────────────────────────────────
+actor "Client"                 as Client
+actor "Service\nE-mail (SMTP)" as Mailer <<système>>
+
+' ────────────────────────────────────────────
+'  PÉRIMÈTRE DU SYSTÈME
+' ────────────────────────────────────────────
+rectangle "Identity Service -- Gestion du profil" {
+
+    usecase "S'authentifier"                       as UC_Auth
+    usecase "Consulter son profil"                 as UC_View
+    usecase "Modifier ses\ninformations personnelles" as UC_UpdateInfo
+    usecase "Modifier son\nadresse e-mail"         as UC_UpdateEmail
+    usecase "Changer son\nmot de passe"            as UC_ChangePwd
+    usecase "Téléverser une\nphoto de profil"      as UC_UploadAvatar
+
+    usecase "Valider les\ndonnées saisies"         as UC_Validate
+    usecase "Vérifier l'ancien\nmot de passe"      as UC_CheckOldPwd
+    usecase "Hasher le nouveau\nmot de passe (BCrypt)" as UC_HashPwd
+    usecase "Générer un OTP de\nconfirmation"      as UC_GenOtp
+    usecase "Envoyer une\nnotification e-mail"     as UC_SendMail
+}
+
+' ────────────────────────────────────────────
+'  ASSOCIATIONS ACTEUR -> CAS D'UTILISATION
+' ────────────────────────────────────────────
+Client --> UC_Auth
+Client --> UC_View
+Client --> UC_UpdateInfo
+Client --> UC_UpdateEmail
+Client --> UC_ChangePwd
+Client --> UC_UploadAvatar
+
+UC_SendMail --> Mailer
+
+' ────────────────────────────────────────────
+'  RELATIONS INCLUDE / EXTEND
+' ────────────────────────────────────────────
+' Toute opération nécessite d'être connecté
+UC_View         ..> UC_Auth        : <<include>>
+UC_UpdateInfo   ..> UC_Auth        : <<include>>
+UC_UpdateEmail  ..> UC_Auth        : <<include>>
+UC_ChangePwd    ..> UC_Auth        : <<include>>
+UC_UploadAvatar ..> UC_Auth        : <<include>>
+
+' Validation systématique des entrées
+UC_UpdateInfo   ..> UC_Validate    : <<include>>
+UC_UpdateEmail  ..> UC_Validate    : <<include>>
+UC_ChangePwd    ..> UC_Validate    : <<include>>
+
+' Changement de mot de passe : double contrôle
+UC_ChangePwd    ..> UC_CheckOldPwd : <<include>>
+UC_ChangePwd    ..> UC_HashPwd     : <<include>>
+
+' Changement d'e-mail : re-vérification par OTP obligatoire
+UC_UpdateEmail  ..> UC_GenOtp      : <<include>>
+UC_UpdateEmail  ..> UC_SendMail    : <<include>>
+
+' Notifications optionnelles (sécurité)
+UC_ChangePwd    ..> UC_SendMail    : <<extend>>\n(alerte sécurité)
+
+' ────────────────────────────────────────────
+'  NOTES EXPLICATIVES
+' ────────────────────────────────────────────
+note right of UC_View
+  Endpoint : GET /api/auth/me
+  Retourne UserDto (sans le hash)
+end note
+
+note right of UC_UpdateInfo
+  Endpoint : PUT /api/auth/me
+  Champs modifiables :
+  prenom, nom, telephone, adresse
+end note
+
+note bottom of UC_UpdateEmail
+  Endpoint : PUT /api/auth/me
+  Le nouveau e-mail repasse par
+  la vérification OTP avant d'être
+  effectivement appliqué.
+end note
+
+note bottom of UC_ChangePwd
+  Endpoint : PUT /api/auth/me/password
+  Précondition : ancien mot de passe correct
+  Postcondition :
+    - Tous les Refresh Tokens révoqués
+    - Notification e-mail envoyée
+end note
+
+@enduml

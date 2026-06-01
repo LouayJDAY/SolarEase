@@ -1,0 +1,32 @@
+@startuml uc-installateur-avancement
+title Raffinement -- Suivi terrain
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+actor "Admin"        as Admin
+
+rectangle "Suivi terrain" {
+    usecase "Saisir l'avancement\n(statut, %, note)" as Input
+    usecase "Soumettre l'avancement"                as Submit
+    usecase "Signaler un blocage"                   as Block
+    usecase "Valider / refuser\nl'avancement"       as Validate
+}
+
+Installer --> Input
+Installer --> Submit
+Installer --> Block
+
+Admin --> Validate
+
+@enduml

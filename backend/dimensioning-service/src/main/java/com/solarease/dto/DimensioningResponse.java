@@ -25,4 +25,10 @@ public class DimensioningResponse {
     private String aiRecommendation;
     private String panelType; // "CLASSIC" or "NIGHT_PANEL"
     private FinancialMetrics financials; // Financial projections for the project
+    /**
+     * Structured RAG-based installer recommendation produced by
+     * {@code DecisionSupportService}. Optional: the legacy {@code aiRecommendation}
+     * still carries the same content as a single string for the PDF.
+     */
+    private com.solarease.rag.InstallerRecommendationDto installerRecommendation;
 }

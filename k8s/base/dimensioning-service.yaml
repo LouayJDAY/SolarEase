@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dimensioning-service
+  namespace: solarease
+  labels:
+    app: dimensioning-service
+    app.kubernetes.io/part-of: solarease
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dimensioning-service
+  template:
+    metadata:
+      labels:
+        app: dimensioning-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8083"
+    spec:
+      containers:
+        - name: dimensioning-service
+          image: ghcr.io/louayjday/solarease/dimensioning-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+              name: http
+          env:
+            - name: PORT
+              value: "8083"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-dimensioning:5432/solarease_dimensioning
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: POSTGRES_USER }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: solarease-secrets, key: POSTGRES_PASSWORD }
+            - name: OLLAMA_BASE_URL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: OLLAMA_BASE_URL }
+            - name: OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: OLLAMA_MODEL }
+          startupProbe:
+            httpGet: { path: /actuator/health, port: 8083 }
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8083 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8083 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits: { cpu: 1500m, memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dimensioning-service
+  namespace: solarease
+  labels:
+    app: dimensioning-service
+spec:
+  selector:
+    app: dimensioning-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+      name: http

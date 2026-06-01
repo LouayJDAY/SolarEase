@@ -1,0 +1,41 @@
+@startuml uc-s5-global
+title Diagramme de cas d'utilisation global -- Sprint 5
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Prospect /\nClient" as Client
+actor "Installateur"       as Installer
+actor "Admin"              as Admin
+
+rectangle "Espace Client & Facturation" {
+    usecase "Soumettre une\ndemande solaire"   as Submit
+    usecase "Gérer les demandes"               as Manage
+    usecase "Gérer les devis"                  as Quotes
+    usecase "Accepter ou refuser\nun devis"    as DecideQuote
+    usecase "Consulter les factures"           as Invoices
+    usecase "Espace client"                    as Space
+}
+
+Client    --> Submit
+Client    --> DecideQuote
+Client    --> Invoices
+Client    --> Space
+
+Installer --> Quotes
+Installer --> Invoices
+
+Admin     --> Manage
+Admin     --> Quotes
+Admin     --> Invoices
+
+@enduml

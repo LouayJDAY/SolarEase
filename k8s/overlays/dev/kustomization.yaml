@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: solarease-dev
+
+resources:
+  - ../../base
+
+namePrefix: dev-
+
+commonLabels:
+  environment: dev
+
+patches:
+  - target:
+      kind: Deployment
+      name: gateway-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: ConfigMap
+      name: solarease-config
+    patch: |-
+      - op: replace
+        path: /data/SOLAREASE_DEMO_SEED
+        value: "true"
+      - op: replace
+        path: /data/SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: "update"

@@ -16,7 +16,7 @@ public class OllamaService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${ollama.base-url:http://host.docker.internal:11434}")
+    @Value("${ollama.base-url:http://localhost:11434}")
     private String ollamaBaseUrl;
 
     @Value("${ollama.model:mistral}")

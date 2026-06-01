@@ -1,0 +1,34 @@
+@startuml uc-client-demande
+title Raffinement -- Soumettre une demande solaire
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Prospect /\nClient" as Client
+actor "Admin"              as Admin
+
+rectangle "Demandes solaires" {
+    usecase "Soumettre une\ndemande"             as Submit
+    usecase "Consulter /\ncompléter sa demande"  as Track
+    usecase "Traiter la demande"                 as Treat
+    usecase "Valider et convertir\nen projet"    as Convert
+    usecase "Rejeter la demande"                 as Reject
+}
+
+Client --> Submit
+Client --> Track
+
+Admin --> Treat
+Admin --> Convert
+Admin --> Reject
+
+@enduml

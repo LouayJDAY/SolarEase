@@ -1,0 +1,115 @@
+@startuml seq-sinscrire
+title Diagramme de séquence -- S'inscrire (Sprint 1)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor          #2C5282
+    LifeLineBackgroundColor #FAFAFA
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #E8F0FE
+    ActorBorderColor          #2C5282
+}
+
+actor       "Visiteur\n(futur Client)" as Visitor
+participant "Frontend\n(React)"        as Front
+participant "API Gateway"              as GW
+participant "AuthController"           as Ctrl
+participant "AuthService"              as Svc
+participant "OtpService"               as Otp
+participant "UserRepository"           as URepo
+participant "OtpTokenRepository"       as ORepo
+participant "EmailService\n(SMTP)"     as Mailer
+database    "Base de données"          as DB
+
+== Étape 1 : Création du compte ==
+Visitor -> Front : Remplit formulaire d'inscription
+activate Front
+Front -> GW    : POST /api/auth/register
+activate GW
+GW -> Ctrl     : Route publique
+activate Ctrl
+Ctrl -> Svc    : register(registerRequest)
+activate Svc
+
+Svc -> URepo   : existsByEmail(email)
+URepo -> DB    : SELECT COUNT(*) ...
+DB --> URepo   : 0 ou 1
+URepo --> Svc  : boolean
+
+alt E-mail déjà existant
+    Svc --> Ctrl  : EmailAlreadyExistsException
+    Ctrl --> GW   : HTTP 409
+    GW --> Front  : 409
+    Front --> Visitor : "Cet e-mail est déjà utilisé"
+else E-mail libre
+    Svc -> Svc    : BCrypt.hash(password, 10)
+    Svc -> Svc    : new User(role=CLIENT,\n  isEmailVerified=false)
+    Svc -> URepo  : save(user)
+    URepo -> DB   : INSERT INTO users
+    DB --> URepo  : User saved
+    URepo --> Svc : User
+
+    Svc -> Otp    : generateOtp(user)
+    activate Otp
+    Otp -> Otp    : génération code 6 chiffres
+    Otp -> ORepo  : save(otpToken, TTL=10min)
+    ORepo -> DB   : INSERT INTO otp_tokens
+    DB --> ORepo  : OK
+    ORepo --> Otp : OK
+    Otp --> Svc   : OtpToken
+    deactivate Otp
+
+    Svc -> Mailer : sendOtpEmail(user.email, code)
+    activate Mailer
+    Mailer --> Svc : OK
+    deactivate Mailer
+
+    Svc --> Ctrl  : RegisterResponse
+    Ctrl --> GW   : HTTP 201
+    GW --> Front  : 201
+    Front --> Visitor : Redirection vers page OTP
+end
+
+deactivate Svc
+deactivate Ctrl
+deactivate GW
+
+== Étape 2 : Vérification de l'OTP ==
+Visitor -> Front : Saisit le code OTP (6 chiffres)
+Front -> GW    : POST /api/auth/verify-otp\n{email, code}
+activate GW
+GW -> Ctrl     : Route publique
+activate Ctrl
+Ctrl -> Otp    : verifyOtp(email, code)
+activate Otp
+
+Otp -> ORepo   : findValidByEmailAndCode(...)
+ORepo -> DB    : SELECT WHERE email=? AND code=?\nAND expiresAt>NOW() AND used=false
+DB --> ORepo   : OtpToken | null
+ORepo --> Otp  : Optional<OtpToken>
+
+alt OTP invalide ou expiré
+    Otp --> Ctrl  : InvalidOtpException
+    Ctrl --> GW   : HTTP 400
+    GW --> Front  : 400
+    Front --> Visitor : "Code expiré -- proposer renvoi"
+else OTP valide
+    Otp -> ORepo  : markAsUsed(otp)
+    Otp -> URepo  : setEmailVerified(user, true)
+    URepo -> DB   : UPDATE users SET is_email_verified=true
+    DB --> URepo  : OK
+
+    Otp --> Ctrl  : OK
+    Ctrl --> GW   : HTTP 200
+    GW --> Front  : 200
+    Front --> Visitor : "Compte activé\nRedirection vers /login"
+end
+
+deactivate Otp
+deactivate Ctrl
+deactivate GW
+deactivate Front
+
+@enduml

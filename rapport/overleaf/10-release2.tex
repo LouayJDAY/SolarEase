@@ -1,0 +1,826 @@
+% ============================================================
+%  10-release2.tex  (fusionné dans le chapitre 3)
+%  Contient : Sprint 3 (Dimensioning Service + IA + PDF)
+% ============================================================
+
+% ══════════════════════════════════════════════════════════
+\section{Sprint 3~: Service de Dimensionnement Solaire}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Backlog du sprint}
+
+\begin{kanbanbox}[breakable]{Sprint 3 --- Dimensioning Service (Port 8083)}
+\centering\small
+\begin{tabular}{|C{1cm}|L{4.5cm}|L{4cm}|C{2cm}|C{1.8cm}|}
+  \hline
+  \rowcolor{figblue!20}
+  \textbf{ID Jira} & \textbf{Fonctionnalité} & \textbf{Tâches techniques} &
+  \textbf{Priorité} & \textbf{Statut} \\
+  \hline
+  SOLAR-11 & Collecte données conso. & Formulaire multi-appareils, kWh/j calculé & Haute & \ok~Fait \\
+  \hline
+  SOLAR-07 & Intégration PVGIS & GET PVGIS API, GHI, kWh/kWc/j & Haute & \ok~Fait \\
+  \hline
+  SOLAR-13 & Calcul Night Panel & kWc, nb panneaux, surface, coût & Haute & \ok~Fait \\
+  \hline
+  SOLAR-10 & Assistant IA & Ollama/TinyLLaMA, recommandations & Moyenne & \ok~Fait \\
+  \hline
+  SOLAR-12 & Rapport PDF & iText 8, mise en page dynamique & Haute & \ok~Fait \\
+  \hline
+  SOLAR-12b & Historique calculs & GET /calculations/history, pagination & Moyenne & \ok~Fait \\
+  \hline
+  SOLAR-07b & Visualisation graphes & Chart.js, courbe mensuelle rayonnement & Basse & \ok~Fait \\
+  \hline
+\end{tabular}
+\end{kanbanbox}
+
+\subsection{Analyse du sprint 3}
+
+Pour mieux comprendre ce troisième sprint, nous allons présenter le diagramme
+de cas d'utilisation du sprint~3, décrire les différents cas d'utilisation,
+et détailler les fonctionnalités mentionnées dans ce sprint.
+
+\subsubsection{Diagramme de cas d'utilisation global relatif au sprint 3}
+
+Ce diagramme de cas d'utilisation illustre les différentes fonctionnalités
+prises en charge lors du sprint~3, accessibles à l'\textbf{Installateur},
+qui réalise les études techniques de dimensionnement, exploite les
+recommandations IA et fournit le rapport PDF au client.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{uc-s3-global.png}{%
+    \includegraphics[width=0.88\textwidth]{uc-s3-global.png}%
+  }{%
+    \fbox{\parbox[c][8cm][c]{0.92\textwidth}{\centering Diagramme de cas d'utilisation global de Sprint 3}}%
+  }
+  \caption{Diagramme de cas d'utilisation global de Sprint~3}
+  \label{fig:uc-s3}
+\end{figure}
+
+\subsubsection{Vue détaillée des cas d'utilisation développés durant le sprint 3}
+
+Ensuite, nous présentons les diagrammes de cas d'utilisation détaillés
+correspondant aux fonctionnalités principales. Ces diagrammes permettent
+de mieux illustrer les interactions entre les acteurs et le système.
+
+% ──────────────────────────────────────────────
+\paragraph{Raffinement de cas d'utilisation «~Lancer le dimensionnement~»}
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{uc-installateur-dimensionnement.png}{%
+    \includegraphics[width=0.85\textwidth]{uc-installateur-dimensionnement.png}%
+  }{%
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Diagramme de cas d'utilisation -- Lancer le dimensionnement}}%
+  }
+  \caption{Diagramme de cas d'utilisation pour «~Lancer le dimensionnement~»}
+  \label{fig:uc-dimensionnement}
+\end{figure}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Saisir les données de consommation~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Saisir les données de consommation~»}
+  \label{tab:cu-saisir-conso}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Saisir les données de consommation. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de renseigner la consommation électrique du client (par appareil ou agrégée en kWh/j) afin de préparer le dimensionnement. \\
+    \hline
+    \textbf{Précondition} & L'installateur est authentifié et un projet existe pour le client. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur accède à la fiche projet du client.\newline
+    2. Il clique sur «~Nouveau dimensionnement~».\newline
+    3. Il choisit le mode de saisie~: par appareil (puissance, heures, quantité) ou total kWh/j.\newline
+    4. Il saisit les valeurs et valide le formulaire.\newline
+    5. Le frontend agrège les consommations par appareil pour calculer le total.\newline
+    6. Les données sont stockées temporairement en attendant le lancement du calcul.\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Consommation à zéro :}\newline
+    \hspace*{6pt}4.1.~Le système détecte un total nul.\newline
+    \hspace*{6pt}4.2.~Le système affiche : «~La consommation doit être supérieure à zéro~».\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Lancer le calcul de dimensionnement~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Lancer le calcul de dimensionnement~»}
+  \label{tab:cu-lancer-calcul}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Lancer le calcul de dimensionnement. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de calculer la puissance crête requise, le nombre de panneaux, la surface nécessaire et le coût estimé à partir de la consommation et de la localisation, en exploitant les données solaires PVGIS. \\
+    \hline
+    \textbf{Précondition} & Les données de consommation sont saisies, la localisation (latitude, longitude) est renseignée et l'API PVGIS est accessible. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur valide le formulaire complet (consommation + localisation).\newline
+    2. Le frontend envoie \texttt{POST /api/calculations} avec le JWT.\newline
+    3. Le Dimensioning Service reçoit les paramètres.\newline
+    4. \texttt{PvgisClient} interroge l'API PVGIS (latitude, longitude).\newline
+    5. Récupération du GHI mensuel et du ratio kWh/kWc/jour.\newline
+    6. \texttt{NightPanelCalculator} applique le modèle~: kWc, nb panneaux, surface, coût estimé.\newline
+    7. Le résultat est persisté dans la table \texttt{dimensionings}.\newline
+    8. Le Project Service est notifié pour passer le projet en \texttt{IN\_PROGRESS}.\newline
+    9. La réponse complète est retournée au frontend.\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- PVGIS indisponible :}\newline
+    \hspace*{6pt}4.1.~Le système renvoie HTTP~503 «~Service météo indisponible~».\newline[2pt]
+    \textit{Scénario alternatif 2 -- Localisation hors couverture :}\newline
+    \hspace*{6pt}5.1.~Le système indique que la zone n'est pas couverte par PVGIS.\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Consulter le résultat Night Panel~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Consulter le résultat Night Panel~»}
+  \label{tab:cu-resultat-np}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Consulter le résultat du dimensionnement. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de visualiser de façon synthétique les résultats du calcul : puissance crête, nombre de panneaux, surface, coût estimé, GHI mensuel et productible. \\
+    \hline
+    \textbf{Précondition} & Un calcul de dimensionnement a été effectué pour ce projet. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur accède à la page «~Résultat du dimensionnement~».\newline
+    2. Le frontend envoie \texttt{GET /api/calculations/\{id\}}.\newline
+    3. Le système retourne les indicateurs clés et les données mensuelles.\newline
+    4. L'écran affiche~: cartes KPI (kWc, panneaux, surface, coût), graphique mensuel du productible, carte de localisation.\newline
+    5. L'installateur peut comparer avec d'autres calculs depuis l'historique.\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Calcul inexistant :}\newline
+    \hspace*{6pt}3.1.~L'identifiant est invalide.\newline
+    \hspace*{6pt}3.2.~Le système renvoie HTTP~404.\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Consulter l'historique des calculs~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Consulter l'historique des calculs~»}
+  \label{tab:cu-historique-calculs}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Consulter l'historique des calculs. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de retrouver l'ensemble des calculs réalisés pour un projet et de comparer plusieurs simulations. \\
+    \hline
+    \textbf{Précondition} & L'installateur est authentifié et au moins un calcul a été effectué pour le projet. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur accède à l'onglet «~Historique~» d'un projet.\newline
+    2. Le frontend envoie \texttt{GET /api/calculations?projectId=\{id\}}.\newline
+    3. Le système retourne la liste des calculs triés par date décroissante.\newline
+    4. L'écran affiche un tableau avec date, kWc, nb panneaux, coût.\newline
+    5. L'installateur peut sélectionner un ou plusieurs calculs pour les visualiser ou les comparer.\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Historique vide :}\newline
+    \hspace*{6pt}3.1.~Le projet n'a aucun calcul.\newline
+    \hspace*{6pt}3.2.~Le système affiche : «~Aucun calcul effectué~».\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+% ──────────────────────────────────────────────
+\paragraph{Raffinement de cas d'utilisation «~Obtenir les recommandations IA~»}
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{uc-installateur-recommendations.png}{%
+    \includegraphics[width=0.85\textwidth]{uc-installateur-recommendations.png}%
+  }{%
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Diagramme de cas d'utilisation -- Obtenir les recommandations IA}}%
+  }
+  \caption{Diagramme de cas d'utilisation pour «~Obtenir les recommandations IA~»}
+  \label{fig:uc-recommendations}
+\end{figure}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Demander des recommandations IA~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Demander des recommandations IA~»}
+  \label{tab:cu-demander-reco}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Demander des recommandations IA. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur d'obtenir, à partir du
+      résultat du dimensionnement, un \textbf{kit complet validé}~: onduleur
+      Solax/Sungrow du catalogue société, câbles photovoltaïques tunisiens et
+      disjoncteurs Schneider AC/DC. Le kit est accompagné d'un \textbf{score de
+      compatibilité 0--100}, d'alertes éventuelles, d'arguments à présenter au
+      client et d'une \textit{checklist} terrain. La pertinence est assurée par
+      un pipeline RAG hybride~: sélection déterministe + recherche sémantique
+      \texttt{pgvector} + génération Ollama. \\
+    \hline
+    \textbf{Précondition} & Le résultat du dimensionnement est disponible.
+      La base \texttt{knowledge\_chunks} (pgvector) a été indexée au démarrage
+      du service. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur clique sur «~Recommandations IA~» depuis la page résultat.\newline
+    2. Le frontend envoie \texttt{POST /api/dimensioning/\{id\}/ai/regenerate}.\newline
+    3. Le \texttt{DecisionSupportService} sélectionne de manière déterministe
+       l'onduleur (Solax/Sungrow, monophasé ou triphasé selon STEG), les
+       câbles (NFC~33-209) et les disjoncteurs Schneider via
+       \texttt{EquipmentSelectionService}.\newline
+    4. \texttt{CompatibilityRuleEngine} calcule un score 0--100 et un verdict
+       (\texttt{OK}, \texttt{ATTENTION}, \texttt{NON\_COMPATIBLE}).\newline
+    5. \texttt{EmbeddingService} (Ollama \texttt{nomic-embed-text}) produit le
+       vecteur de la requête et \texttt{KnowledgeChunkRepository} interroge
+       \texttt{pgvector} (\texttt{ORDER BY embedding <=> \$1 LIMIT 5}) pour
+       récupérer les passages pertinents (catalogue, normes, STEG/ANME).\newline
+    6. Un prompt structuré est envoyé à Ollama qui retourne un JSON
+       (alertes, arguments client, \textit{checklist}, narratif).\newline
+    7. Le service fusionne le verdict déterministe avec l'enrichissement LLM
+       et retourne un \texttt{InstallerRecommendationDto}.\newline
+    8. Le frontend affiche le kit, le score, les alertes et les arguments. \\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Ollama indisponible :}\newline
+    \hspace*{6pt}5.1.~Le service applique le \textbf{mode \textit{fallback}}~:
+      le kit déterministe et le score sont renvoyés avec
+      \texttt{fallback=true} et un narratif généré localement.\newline[2pt]
+    \textit{Scénario alternatif 2 -- Catalogue insuffisant :}\newline
+    \hspace*{6pt}3.1.~Si aucun onduleur ne couvre la puissance demandée,
+      le plus puissant disponible est proposé et une alerte
+      «~kit sous-dimensionné~» est ajoutée. \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Régénérer les recommandations~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Régénérer les recommandations~»}
+  \label{tab:cu-regenerer-reco}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Régénérer les recommandations IA. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de relancer le pipeline
+      RAG (\textit{retrieval} \texttt{pgvector} + génération Ollama) s'il a
+      modifié les paramètres du calcul ou s'il souhaite obtenir une nouvelle
+      formulation du narratif et des arguments client. \\
+    \hline
+    \textbf{Précondition} & Un dimensionnement existe pour ce projet. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur clique sur «~Régénérer~» dans la zone IA.\newline
+    2. Le frontend envoie \texttt{POST /api/dimensioning/\{id\}/ai/regenerate}.\newline
+    3. La sélection déterministe (onduleur, câbles, disjoncteurs) est
+       recalculée afin de refléter les éventuelles modifications.\newline
+    4. Une nouvelle requête vectorielle est exécutée sur \texttt{knowledge\_chunks}.\newline
+    5. Ollama produit un nouveau JSON (alertes, arguments, \textit{checklist},
+       narratif).\newline
+    6. Le \texttt{InstallerRecommendationDto} ainsi qu'\texttt{aiRecommendation}
+       sont persistés et remplacent les valeurs précédentes. \\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Quota dépassé :}\newline
+    \hspace*{6pt}1.1.~L'installateur a régénéré plus de 3~fois en moins de 5~minutes.\newline
+    \hspace*{6pt}1.2.~Le système refuse l'opération avec un message d'attente.\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+% ──────────────────────────────────────────────
+\paragraph{Raffinement de cas d'utilisation «~Télécharger le rapport PDF~»}
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{uc-installateur-rapport-pdf.png}{%
+    \includegraphics[width=0.85\textwidth]{uc-installateur-rapport-pdf.png}%
+  }{%
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Diagramme de cas d'utilisation -- Télécharger le rapport PDF}}%
+  }
+  \caption{Diagramme de cas d'utilisation pour «~Télécharger le rapport PDF~»}
+  \label{fig:uc-rapport-pdf}
+\end{figure}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Télécharger le rapport PDF~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Télécharger le rapport PDF~»}
+  \label{tab:cu-telecharger-pdf}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Télécharger le rapport technique PDF. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de générer et télécharger un rapport PDF complet (logo entreprise, informations client, données PVGIS, résultats Night Panel, graphiques mensuels, recommandations IA) qu'il pourra remettre au client. \\
+    \hline
+    \textbf{Précondition} & Un calcul de dimensionnement a été effectué pour le projet. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur clique sur «~Télécharger le rapport~» depuis la page résultat.\newline
+    2. Le frontend envoie \texttt{GET /api/calculations/\{id\}/pdf}.\newline
+    3. Le service récupère les données du calcul, du client et du projet.\newline
+    4. \texttt{PdfGenerationService} construit le document via iText~8 (logo, infos client, données PVGIS, résultats Night Panel, graphique mensuel, recommandations IA).\newline
+    5. Le fichier est retourné avec \texttt{Content-Type: application/pdf}.\newline
+    6. Le navigateur déclenche le téléchargement \texttt{solarease-report-\{id\}.pdf}.\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Calcul inexistant :}\newline
+    \hspace*{6pt}3.1.~Le système renvoie HTTP~404.\newline[2pt]
+    \textit{Scénario alternatif 2 -- Erreur génération :}\newline
+    \hspace*{6pt}4.1.~iText échoue (police manquante, image non trouvée).\newline
+    \hspace*{6pt}4.2.~Le système renvoie HTTP~500 avec un message diagnostic.\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subparagraph{Description textuelle du cas d'utilisation «~Prévisualiser le rapport~»}
+
+\begin{table}[H]
+  \caption{Description textuelle du cas d'utilisation «~Prévisualiser le rapport~»}
+  \label{tab:cu-previsualiser-pdf}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue!10}
+    \textbf{Cas d'utilisation} & Prévisualiser le rapport avant téléchargement. \\
+    \hline
+    \textbf{Acteur initiateur} & Installateur \\
+    \hline
+    \textbf{But du cas} & Permettre à l'installateur de visualiser le rapport directement dans le navigateur avant de le télécharger ou de le partager. \\
+    \hline
+    \textbf{Précondition} & Le rapport est généré pour un calcul existant. \\
+    \hline
+    \textbf{Description du scénario} &
+    \textbf{Scénario principal :}\newline
+    1. L'installateur clique sur «~Prévisualiser~» depuis la page résultat.\newline
+    2. Le frontend ouvre le PDF dans un \texttt{iframe} ou une modale.\newline
+    3. L'installateur navigue dans les pages du rapport.\newline
+    4. Il peut alors cliquer sur «~Télécharger~» ou «~Partager~».\\
+    \hline
+    \textbf{Scénarios alternatifs} &
+    \textit{Scénario alternatif 1 -- Navigateur non compatible :}\newline
+    \hspace*{6pt}2.1.~Le système propose un téléchargement direct.\\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Conception du sprint 3}
+
+L'analyse conceptuelle de ce troisième sprint comprendra la description des
+diagrammes de séquence liés aux fonctionnalités majeures du sprint~3. Elle
+se conclura par l'élaboration du diagramme de classes, synthétisant
+l'ensemble des éléments étudiés.
+
+\subsubsection{Diagrammes de séquence}
+
+Dans cette phase, nous présentons les diagrammes de séquence correspondant
+aux principales fonctionnalités développées lors du sprint~3. Ces diagrammes
+illustrent les interactions entre les différents composants du système pour
+chaque fonctionnalité ciblée.
+
+% ──────────────────────────────────────────────
+\paragraph{Diagramme de séquence «~Lancer le dimensionnement~»}
+
+La figure ci-après présente le scénario nominal d'un calcul de dimensionnement~:
+saisie de la consommation, appel à l'API PVGIS pour récupérer les données
+solaires, application du modèle Night Panel, persistance du résultat.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{seq-dimensionnement.png}{%
+    \includegraphics[width=0.95\textwidth,height=0.7\textheight,keepaspectratio]{seq-dimensionnement.png}%
+  }{%
+    \fbox{\parbox[c][7cm][c]{0.92\textwidth}{\centering Diagramme de séquence «~Lancer le dimensionnement~»}}%
+  }
+  \caption{Diagramme de séquence «~Lancer le dimensionnement~»}
+  \label{fig:seq-s3}
+\end{figure}
+
+% ──────────────────────────────────────────────
+\paragraph{Diagramme de séquence «~Obtenir les recommandations IA~»}
+
+La figure ci-après illustre le pipeline RAG hybride~: sélection déterministe
+du kit (\texttt{EquipmentSelectionService} + \texttt{CompatibilityRuleEngine}),
+recherche sémantique dans la base vectorielle \texttt{pgvector}, génération
+narrative par Ollama, puis restitution structurée
+(\texttt{InstallerRecommendationDto}) au frontend.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{seq-recommandations-ia.png}{%
+    \includegraphics[width=0.95\textwidth,height=0.7\textheight,keepaspectratio]{seq-recommandations-ia.png}%
+  }{%
+    \fbox{\parbox[c][7cm][c]{0.92\textwidth}{\centering Diagramme de séquence «~Obtenir les recommandations IA~»}}%
+  }
+  \caption{Diagramme de séquence «~Obtenir les recommandations IA~»}
+  \label{fig:seq-reco-ia}
+\end{figure}
+
+% ──────────────────────────────────────────────
+\paragraph{Diagramme de séquence «~Télécharger le rapport PDF~»}
+
+La figure ci-après détaille la génération du rapport PDF via iText~8 à partir
+des données du calcul, du client et des recommandations IA.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{seq-rapport-pdf.png}{%
+    \includegraphics[width=0.95\textwidth,height=0.7\textheight,keepaspectratio]{seq-rapport-pdf.png}%
+  }{%
+    \fbox{\parbox[c][7cm][c]{0.92\textwidth}{\centering Diagramme de séquence «~Télécharger le rapport PDF~»}}%
+  }
+  \caption{Diagramme de séquence «~Télécharger le rapport PDF~»}
+  \label{fig:seq-pdf}
+\end{figure}
+
+\subsubsection{Diagramme de classes du sprint 3}
+
+Ce diagramme de classes global illustre l'architecture du projet, avec les
+classes liées au sprint~3.
+
+Il permet d'identifier clairement les entités utilisées lors de ce troisième
+sprint.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{class-sprint3.png}{%
+    \includegraphics[width=0.85\textwidth]{class-sprint3.png}%
+  }{%
+    \fbox{\parbox[c][8cm][c]{0.92\textwidth}{\centering Diagramme de classes global du sprint 3}}%
+  }
+  \caption{Diagramme de classes global du sprint~3}
+  \label{fig:class-s3}
+\end{figure}
+
+\subsection{Réalisation du sprint 3}
+
+\subsubsection{Modèle de calcul Night Panel}
+
+\begin{lstlisting}[caption={NightPanelCalculator.java --- Logique de dimensionnement},
+                   label=lst:nightpanel, language=Java]
+@Component
+public class NightPanelCalculator {
+
+    // Parametres du modele Night Panel
+    private static final double PANEL_EFFICIENCY   = 0.20; // 20%%
+    private static final double SYSTEM_LOSSES      = 0.80; // pertes systeme
+    private static final double PANEL_POWER_KWC    = 0.40; // 400 Wc / panneau
+    private static final double COST_PER_KWC_TND   = 2_800; // TND/kWc
+
+    public DimensionResult calculate(double dailyKwh, double ghi) {
+        // 1. Puissance creete requise (kWc)
+        double kWcRequired = dailyKwh / (ghi * SYSTEM_LOSSES);
+        // 2. Nombre de panneaux (arrondi superieur)
+        int nbPanels = (int) Math.ceil(kWcRequired / PANEL_POWER_KWC);
+        // 3. Surface utilisee (m2)
+        double surface = nbPanels * 1.6 * 0.99;      // 1.6 x 0.99 m
+        // 4. Cout estime (TND)
+        double cost = kWcRequired * COST_PER_KWC_TND;
+        return new DimensionResult(kWcRequired, nbPanels, surface, cost);
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption={OllamaService.java --- Appel au modèle IA},
+                   label=lst:ollama, language=Java]
+@Service
+public class OllamaService {
+
+    public String generateRecommendations(DimensionResult result, double ghi) {
+        String prompt = String.format(
+            "Tu es un expert en energie solaire en Tunisie.\n" +
+            "Puissance requise : %.2f kWc. Consommation journaliere : %.1f kWh.\n" +
+            "Localisation GHI : %.2f kWh/m2/j. Nombre panneaux : %d.\n" +
+            "Recommande : 1) Marques de panneaux, 2) Entretien, 3) Retour investissement.",
+            result.getKwcRequired(), result.getDailyKwh(),
+            ghi, result.getNbPanels());
+
+        OllamaRequest req = new OllamaRequest("tinyllama", prompt, false);
+        OllamaResponse res = restTemplate.postForObject(
+            ollamaUrl + "/api/generate", req, OllamaResponse.class);
+        return res != null ? res.getResponse() : "Service IA indisponible.";
+    }
+}
+\end{lstlisting}
+
+\subsubsection{Interfaces utilisateur réalisées}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{
+    \centering\vspace{0.5cm}
+    \textit{Formulaire de saisie des données de consommation}\\[4pt]
+    \small Remplacer par : \texttt{\textbackslash includegraphics[width=0.85\textbackslash textwidth]\{images/consumption-form.png\}}\\[4pt]
+    Liste d'appareils dynamique, puissance (W), heures/jour, quantité, total kWh/j auto-calculé
+    \vspace{0.5cm}
+  }}
+  \caption{Formulaire de saisie de consommation -- Sprint 3}
+  \label{fig:ui-conso}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{
+    \centering\vspace{0.5cm}
+    \textit{Page de résultats du dimensionnement -- Modèle Night Panel}\\[4pt]
+    \small Remplacer par : \texttt{\textbackslash includegraphics[width=0.85\textbackslash textwidth]\{images/dimensioning-result.png\}}\\[4pt]
+    Puissance kWc, Nb panneaux, Surface (m²), Coût estimé (TND), Graphe mensuel PVGIS
+    \vspace{0.5cm}
+  }}
+  \caption{Résultats de dimensionnement -- Sprint 3}
+  \label{fig:ui-result}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{
+    \centering\vspace{0.5cm}
+    \textit{Interface des recommandations IA (Ollama / TinyLLaMA)}\\[4pt]
+    \small Remplacer par : \texttt{\textbackslash includegraphics[width=0.85\textbackslash textwidth]\{images/ai-recommendations.png\}}\\[4pt]
+    Bulles de dialogue~: marques recommandées, entretien, ROI estimé, conseils personnalisés
+    \vspace{0.5cm}
+  }}
+  \caption{Recommandations IA embarquée -- Sprint 3}
+  \label{fig:ui-ia}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{
+    \centering\vspace{0.5cm}
+    \textit{Aperçu du rapport PDF généré (iText 8)}\\[4pt]
+    \small Remplacer par : \texttt{\textbackslash includegraphics[width=0.85\textbackslash textwidth]\{images/pdf-report.png\}}\\[4pt]
+    Logo SolarEase, données client, tableau résultats, graphique ensoleillement, recommandations IA
+    \vspace{0.5cm}
+  }}
+  \caption{Rapport PDF généré automatiquement -- Sprint 3}
+  \label{fig:ui-pdf}
+\end{figure}
+
+\subsection{Environnement du sprint 3}
+
+\begin{table}[H]
+  \caption{Technologies et outils utilisés -- Sprint 3}
+  \label{tab:tech-s3}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3cm}|L{3cm}|X|}
+    \hline
+    \rowcolor{figblue!20}
+    \textbf{Technologie} & \textbf{Version} & \textbf{Rôle dans le sprint 3} \\
+    \hline
+    Spring Boot & 3.2 & Microservice de dimensionnement (Dimensioning Service) \\
+    \hline
+    PVGIS API & v5.2 & Données d'ensoleillement (GHI mensuel, kWh/kWc/j) \\
+    \hline
+    Ollama & 0.1.x & Runtime local pour le modèle TinyLLaMA (recommandations IA) \\
+    \hline
+    TinyLLaMA & 1.1B & Modèle de langage embarqué~; génération de recommandations \\
+    \hline
+    iText 8 & 8.0 & Génération de rapports PDF dynamiques et professionnels \\
+    \hline
+    Chart.js & 4.x & Visualisation des données PVGIS (rayonnement mensuel) \\
+    \hline
+    PostgreSQL & 16 & Stockage des calculs, historique et données de consommation \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsubsection{Tests et validation}
+
+\begin{table}[H]
+  \caption{Résultats des tests fonctionnels -- Sprint 3}
+  \label{tab:tests-s3}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|C{1.2cm}|L{3.5cm}|X|C{1.4cm}|}
+    \hline
+    \rowcolor{figblue!20}
+    \textbf{ID} & \textbf{Cas de test} & \textbf{Résultat attendu} & \textbf{Statut} \\
+    \hline
+    T-17 & Dimensionnement valide & kWc, nb panneaux, surface, coût calculés & \ok~OK \\
+    \hline
+    T-18 & PVGIS disponible & GHI récupéré, données stockées & \ok~OK \\
+    \hline
+    T-19 & PVGIS hors service & Message d'erreur + données cache & \ok~OK \\
+    \hline
+    T-20 & Recommandations IA & Texte généré $<$ 3 secondes & \ok~OK \\
+    \hline
+    T-21 & Génération PDF & Fichier PDF valide, taille $<$ 2 Mo & \ok~OK \\
+    \hline
+    T-22 & Historique paginé & Liste des calculs + métadonnées & \ok~OK \\
+    \hline
+    T-23 & Résultat Night Panel & Cohérence kWc/nb panneaux & \ok~OK \\
+    \hline
+    T-24 & Accès non autorisé & HTTP 401 via Gateway & \ok~OK \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+% ══════════════════════════════════════════════════════════
+\subsection{Approche RAG hybride (pgvector + catalogue société)}
+% ══════════════════════════════════════════════════════════
+
+L'assistant IA de SolarEase ne se limite pas à un simple appel LLM.
+Il combine~:
+
+\begin{itemize}
+  \item un \textbf{moteur déterministe} qui sélectionne le kit complet
+    (onduleur Solax/Sungrow, câbles photovoltaïques tunisiens normalisés,
+    disjoncteurs Schneider AC/DC) à partir du \textbf{catalogue de la
+    société} stocké dans la table \texttt{equipments}~;
+  \item un \textbf{moteur sémantique} (\textbf{RAG}, \textit{Retrieval-Augmented
+    Generation}) qui interroge une base vectorielle \texttt{pgvector}
+    (table \texttt{knowledge\_chunks}, embeddings de dimension~768)
+    contenant la documentation produit, les normes câblage et les règles
+    STEG/ANME~;
+  \item un \textbf{LLM local} (Ollama) qui produit, à partir du kit et
+    des passages retrouvés, une réponse \textbf{JSON structurée}
+    (alertes, arguments client, \textit{checklist} terrain, narratif).
+\end{itemize}
+
+Cette architecture garantit que la \textbf{décision technique} (quel
+onduleur, quel câble, quel disjoncteur) reste \textbf{reproductible et
+auditable}, tandis que la \textbf{communication vers le client} bénéficie
+de la richesse d'un LLM. En cas d'indisponibilité d'Ollama, le mode
+\textit{fallback} renvoie le kit déterministe seul, sans rupture de service.
+
+\subsubsection{Architecture du pipeline RAG hybride}
+
+Le pipeline se décompose en quatre étapes~:
+
+\begin{enumerate}
+  \item \textbf{Sélection déterministe~:} \texttt{Equip\-mentSelectionService}
+    interroge \texttt{equipments} pour choisir l'onduleur de plus petite
+    puissance couvrant la capacité demandée et respectant la règle STEG
+    monophasé/triphasé ($\leq$~5,5~kWc en monophasé, $>$~5,5~kWc en
+    triphasé). Les sections de câbles DC/AC suivent la norme NFC~33-209
+    en fonction de la puissance, et les disjoncteurs Schneider sont
+    dimensionnés sur le courant de court-circuit majoré de 25~\%.
+  \item \textbf{Scoring de compatibilité~:} \texttt{Compatibility\-RuleEngine}
+    calcule un score 0--100 et un verdict (\texttt{OK},
+    \texttt{ATTENTION}, \texttt{NON\_COMPATIBLE}) en pénalisant les
+    écarts (sur-/sous-dimensionnement onduleur, mauvaise phase, câble
+    sous-dimensionné, disjoncteur manquant). Les anomalies sont
+    converties en \textbf{alertes textuelles}.
+  \item \textbf{Retrieval sémantique~:} \texttt{Embed\-dingService}
+    appelle Ollama (\texttt{nomic-embed-text}) pour transformer la
+    requête en vecteur de dimension~768. \texttt{Knowledge\-Chunk\-Repository}
+    interroge ensuite \texttt{pgvector} via l'opérateur de cosinus
+    \texttt{embedding <=> \$1} et récupère les 5 \textit{chunks} les
+    plus proches.
+  \item \textbf{Generation~:} le \texttt{DecisionSupportService} construit
+    un prompt incluant le kit, les alertes et les passages retrouvés,
+    puis demande à Ollama un JSON conforme à un schéma précis
+    (\texttt{alerts}, \texttt{clientArguments}, \texttt{terrainChecklist},
+    \texttt{narrativeSummary}). Le service fusionne le résultat avec le
+    verdict déterministe et renvoie un \texttt{InstallerRecommendationDto}.
+\end{enumerate}
+
+\subsubsection{Indexation de la base vectorielle}
+
+Au démarrage du Dimensioning Service, \texttt{Knowledge\-IndexerService}
+construit ou met à jour la table \texttt{knowledge\_chunks}~:
+
+\begin{table}[H]
+  \caption{Sources indexées dans la base vectorielle pgvector}
+  \label{tab:kb-rag}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{3.5cm}|X|}
+    \hline
+    \rowcolor{figblue!20}
+    \textbf{Source} & \textbf{Contenu indexé (chunks)} \\
+    \hline
+    Catalogue société & Onduleurs Solax / Sungrow (plages de puissance,
+      monophasé/triphasé, prix), panneaux et batteries de référence,
+      disjoncteurs Schneider AC/DC (calibres, type \textit{photovoltaïque}). \\
+    \hline
+    Normes câblage & Câbles photovoltaïques tunisiens, sections par
+      bracket de puissance (NFC~33-209), chutes de tension admissibles,
+      températures d'usage. \\
+    \hline
+    Règles STEG / ANME & Plafonds d'autoconsommation, raccordement
+      monophasé / triphasé, primes ANME, démarches administratives
+      (autorisations, raccordement, comptage). \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsubsection{Schéma de la table \texttt{knowledge\_chunks}}
+
+\begin{lstlisting}[caption={Schéma pgvector --- knowledge\_chunks},
+                   label=lst:pgvector, language=SQL]
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+    id          BIGSERIAL PRIMARY KEY,
+    source_type VARCHAR(40) NOT NULL,   -- EQUIPMENT | RULE | REGULATION
+    source_id   VARCHAR(120),
+    content     TEXT NOT NULL,
+    metadata    JSONB,
+    embedding   vector(768)             -- nomic-embed-text
+);
+
+CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx
+    ON knowledge_chunks
+    USING ivfflat (embedding vector_cosine_ops)
+    WITH (lists = 100);
+\end{lstlisting}
+
+\subsubsection{Extrait de code --- Pipeline RAG hybride}
+
+\begin{lstlisting}[caption={DecisionSupportService.java --- pipeline hybride pgvector},
+                   label=lst:rag, language=Java]
+public Result generate(DimensioningResponse dim,
+                       Equipment usedPanel,
+                       Equipment usedInverter) {
+    double kw = dim.getInstallation().getTotalCapacityKw();
+
+    // 1. Selection deterministe (catalogue societe)
+    InstallerRecommendationDto.RecommendedKit kit = buildKit(kw, usedInverter);
+
+    // 2. Scoring de compatibilite
+    CompatibilityRuleEngine.Result eval = ruleEngine.evaluate(
+            kw, kit.getInverter(), kit.getDcCable(), null, null);
+
+    InstallerRecommendationDto dto = baseDto(eval, kit, kw, usedInverter);
+
+    try {
+        // 3. Retrieval semantique (pgvector)
+        float[] q = embeddingService.embed(buildQuery(dim, kit));
+        List<KnowledgeChunk> chunks =
+                chunkRepository.searchSimilar(q, RETRIEVAL_TOPK);
+        dto.getRagSources().addAll(toSourceLabels(chunks));
+
+        // 4. Generation LLM + parsing JSON
+        String json = ollamaService.generate(buildPrompt(dim, kit, dto, chunks));
+        applyLlmAnswer(dto, json);
+    } catch (Exception e) {
+        log.warn("RAG augmentation skipped, deterministic kit only: {}",
+                 e.getMessage());
+        dto.setFallback(true);
+        applyDeterministicNarrative(dto, dim.getInstallation(), dim.getFinancials());
+    }
+    return new Result(dto, dto.getNarrativeSummary());
+}
+\end{lstlisting}
+
+\begin{conclusionbox}
+Le sprint~3 concrétise la proposition de valeur centrale de SolarEase.
+Le modèle Night Panel offre des calculs fiables validés contre des
+références terrain. Le pipeline RAG \textbf{hybride} couple une sélection
+déterministe sur le \textbf{catalogue société} (onduleurs Solax/Sungrow,
+câbles tunisiens, disjoncteurs Schneider) à une recherche sémantique
+\textbf{pgvector} et à un LLM local Ollama. L'installateur reçoit ainsi
+un \textbf{kit prêt à commander}, un \textbf{score de compatibilité} et
+des \textbf{arguments à présenter au client}, le tout avec un
+\textit{fallback} déterministe garantissant la disponibilité même si le
+modèle est hors-ligne. La génération PDF professionnelle permet enfin
+à l'installateur de remettre un rapport complet au client final.
+\end{conclusionbox}
+
+\cleardoublepage

@@ -1,0 +1,38 @@
+@startuml uc-admin-projets
+title Raffinement -- Gérer les projets
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Admin"        as Admin
+actor "Installateur" as Installer
+
+rectangle "Gestion des projets" {
+    usecase "Créer un projet"               as Create
+    usecase "Affecter un projet\nà un installateur" as Assign
+    usecase "Consulter les projets"         as List
+    usecase "Modifier un projet"            as Edit
+    usecase "Changer le statut\ndu projet"  as ChangeStatus
+    usecase "Supprimer un projet"           as Delete
+}
+
+Admin     --> Create
+Admin     --> Assign
+Admin     --> List
+Admin     --> Edit
+Admin     --> ChangeStatus
+Admin     --> Delete
+
+Installer --> List
+Installer --> ChangeStatus
+
+@enduml

@@ -1,0 +1,55 @@
+@startuml seq-changer-statut
+title Diagramme de séquence -- Changer le statut d'un projet
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Admin /\nInstallateur" as User
+participant "Frontend\n(React)"        as FE
+participant "API Gateway"               as GW
+participant "ProjectController"         as PC
+participant "AccessControlService"      as ACS
+participant "ProjectService"            as PS
+participant "ProjectRepository"         as PR
+database  "PostgreSQL"                  as DB
+
+User -> FE : Sélectionner nouveau\nstatut sur la fiche projet
+FE   -> GW : PATCH /api/projects/{id}/status\n(JWT, body={status})
+GW   -> GW : Valider JWT
+GW   -> PC : Forward + X-User-Id,\nX-User-Role
+PC   -> ACS : requireAnyRole("ADMIN","INSTALLER")
+ACS --> PC : OK
+PC   -> PS : updateStatus(id, newStatus, userId)
+PS   -> PR : findById(id)
+PR   -> DB : SELECT * FROM projects
+DB  --> PR : Project
+PR  --> PS : Project
+PS   -> PS : Valider transition\n(parmi 6 valeurs)
+alt Installateur
+    PS -> PS : Vérifier ownership\n(installerId == userId)
+end
+PS   -> PS : project.status = newStatus\nproject.updatedAt = now()
+PS   -> PR : save(Project)
+PR   -> DB : UPDATE projects\nSET status=?, updated_at=?
+DB  --> PR : OK
+PR  --> PS : Project mis à jour
+PS  --> PC : ProjectResponse
+PC  --> GW : 200 OK
+GW  --> FE : 200 + ProjectResponse
+FE  --> User : Confirmation\n+ badge statut actualisé
+
+alt Statut invalide
+    PS  --> PC : IllegalArgumentException
+    PC  --> GW : 400 Bad Request
+    GW  --> FE : 400
+    FE  --> User : "Statut invalide"
+end
+
+@enduml
