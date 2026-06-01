@@ -1,0 +1,64 @@
+@startuml seq-dashboard-client
+title Diagramme de séquence -- Consulter le tableau de bord client
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Client"  as Client
+participant "Frontend"              as FE
+participant "API Gateway"            as GW
+participant "ClientController"       as CC
+participant "ProjectService"         as PS
+participant "QuoteService"           as QS
+participant "InvoiceService"         as IS
+participant "NotificationService"    as NS
+database  "PostgreSQL"               as DB
+
+Client -> FE : Se connecter
+Client -> FE : Accéder à "Espace client"
+
+FE   -> GW : GET /api/clients/me/dashboard (JWT)
+GW   -> CC : Forward + role=CLIENT
+CC   -> CC : Identifier le client\n(userId = X-User-Id)
+
+par Charger projets
+    CC -> PS : findActiveProjects(clientId)
+    PS -> DB : SELECT * FROM projects\nWHERE client_id=? AND status<>COMPLETED
+    DB --> PS : List<Project>
+    PS --> CC : List<ProjectDTO>
+end
+
+par Charger devis
+    CC -> QS : findByClient(clientId)
+    QS -> DB : SELECT * FROM quotes\nWHERE client_id=?
+    DB --> QS : List<Quote>
+    QS --> CC : List<QuoteDTO>
+end
+
+par Charger factures
+    CC -> IS : findByClient(clientId)
+    IS -> DB : SELECT * FROM invoices\nWHERE client_id=?
+    DB --> IS : List<Invoice>
+    IS --> CC : List<InvoiceDTO>
+end
+
+par Charger notifications
+    CC -> NS : findByUserId(userId)
+    NS -> DB : SELECT * FROM notifications\nWHERE user_id=? AND read=false
+    DB --> NS : List<Notification>
+    NS --> CC : List<NotificationDTO>
+end
+
+CC   -> CC : Construire DashboardClientResponse\n(projets, devis, factures, notifs)
+CC  --> GW : 200 OK + JSON
+GW  --> FE : 200 + dashboard
+FE  --> Client : Affichage~:\n- Cartes KPI\n- Stepper du projet actif\n- Liens vers devis/factures\n- Notifications récentes
+
+@enduml

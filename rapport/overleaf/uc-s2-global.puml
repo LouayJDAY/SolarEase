@@ -1,0 +1,31 @@
+@startuml uc-s2-global
+title Diagramme de cas d'utilisation global -- Sprint 2
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Admin"        as Admin
+actor "Installateur" as Installer
+
+rectangle "Project Service" {
+    usecase "Gérer les clients"           as UC_Clients
+    usecase "Gérer les projets"           as UC_Projets
+    usecase "Consulter le tableau\nde bord" as UC_Dashboard
+}
+
+Admin     --> UC_Clients
+Admin     --> UC_Projets
+Admin     --> UC_Dashboard
+Installer --> UC_Projets
+Installer --> UC_Dashboard
+
+@enduml

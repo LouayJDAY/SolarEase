@@ -11,6 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+import java.util.List;
+
 @Service
 @Slf4j
 @Transactional
@@ -74,6 +77,17 @@ public class AuthService {
             throw new BadRequestException("Username already taken");
         }
 
+        // Determine user role: default to CLIENT if not specified
+        User.UserRole userRole = User.UserRole.CLIENT;
+        if (request.getUserRole() != null && !request.getUserRole().isEmpty()) {
+            try {
+                userRole = User.UserRole.valueOf(request.getUserRole().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid user role: {}, defaulting to CLIENT", request.getUserRole());
+                userRole = User.UserRole.CLIENT;
+            }
+        }
+
         User newUser = User.builder()
                 .uuid(java.util.UUID.randomUUID().toString())
                 .email(request.getEmail())
@@ -82,17 +96,31 @@ public class AuthService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .phone(request.getPhone())
-                .role(User.UserRole.INSTALLER)
+                .role(userRole)
                 .isActive(true)
-                .isEmailVerified(true)
+            .isEmailVerified(false)
                 .build();
 
         User savedUser = userRepository.save(newUser);
 
-        log.info("User {} registered successfully (auto-verified)", savedUser.getEmail());
+        // Générer l'OTP et tenter l'envoi email sans bloquer l'inscription si SMTP échoue
+        String message;
+        String otpCode = null;
+        try {
+            otpCode = otpService.generateAndSendOtp(savedUser);
+            message = "User registered successfully. Please verify your email with the OTP code sent.";
+        } catch (RuntimeException e) {
+            log.warn("OTP generation/email failed for {}: {}", savedUser.getEmail(), e.getMessage());
+            message = "User registered successfully, but the OTP email could not be sent. You can request a new code later.";
+            otpCode = getLatestOtpCode(savedUser);
+        }
+
+        log.info("User {} registered successfully (email not verified, OTP sent)", savedUser.getEmail());
         
         return AuthResponse.builder()
-                .message("User registered successfully. Please verify your email with the OTP code sent.")
+                .message(message)
+                .email(savedUser.getEmail())
+            .otpCode(otpCode)
                 .build();
     }
 
@@ -134,6 +162,132 @@ public class AuthService {
                 .isActive(user.getIsActive())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    public List<AuthResponse.UserDto> listInstallers() {
+        return userRepository.findAllByRole(User.UserRole.INSTALLER).stream()
+                .map(this::buildUserDto)
+                .toList();
+    }
+
+    public List<AuthResponse.UserDto> listClients() {
+        return userRepository.findAllByRole(User.UserRole.CLIENT).stream()
+                .map(this::buildUserDto)
+                .toList();
+    }
+
+    public AuthResponse.UserDto createInstaller(CreateInstallerRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email deja utilise");
+        }
+
+        String username = generateUniqueUsername(request.getEmail(), request.getFirstName(), request.getLastName());
+
+        User newInstaller = User.builder()
+                .uuid(java.util.UUID.randomUUID().toString())
+                .email(request.getEmail())
+                .username(username)
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phone(request.getPhone())
+                .role(User.UserRole.INSTALLER)
+                .isActive(true)
+                .isEmailVerified(true)
+                .build();
+
+        User saved = userRepository.save(newInstaller);
+        log.info("Installer created by admin: {} ({})", saved.getEmail(), saved.getUuid());
+        return buildUserDto(saved);
+    }
+
+    public AuthResponse.UserDto updateInstaller(String installerUuid, UpdateInstallerRequest request) {
+        log.debug("updateInstaller called: installerUuid={}, request={}", installerUuid, request);
+
+        User installer = userRepository.findByUuid(installerUuid)
+            .orElseThrow(() -> new ResourceNotFoundException("Installateur non trouve"));
+
+        log.debug("Existing installer before update: email={}, username={}, isEmailVerified={}, isActive={}",
+            installer.getEmail(), installer.getUsername(), installer.getIsEmailVerified(), installer.getIsActive());
+
+        if (installer.getRole() != User.UserRole.INSTALLER) {
+            throw new BadRequestException("L'utilisateur cible n'est pas un installateur");
+        }
+
+        if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(installer.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email deja utilise");
+            }
+            installer.setEmail(request.getEmail());
+            installer.setUsername(generateUniqueUsername(request.getEmail(), installer.getFirstName(), installer.getLastName()));
+            // Email changed -> require re-verification
+            installer.setIsEmailVerified(false);
+            try {
+                otpService.generateAndSendOtp(installer);
+                log.info("OTP resent to updated installer email: {}", installer.getEmail());
+            } catch (RuntimeException e) {
+                log.warn("Failed to send OTP after email update for {}: {}", installer.getEmail(), e.getMessage());
+            }
+        }
+
+        if (request.getFirstName() != null) {
+            installer.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            installer.setLastName(request.getLastName());
+        }
+        if (request.getPhone() != null) {
+            installer.setPhone(request.getPhone());
+        }
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            installer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+        if (request.getIsActive() != null) {
+            installer.setIsActive(request.getIsActive());
+        }
+
+        User saved = userRepository.save(installer);
+        log.info("Installer updated by admin: {} ({})", saved.getEmail(), saved.getUuid());
+        return buildUserDto(saved);
+    }
+
+    public void deleteInstaller(String installerUuid) {
+        User installer = userRepository.findByUuid(installerUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("Installateur non trouve"));
+
+        if (installer.getRole() != User.UserRole.INSTALLER) {
+            throw new BadRequestException("Suppression autorisee uniquement pour les installateurs");
+        }
+
+        userRepository.delete(installer);
+        log.info("Installer deleted by admin: {} ({})", installer.getEmail(), installer.getUuid());
+    }
+
+    private String generateUniqueUsername(String email, String firstName, String lastName) {
+        String base = email != null && email.contains("@")
+                ? email.substring(0, email.indexOf("@"))
+                : ((firstName == null ? "" : firstName) + "." + (lastName == null ? "" : lastName));
+
+        String normalizedBase = base
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]", "")
+                .replaceAll("\\.{2,}", ".")
+                .replaceAll("_{2,}", "_")
+                .replaceAll("-{2,}", "-")
+                .replaceAll("^[._-]+|[._-]+$", "");
+
+        if (normalizedBase.isBlank()) {
+            normalizedBase = "installer";
+        }
+
+        String candidate = normalizedBase;
+        int suffix = 1;
+        while (userRepository.existsByUsername(candidate)) {
+            candidate = normalizedBase + suffix;
+            suffix++;
+        }
+
+        return candidate;
     }
 
     // ==================== PROFILE MANAGEMENT ====================
@@ -250,12 +404,26 @@ public class AuthService {
             throw new BadRequestException("L'email est déjà vérifié");
         }
 
-        otpService.generateAndSendOtp(user);
+        String message;
+        String otpCode = null;
+        try {
+            otpCode = otpService.generateAndSendOtp(user);
+            message = "Un nouveau code OTP a été envoyé à votre email";
+        } catch (RuntimeException e) {
+            log.warn("OTP resend failed for {}: {}", request.getEmail(), e.getMessage());
+            message = "Le compte a bien été trouvé, mais l'email OTP n'a pas pu être envoyé. Réessayez plus tard.";
+            otpCode = getLatestOtpCode(user);
+        }
 
         log.info("OTP resent to: {}", request.getEmail());
         return AuthResponse.builder()
-                .message("Un nouveau code OTP a été envoyé à votre email")
+                .message(message)
                 .email(request.getEmail())
+                .otpCode(otpCode)
                 .build();
+    }
+
+    private String getLatestOtpCode(User user) {
+        return otpService.findLatestOtpCode(user).orElse(null);
     }
 }

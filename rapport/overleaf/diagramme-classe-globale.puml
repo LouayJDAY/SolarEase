@@ -1,0 +1,215 @@
+@startuml diagramme-classe-globale
+title Diagramme de classes globale -- SolarEase
+
+' ────────────────────────────────────────────────────────────
+'  Corrections (annotations rouges de l'encadrant) :
+'    • Technicien    -> Installateur
+'    • Cycle Installateur-Client-Projet brisé
+'        (suppression de Installateur gère Client)
+'    • Suppression de Admin gère Client (non envisageable)
+'  Tout le reste du diagramme est conservé à l'identique.
+' ────────────────────────────────────────────────────────────
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor   #FAFAFA
+    BorderColor       #2C5282
+    ArrowColor        #2C5282
+    ArrowFontSize     11
+}
+
+' =========================
+'   IDENTITÉ
+' =========================
+class Utilisateur {
+    -id : int
+    -nom : String
+    -email : String
+    -motDePasse : String
+    -role : Role
+    +seConnecter()
+    +seDeconnecter()
+}
+
+class OtpToken {
+    -id : int
+    -token : String
+    -expiresAt : Date
+    -used : boolean
+    +isValid()
+}
+
+class RefreshToken {
+    -id : int
+    -token : String
+    -expiresAt : Date
+    -revoked : boolean
+    +isExpired()
+    +revoke()
+}
+
+class Installateur {
+    -telephone : String
+    -adresse : String
+    +gererClients()
+    +gererProjets()
+    +consulterStatistiques()
+}
+
+class Admin {
+    +gererUtilisateurs()
+    +consulterStatistiques()
+}
+
+class Client {
+    -telephone : String
+    -adresse : String
+    +consulterProjets()
+    +recevoirDevis()
+    +onCreate()
+    +onUpdate()
+}
+
+' =========================
+'   PROJET
+' =========================
+class Projet {
+    -id : int
+    -nom : String
+    -dateDebut : Date
+    -dateFin : Date
+    -statut : String
+    +ajouterEquipement()
+    +genererDevis()
+    +onCreate()
+    +onUpdate()
+}
+
+' =========================
+'   COMMERCIAL / DOCUMENTS
+' =========================
+class Notification {
+    -id : int
+    -message : String
+    -dateEnvoi : Date
+    -lu : boolean
+    +marquerCommeLue()
+}
+
+class Facture {
+    -id : int
+    -montant : float
+    -dateEmission : Date
+    -statut : String
+    +envoyerAuClient()
+    +enregistrerPaiement()
+}
+
+class Document {
+    -id : int
+    -nom : String
+    -type : String
+    -url : String
+    -dateUpload : Date
+    +telecharger()
+    +supprimer()
+}
+
+class Devis {
+    -id : int
+    -montant : float
+    -dateEmission : Date
+    -statut : String
+    +envoyerAuClient()
+    +valider()
+    +rejeter()
+}
+
+class Rapport {
+    -id : int
+    -type : String
+    -contenu : String
+    -dateCreation : Date
+    +genererPDF()
+}
+
+' =========================
+'   DIMENSIONNEMENT
+' =========================
+class Dimensioning {
+    -id : Long
+    -projectId : Long
+    -status : DimensioningStatus
+    -aiRecommendation : String
+    -panelType : String
+    +calculerDimensionning()
+    +compareDimensionings()
+}
+
+class RoofCharacteristic {
+    -id : int
+    -surface : float
+    -inclinaison : float
+    -orientation : String
+    -materiau : String
+    +calculerSurface()
+}
+
+class SolarInstallation {
+    -id : int
+    -puissanceTotale : float
+    -nombrePanneaux : int
+    -rendement : float
+    -dateInstallation : Date
+    +calculerRendement()
+    +genererRapport()
+}
+
+class Equipment {
+    -id : int
+    -type : String
+    -marque : String
+    -modele : String
+    -quantite : int
+    -puissance : float
+    +getAllEquipements()
+    +getEquipementByType()
+    +getEquipementById()
+}
+
+' ────────────────────────────────────────────
+'   RELATIONS
+' ────────────────────────────────────────────
+
+' Héritage
+Utilisateur <|-- Installateur
+Utilisateur <|-- Admin
+Utilisateur <|-- Client
+
+' Authentification
+Utilisateur "1" -- "0..*" OtpToken     : génère
+Utilisateur "1" -- "0..*" RefreshToken : possède
+
+' Gestion (cycle supprimé : Installateur ne gère plus directement Client)
+Installateur "1" -- "0..*" Projet  : gère
+
+' Projet ↔ Client
+Client "1" -- "*" Projet : concerne
+
+' Client reçoit des artefacts (pas de retour, pas de cycle)
+Client "1" -- "0..*" Notification : reçoit
+Client "1" -- "0..*" Facture      : reçoit
+Client "1" -- "0..*" Document     : possède
+
+' Production à partir du projet
+Projet "1" -- "1..*" Rapport      : produit
+Projet "1" -- "1..*" Dimensioning : contient
+Projet "1" -- "1..*" Devis        : génère
+
+' Dimensionnement
+Dimensioning "1" -- "1"   RoofCharacteristic : décrit
+Dimensioning "1" -- "1"   SolarInstallation  : définit
+Dimensioning "*" -- "1..*" Equipment         : utilise
+
+@enduml

@@ -40,6 +40,9 @@ public class Client {
     @Column(name = "installer_id")
     private String installerId;
 
+    @Column(name = "user_id", unique = true)
+    private String userId;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 

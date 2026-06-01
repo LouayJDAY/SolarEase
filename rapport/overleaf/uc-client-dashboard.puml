@@ -1,0 +1,48 @@
+@startuml uc-client-dashboard
+title Raffinement -- Tableau de bord client
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Client" as Client
+
+rectangle "Espace Client" {
+    usecase "S'authentifier"           as Auth
+    usecase "Consulter le tableau\nde bord"   as Dashboard
+    usecase "Suivre l'avancement\ndu projet (stepper)" as Stepper
+    usecase "Consulter ses devis"      as Quotes
+    usecase "Consulter ses factures"   as Invoices
+    usecase "Consulter ses\ndocuments"  as Docs
+    usecase "Consulter ses messages"   as Messages
+    usecase "Modifier son profil"      as Profile
+    usecase "Consulter les notifications"  as Notifications
+}
+
+Client --> Auth
+Client --> Dashboard
+Client --> Stepper
+Client --> Quotes
+Client --> Invoices
+Client --> Docs
+Client --> Messages
+Client --> Profile
+Client --> Notifications
+
+Dashboard     ..> Auth      : <<include>>
+Stepper       ..> Dashboard : <<extend>>
+Quotes        ..> Dashboard : <<extend>>
+Invoices      ..> Dashboard : <<extend>>
+Docs          ..> Dashboard : <<extend>>
+Messages      ..> Dashboard : <<extend>>
+Notifications ..> Dashboard : <<extend>>
+
+@enduml

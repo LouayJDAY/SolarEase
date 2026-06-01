@@ -1,0 +1,83 @@
+@startuml seq-creer-installateur
+title Diagramme de séquence -- Créer un compte installateur (Sprint 1)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor          #2C5282
+    LifeLineBackgroundColor #FAFAFA
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #E8F0FE
+    ActorBorderColor          #2C5282
+}
+
+actor       "Admin authentifié"          as Admin
+participant "Frontend admin\n(React)"    as Front
+participant "API Gateway"                 as GW
+participant "JWT Filter"                  as Filter
+participant "AuthController"              as Ctrl
+participant "AuthService"                 as Svc
+participant "UserRepository"              as Repo
+participant "EmailService\n(SMTP)"        as Mailer
+database    "Base de données"             as DB
+
+Admin -> Front : Remplit formulaire\n(prénom, nom, e-mail, téléphone, mdp)
+activate Front
+
+Front -> GW    : POST /api/auth/installers\nHeader: Authorization: Bearer <JWT>
+activate GW
+
+GW -> Filter   : valide JWT
+activate Filter
+Filter -> Filter : extractClaims()
+alt Rôle <> ADMIN
+    Filter --> GW   : HTTP 403 Forbidden
+    GW    --> Front : 403
+    Front --> Admin : "Accès refusé"
+else Rôle = ADMIN
+    Filter --> GW : OK + X-User-Id, X-User-Role
+    deactivate Filter
+
+    GW -> Ctrl : forward + headers
+    activate Ctrl
+
+    Ctrl -> Svc : createInstaller(request)
+    activate Svc
+
+    Svc -> Repo : existsByEmail(email)
+    Repo -> DB  : SELECT COUNT(*) FROM users WHERE email=?
+    DB  --> Repo: 0 ou 1
+    Repo--> Svc : boolean
+
+    alt Email déjà existant
+        Svc  --> Ctrl : throw EmailAlreadyExistsException
+        Ctrl --> GW   : HTTP 409 Conflict
+        GW   --> Front: 409
+        Front--> Admin: "Installateur déjà existant"
+    else Email libre
+        Svc -> Svc : BCrypt.hash(password, 10)
+        Svc -> Svc : new User(role=INSTALLER,\n  isEmailVerified=true,\n  isActive=true)
+        Svc -> Repo : save(user)
+        Repo -> DB  : INSERT INTO users
+        DB  --> Repo: User saved
+        Repo--> Svc : User
+
+        Svc -> Mailer : sendWelcomeEmail(user, password)
+        activate Mailer
+        Mailer --> Svc : OK
+        deactivate Mailer
+
+        Svc  --> Ctrl : UserDto
+        Ctrl --> GW   : HTTP 201 Created + UserDto
+        GW   --> Front: 201 + UserDto
+        Front-> Front : Rafraîchit la liste
+        Front--> Admin: "Compte installateur créé\n(identifiants envoyés par e-mail)"
+    end
+    deactivate Svc
+    deactivate Ctrl
+end
+deactivate GW
+deactivate Front
+
+@enduml

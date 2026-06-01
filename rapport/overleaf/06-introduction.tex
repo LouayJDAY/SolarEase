@@ -1,0 +1,145 @@
+% ============================================================
+%  06-introduction.tex — Introduction Générale
+% ============================================================
+\chapterstar{Introduction Générale}
+
+\vspace{-6pt}
+\begin{tcolorbox}[
+  enhanced, colback=sectionbg, colframe=isetblue!40,
+  arc=4pt, boxrule=0pt,
+  borderline west={4pt}{0pt}{isetgold},
+  left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fontupper=\small\itshape\color{darkgray}
+]
+Ce rapport présente le travail réalisé dans le cadre du Projet de Fin d'Études
+(PFE) pour l'obtention de la Licence en \textbf{Développement des Systèmes
+d'Information} à l'ISET Nabeul, année universitaire~2024/2025.
+Il documente la conception et la réalisation complète de la plateforme
+\textbf{SolarEase}, depuis l'analyse des besoins jusqu'au déploiement.
+\end{tcolorbox}
+
+\vspace{12pt}
+
+% ──────────────────────────────────────────────────────────
+\section*{Contexte et motivation}
+
+La transition énergétique figure parmi les enjeux stratégiques majeurs du
+XXI\textsuperscript{e} siècle. En Tunisie, la filière photovoltaïque connaît
+une croissance soutenue, portée par deux dynamiques convergentes~:
+d'une part, les objectifs nationaux d'efficacité énergétique inscrits dans
+le \textit{Plan Solaire Tunisien} (30\,\% d'énergies renouvelables à
+l'horizon 2030)~; d'autre part, la baisse continue des coûts des modules
+solaires qui rend cette technologie accessible à un public de plus en plus
+large --- résidentiel, commercial et industriel.
+
+Des centaines de sociétés d'installation photovoltaïque opèrent aujourd'hui
+sur le territoire tunisien. Ces acteurs jouent un rôle clé dans la
+concrétisation de la transition énergétique, mais peinent encore à
+industrialiser leurs processus internes~: dimensionnement, suivi client,
+facturation et génération de rapports techniques.
+
+% ──────────────────────────────────────────────────────────
+\section*{Problématique}
+
+Une analyse de terrain révèle que la majorité de ces installateurs s'appuient
+sur des outils hétérogènes et non intégrés~: tableurs manuels pour le
+dimensionnement, logiciels isolés pour la simulation, courriers électroniques
+pour la relation client et documents bureautiques pour les devis. Cette
+fragmentation engendre~:
+\begin{itemize}
+  \item des erreurs de calcul lors du dimensionnement~;
+  \item une perte de temps considérable sur les tâches répétitives~;
+  \item l'absence de traçabilité des projets~;
+  \item une image peu professionnelle vis-à-vis du client final.
+\end{itemize}
+
+\begin{tcolorbox}[
+  enhanced, colback=isetblue!7, colframe=isetblue,
+  arc=4pt, boxrule=0.6pt,
+  left=12pt, right=12pt, top=10pt, bottom=10pt,
+  fontupper=\normalsize\itshape\color{isetblue!80!black}
+]
+\textbf{Problématique centrale~:} Comment concevoir et réaliser une plateforme
+web unifiée permettant aux installateurs photovoltaïques de gérer l'intégralité
+de leur cycle métier --- du premier contact client jusqu'au rapport de
+dimensionnement --- en s'appuyant sur des données fiables (PVGIS) et des
+recommandations intelligentes (IA), tout en garantissant sécurité, scalabilité
+et évolutivité~?
+\end{tcolorbox}
+
+% ──────────────────────────────────────────────────────────
+\section*{Solution proposée~: SolarEase}
+
+Pour répondre à cette problématique, nous proposons \textbf{SolarEase}~---~une
+plateforme web intelligente dédiée aux installateurs photovoltaïques. Elle
+centralise l'intégralité du cycle de vie d'un projet solaire au sein d'une
+interface unique, depuis la gestion du client jusqu'à la remise d'un rapport
+PDF professionnel, en passant par le calcul de dimensionnement et l'analyse
+financière sur 25~ans.
+
+SolarEase se distingue par trois innovations majeures~:
+\begin{enumerate}
+  \item \textbf{Données réelles PVGIS}~: les calculs de production solaire
+    s'appuient sur l'API officielle de la Commission Européenne (données
+    d'irradiance géolocalisées), garantissant une précision scientifique~;
+  \item \textbf{Mode Night~Panel}~: une fonctionnalité inédite permettant
+    de simuler et comparer des installations avec stockage batterie intégré,
+    incluant le calcul de la couverture nocturne et du taux
+    d'autoconsommation~;
+  \item \textbf{Intelligence Artificielle locale}~: des recommandations
+    personnalisées générées par un LLM (Ollama / TinyLLaMA) déployé
+    localement, sans dépendance à des services cloud externes.
+\end{enumerate}
+
+% ──────────────────────────────────────────────────────────
+\section*{Méthodologie et organisation du rapport}
+
+Le projet a été mené selon la méthodologie \textbf{Kanban}, offrant un flux
+continu de développement piloté visuellement via \textbf{Jira}. Le travail
+est découpé en \textbf{cinq sprints} itératifs de deux semaines chacun,
+permettant des livraisons incrémentales et une validation régulière avec
+l'encadrant.
+
+Le présent rapport est structuré comme suit~:
+
+\begin{table}[H]
+  \caption*{Structure du rapport}
+  \centering\small
+  \setlength{\tabcolsep}{8pt}
+  \begin{tabularx}{\textwidth}{L{4.5cm} X}
+    \toprule
+    \textbf{Section} & \textbf{Contenu} \\
+    \midrule
+    Chapitre 1 --- Cadre général &
+    Présentation de l'organisme d'accueil, problématique, objectifs,
+    analyse critique de l'existant et choix méthodologique \\
+    \addlinespace
+    Chapitre 2 --- Besoins \& Architecture &
+    Spécification des besoins, pilotage Kanban, Product Backlog,
+    planification des sprints et architecture technique globale \\
+    \addlinespace
+    Chapitre 3 --- Sprints 1 et 2 &
+    Fondation technique (authentification JWT/OTP, Gateway) et gestion
+    des clients et des projets (CRUD, cycle de vie, tableau de bord) \\
+    \addlinespace
+    Chapitre 4 --- Sprints 3, 4 et 5 &
+    Dimensionnement solaire (PVGIS, Night Panel), approche RAG \textbf{hybride}
+    (catalogue société + \texttt{pgvector}) pour les recommandations IA,
+    génération PDF, suivi terrain, messagerie
+    temps réel, notifications, espace client, demandes, devis,
+    factures et workflow commercial complet \\
+    \addlinespace
+    Chapitre 5 --- DevOps \& mise en production &
+    Containerisation des microservices backend, pipeline CI/CD GitHub
+    Actions, observabilité (Prometheus, Grafana, Loki), qualité et
+    sécurité (JaCoCo, Trivy, Gitleaks), Infrastructure as Code
+    (Kubernetes + Kustomize) et stratégie de déploiement
+    multi-environnements (Railway pour le backend, Vercel pour le frontend) \\
+    \addlinespace[8pt]
+    Conclusion générale &
+    Bilan des réalisations, limites et perspectives d'évolution \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\cleardoublepage

@@ -1,0 +1,535 @@
+% ============================================================
+%  12-devops.tex
+%  Chapitre 5 : DevOps et mise en production
+%  Couvre : containerisation, CI/CD, observabilité, qualité,
+%           IaC (Kubernetes), stratégie de déploiement
+% ============================================================
+\chapter{DevOps et mise en production}
+
+\begin{chapterintro}
+Ce chapitre clôt la démarche projet en présentant le volet \textbf{DevOps}
+mis en place sur SolarEase. L'objectif est de passer d'un code applicatif
+fonctionnel à une plateforme \textit{déployable, observable, sécurisée et
+maintenable} en production. Le chapitre couvre successivement la
+containerisation des microservices backend, le pipeline CI/CD GitHub Actions,
+la stack d'observabilité (Prometheus, Grafana, Loki), la qualité de code
+(JaCoCo, Trivy), l'infrastructure en tant que code (Kubernetes + Kustomize)
+et enfin la stratégie de déploiement multi-environnements. Le frontend
+React/Vite reste un projet léger, déployé directement sur \textbf{Vercel}
+via le fichier \texttt{vercel.json}~; il n'est donc pas couvert par les
+sous-sections DevOps ci-dessous.
+\end{chapterintro}
+
+% ══════════════════════════════════════════════════════════
+\section{Démarche et architecture DevOps cible}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Principes retenus}
+
+La démarche DevOps appliquée à SolarEase s'appuie sur les cinq piliers du
+modèle \textbf{CALMS}~: \textit{Culture}, \textit{Automation},
+\textit{Lean}, \textit{Measurement}, \textit{Sharing}. Concrètement, cela
+se traduit dans le projet par~:
+
+\begin{itemize}
+  \item \textbf{Automatisation} -- chaque \textit{push} sur le backend
+        déclenche une vérification automatique (build + tests + scans)
+        sans intervention humaine~;
+  \item \textbf{Reproductibilité} -- les environnements (local, staging,
+        production) sont décrits sous forme de code (Docker, Kustomize)~;
+  \item \textbf{Observabilité} -- chaque service expose des
+        métriques Prometheus et ses logs sont agrégés dans Loki~;
+  \item \textbf{Sécurité \og shift-left \fg{}} -- les secrets sont sortis
+        du dépôt, les scans Trivy et Gitleaks s'exécutent à chaque PR~;
+  \item \textbf{Livraison continue} -- les branches \texttt{develop} et
+        les tags \texttt{v*.*.*} déclenchent automatiquement des
+        déploiements backend sur Railway, tandis que le frontend est
+        livré en continu via Vercel.
+\end{itemize}
+
+\subsection{Vue d'ensemble de la chaîne}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox[c][9cm][c]{0.92\textwidth}{\centering
+    \textit{Architecture DevOps SolarEase -- Flux global}\\[6pt]
+    \small \textbf{Developer push} $\rightarrow$ \textbf{GitHub repo}
+    $\rightarrow$ \textbf{GitHub Actions CI} (build + test + scan)
+    $\rightarrow$ \textbf{GitHub Container Registry} (GHCR).\\[4pt]
+    \small Depuis GHCR~: déploiement automatique sur \textbf{Railway}
+    (staging / prod) et possibilité d'appliquer les manifests
+    \textbf{Kubernetes / Kustomize}.\\[4pt]
+    \small Couche d'\textbf{observabilité}~: \textbf{Prometheus} scrape
+    \texttt{/actuator/prometheus} des 4 services, \textbf{Loki} ingère
+    les logs Docker via Promtail, \textbf{Grafana} affiche les tableaux
+    de bord.
+  }}
+  \caption{Architecture DevOps cible -- Vue globale}
+  \label{fig:devops-archi}
+\end{figure}
+
+% ══════════════════════════════════════════════════════════
+\section{Containerisation}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Stratégie multi-stage}
+
+Chaque microservice backend est packagé via un \texttt{Dockerfile}
+\textbf{multi-stage}~: une étape de build Maven (\texttt{maven:3.9.6-eclipse-temurin-17})
+produit le jar exécutable, puis une étape \textit{runtime} basée sur
+\texttt{eclipse-temurin:17-jre-alpine} embarque uniquement l'artifact final.
+Cette approche~:
+
+\begin{itemize}
+  \item réduit la taille des images (d'environ \textbf{600~Mo}
+        en single-stage à \textbf{180~Mo} en multi-stage)~;
+  \item supprime les dépendances de build de l'image finale, ce qui
+        réduit la surface d'attaque~;
+  \item bénéficie du \textit{layer caching} pour des rebuilds rapides.
+\end{itemize}
+
+\begin{lstlisting}[caption={\texttt{backend/identity-service/Dockerfile} --- Multi-stage Maven $\rightarrow$ JRE},
+                   label=lst:dockerfile-backend, language=bash]
+# Build stage
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -Dmaven.test.skip=true
+
+# Run stage
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java", "-jar", "app.jar"]
+\end{lstlisting}
+
+\subsection{Topologie du \texttt{docker-compose} unifié}
+
+Le fichier \texttt{backend/docker-compose.yml} orchestre l'ensemble du stack
+backend (bases de données + microservices + Ollama + n8n) sur un réseau
+\texttt{solarease-net} dédié. Tous les secrets sont injectés via un fichier
+\texttt{.env} (template fourni dans \texttt{backend/.env.example}). Le
+frontend Vite est démarré séparément (\texttt{npm run dev}) en
+développement ou servi par Vercel en production.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox[c][8cm][c]{0.92\textwidth}{\centering
+    \textit{Topologie du Docker Compose unifié -- backend}\\[6pt]
+    \small \textbf{Gateway (Spring Cloud Gateway, port 8080)} -- point
+    d'entrée unique consommé par le frontend (Vite~/~Vercel).\\[2pt]
+    \small Gateway route vers~: \textbf{Identity (8081)},
+    \textbf{Project (8082)}, \textbf{Dimensioning (8083)}.\\[2pt]
+    \small Chaque service backend a sa propre \textbf{PostgreSQL 16}
+    (ports 5433, 5434, 5435).\\[2pt]
+    \small Dimensioning communique avec \textbf{Ollama} (port interne 11434)
+    pour le pipeline RAG.\\[2pt]
+    \small Tous les services partagent le réseau Docker \texttt{solarease-net}.
+  }}
+  \caption{Topologie Docker Compose -- 4 microservices backend + Ollama + n8n}
+  \label{fig:devops-compose}
+\end{figure}
+
+% ══════════════════════════════════════════════════════════
+\section{Pipeline CI/CD GitHub Actions}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Workflows mis en place}
+
+Le dossier \texttt{.github/workflows/} contient quatre pipelines~:
+
+\begin{table}[H]
+  \caption{Workflows GitHub Actions du projet SolarEase}
+  \label{tab:workflows}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|L{4cm}|L{4.5cm}|X|}
+    \hline
+    \rowcolor{black!12}
+    \textbf{Workflow} & \textbf{Déclencheur} & \textbf{Rôle} \\
+    \hline
+    \texttt{backend-ci.yml} & push / PR sur \texttt{backend/**} & \texttt{mvn verify} en matrice sur les 4 services~; upload des rapports JaCoCo \\
+    \hline
+    \texttt{docker-publish.yml} & push \texttt{main}, tags \texttt{v*} & Build multi-arch + push sur GHCR (\texttt{ghcr.io/<owner>/solarease/<service>}) \\
+    \hline
+    \texttt{security-scan.yml} & push, PR, cron hebdo & Trivy (filesystem + images) + Gitleaks (détection de secrets) \\
+    \hline
+    \texttt{deploy.yml} & push \texttt{develop} (staging), tag \texttt{v*} (prod) & Déploiement Railway via CLI + création de GitHub Release \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Workflow CI backend -- exécution en matrice}
+
+\begin{lstlisting}[caption={\texttt{.github/workflows/backend-ci.yml} (extrait)},
+                   label=lst:backend-ci, language=yaml]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - gateway-service
+          - identity-service
+          - project-service
+          - dimensioning-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+      - run: mvn -B -ntp verify
+        working-directory: backend/${{ matrix.service }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-${{ matrix.service }}
+          path: backend/${{ matrix.service }}/target/site/jacoco/
+\end{lstlisting}
+
+\subsection{Étapes du pipeline CI/CD}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox[c][7cm][c]{0.92\textwidth}{\centering
+    \textit{Pipeline CI/CD backend -- Étapes séquentielles}\\[6pt]
+    \small \textbf{1. Checkout} $\rightarrow$ \textbf{2. Setup JDK 17}
+    $\rightarrow$ \textbf{3. Cache Maven}
+    $\rightarrow$ \textbf{4. Build + Tests + JaCoCo}\\[4pt]
+    \small $\rightarrow$ \textbf{5. Upload artifacts (coverage, dist)}
+    $\rightarrow$ \textbf{6. Trivy scan (filesystem + image)}
+    $\rightarrow$ \textbf{7. Gitleaks (secrets)}\\[4pt]
+    \small $\rightarrow$ \textbf{8. Docker build} (multi-stage)
+    $\rightarrow$ \textbf{9. Push GHCR} (tags \texttt{latest}, \texttt{sha-XXXXXXX},
+    \texttt{v1.2.3})
+    $\rightarrow$ \textbf{10. Deploy Railway}
+  }}
+  \caption{Pipeline CI/CD -- Étapes séquentielles du commit au déploiement}
+  \label{fig:devops-pipeline}
+\end{figure}
+
+\subsection{Gestion des dépendances avec Dependabot}
+
+Le fichier \texttt{.github/dependabot.yml} programme des PR
+hebdomadaires pour~: les 4 \texttt{pom.xml} Maven, les 4
+\texttt{Dockerfile}, et les versions des actions GitHub elles-mêmes.
+Cela maintient le backend à jour sans intervention manuelle.
+
+% ══════════════════════════════════════════════════════════
+\section{Observabilité (Prometheus + Grafana + Loki)}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Exposition des métriques applicatives}
+
+Chaque microservice intègre la dépendance
+\texttt{spring-boot-starter-actuator} ainsi que
+\texttt{micrometer-registry-prometheus}. La configuration suivante est
+ajoutée à chaque \texttt{application.properties}~:
+
+\begin{lstlisting}[caption={Configuration Actuator commune aux 4 services},
+                   label=lst:actuator-config, language=bash]
+management.endpoints.web.exposure.include=health,info,metrics,prometheus
+management.endpoint.health.show-details=always
+management.endpoint.health.probes.enabled=true
+management.health.livenessstate.enabled=true
+management.health.readinessstate.enabled=true
+management.metrics.tags.application=${spring.application.name}
+management.prometheus.metrics.export.enabled=true
+\end{lstlisting}
+
+\noindent Chaque service expose ainsi~:
+
+\begin{itemize}
+  \item \texttt{/actuator/health} -- état global (UP / DOWN)~;
+  \item \texttt{/actuator/health/liveness} -- sonde \textit{liveness} K8s~;
+  \item \texttt{/actuator/health/readiness} -- sonde \textit{readiness} K8s~;
+  \item \texttt{/actuator/prometheus} -- métriques au format Prometheus
+        (latence HTTP, mémoire JVM, GC, threads, requêtes par endpoint).
+\end{itemize}
+
+\subsection{Architecture de la stack observabilité}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox[c][9cm][c]{0.92\textwidth}{\centering
+    \textit{Architecture observabilité SolarEase}\\[6pt]
+    \small \textbf{Métriques}~: Prometheus (port 9090) scrape toutes les 15s
+    \texttt{/actuator/prometheus} sur les 4 services. Stockage TSDB local
+    (15 jours de rétention).\\[4pt]
+    \small \textbf{Logs}~: Promtail lit \texttt{/var/lib/docker/containers}
+    et pousse vers Loki (port 3100). Étiquettes automatiques~:
+    \texttt{container}, \texttt{service}, \texttt{stream}.\\[4pt]
+    \small \textbf{Visualisation}~: Grafana (port 3000) provisionne
+    automatiquement les datasources Prometheus et Loki, ainsi qu'un
+    dashboard \og SolarEase -- Microservices Overview \fg{}.\\[4pt]
+    \small \textbf{Dashboards}~: santé des services (\texttt{up}),
+    requêtes/seconde par application, latence p95, heap JVM.
+  }}
+  \caption{Architecture observabilité -- Prometheus + Loki + Grafana}
+  \label{fig:devops-observability}
+\end{figure}
+
+\subsection{Stack déployée via Docker Compose}
+
+Le fichier
+\texttt{backend/observability/docker-compose.observability.yml} est
+\textit{composable} avec le compose principal~: il ajoute Prometheus,
+Loki, Promtail et Grafana au même réseau \texttt{solarease-net}, sans
+modifier la stack applicative. Démarrage en une commande~:
+
+\begin{lstlisting}[caption={Démarrage du stack complet (applicatif + observabilité)},
+                   label=lst:obs-up, language=bash]
+docker compose \
+  -f backend/docker-compose.yml \
+  -f backend/observability/docker-compose.observability.yml \
+  up -d
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════
+\section{Qualité et sécurité du code}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Couverture de tests backend -- JaCoCo}
+
+Le plugin \texttt{jacoco-maven-plugin} (version 0.8.12) est ajouté aux 4
+\texttt{pom.xml} avec deux exécutions~: \texttt{prepare-agent} (au démarrage
+des tests) et \texttt{report} (à la phase \texttt{verify}). Le service
+\texttt{identity-service} ajoute également une règle de qualité (\textit{quality gate})
+avec un seuil minimal de 30~\% de lignes couvertes.
+
+\subsection{Scans de sécurité}
+
+Trois scans automatisés s'exécutent dans le workflow
+\texttt{security-scan.yml}~:
+
+\begin{itemize}
+  \item \textbf{Trivy filesystem} -- détecte les vulnérabilités dans les
+        dépendances Maven et npm (sévérités \texttt{CRITICAL} et \texttt{HIGH})~;
+  \item \textbf{Trivy image} -- scanne les images Docker construites avant
+        publication~;
+  \item \textbf{Gitleaks} -- recherche tout secret accidentellement commité
+        dans l'historique Git.
+\end{itemize}
+
+Les résultats sont remontés au format \texttt{SARIF} dans l'onglet
+\textit{Security} de GitHub.
+
+\subsection{Gestion des secrets}
+
+Tous les secrets ont été extraits du dépôt~:
+
+\begin{itemize}
+  \item En local~: fichier \texttt{backend/.env} (gitignoré), template
+        public dans \texttt{backend/.env.example}~;
+  \item En CI~: secrets GitHub (\texttt{RAILWAY\_TOKEN},
+        \texttt{RAILWAY\_PROD\_TOKEN}, etc.)~;
+  \item En Kubernetes~: objet \texttt{Secret} \texttt{solarease-secrets}
+        injecté par variables d'environnement, dont le \textit{template}
+        figure dans \texttt{k8s/base/secret.template.yaml}.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════
+\section{Infrastructure as Code (Kubernetes + Kustomize)}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Organisation des manifests}
+
+Le dossier \texttt{k8s/} suit le pattern \textbf{base + overlays}
+de Kustomize~:
+
+\begin{lstlisting}[caption={Arborescence du dossier \texttt{k8s/}},
+                   label=lst:k8s-tree, language=bash]
+k8s/
+  base/
+    namespace.yaml
+    configmap.yaml            # variables non sensibles
+    secret.template.yaml      # template (à remplir hors Git)
+    postgres-identity.yaml    # StatefulSet + Service + PVC
+    postgres-project.yaml
+    postgres-dimensioning.yaml
+    ollama.yaml
+    identity-service.yaml     # Deployment + Service
+    project-service.yaml
+    dimensioning-service.yaml
+    gateway-service.yaml
+    ingress.yaml              # /api et /ws -> gateway
+    kustomization.yaml
+  overlays/
+    dev/  kustomization.yaml  # 1 replica, demo-seed=true
+    prod/ kustomization.yaml  # 2-3 replicas, ddl-auto=validate
+\end{lstlisting}
+
+\subsection{Sondes Actuator et limites de ressources}
+
+Chaque \texttt{Deployment} déclare trois sondes pointant sur les endpoints
+Actuator, ce qui rend les rollouts \textbf{sûrs} (pas de trafic vers un
+pod non prêt) et l'auto-réparation \textbf{automatique}~:
+
+\begin{lstlisting}[caption={Sondes Actuator dans un Deployment K8s (extrait)},
+                   label=lst:k8s-probes, language=yaml]
+startupProbe:
+  httpGet: { path: /actuator/health, port: 8081 }
+  failureThreshold: 30
+  periodSeconds: 5
+readinessProbe:
+  httpGet: { path: /actuator/health/readiness, port: 8081 }
+  initialDelaySeconds: 10
+  periodSeconds: 10
+livenessProbe:
+  httpGet: { path: /actuator/health/liveness, port: 8081 }
+  initialDelaySeconds: 30
+  periodSeconds: 30
+resources:
+  requests: { cpu: 200m, memory: 384Mi }
+  limits:   { cpu: 1000m, memory: 768Mi }
+\end{lstlisting}
+
+\subsection{Routage Ingress}
+
+Un \texttt{Ingress nginx} unique expose le backend sur un domaine~:
+
+\begin{itemize}
+  \item \texttt{/api} $\rightarrow$ \texttt{gateway-service:8080}
+  \item \texttt{/ws} $\rightarrow$ \texttt{gateway-service:8080} (WebSocket activé)
+\end{itemize}
+
+\noindent Le frontend, hébergé sur Vercel, consomme l'Ingress via la
+variable d'environnement \texttt{VITE\_API\_BASE\_URL} qui pointe vers le
+domaine du backend.
+
+\subsection{Overlays dev / prod}
+
+Les \textit{overlays} appliquent des \textit{patches JSON} sur la base
+commune~:
+
+\begin{itemize}
+  \item \textbf{dev}~: 1 replica par service, \texttt{SOLAREASE\_DEMO\_SEED=true},
+        \texttt{ddl-auto=update}, namespace \texttt{solarease-dev}~;
+  \item \textbf{prod}~: 2 à 3 replicas, \texttt{SOLAREASE\_DEMO\_SEED=false},
+        \texttt{ddl-auto=validate} (migrations Flyway uniquement),
+        namespace \texttt{solarease-prod}.
+\end{itemize}
+
+Application en une commande~: \texttt{kubectl apply -k k8s/overlays/prod}.
+
+% ══════════════════════════════════════════════════════════
+\section{Stratégie de déploiement multi-environnements}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Modèle de branches (GitFlow simplifié)}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox[c][6.5cm][c]{0.92\textwidth}{\centering
+    \textit{Stratégie GitFlow -- 3 branches, 2 environnements automatiques}\\[6pt]
+    \small \textbf{main} (protégée) $\leftarrow$ \textbf{develop} (intégration) $\leftarrow$ \textbf{feature/SOLAR-X-<slug>}\\[4pt]
+    \small Règles~:\\
+    \small -- toute modification passe par une \textbf{Pull Request}~;\\
+    \small -- la CI doit être \textbf{verte} (backend + frontend + security)~;\\
+    \small -- une revue minimale d'un autre développeur est requise sur \texttt{main}~;\\
+    \small -- merge sur \texttt{develop} $\rightarrow$ déploiement automatique \textbf{staging}~;\\
+    \small -- tag \texttt{v*.*.*} sur \texttt{main} $\rightarrow$ déploiement \textbf{production} + GitHub Release.
+  }}
+  \caption{Stratégie GitFlow et environnements automatiques}
+  \label{fig:devops-gitflow}
+\end{figure}
+
+\subsection{Environnements et URLs}
+
+\begin{table}[H]
+  \caption{Environnements de déploiement de SolarEase}
+  \label{tab:environments}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|L{2.5cm}|L{3.5cm}|L{3.5cm}|X|}
+    \hline
+    \rowcolor{black!12}
+    \textbf{Environnement} & \textbf{Source} & \textbf{Plateforme} & \textbf{Usage} \\
+    \hline
+    Local & Docker Compose & Poste développeur & Développement et tests manuels \\
+    \hline
+    Staging & Push \texttt{develop} & Railway & Validation avant production \\
+    \hline
+    Production & Tag \texttt{v*.*.*} & Railway (\& K8s en option) & Live, monitoring 24/7 \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Procédure de release}
+
+\begin{lstlisting}[caption={Procédure standard de mise en production},
+                   label=lst:release-flow, language=bash]
+git checkout main
+git pull --ff-only
+git merge --no-ff develop
+git tag -a v1.2.0 -m "Release 1.2.0 - Field tracking + RAG"
+git push origin main --tags
+# -> deploy.yml se declenche automatiquement
+# -> images Docker poussees sur GHCR
+# -> services deployes sur Railway production
+# -> GitHub Release creee avec les notes
+\end{lstlisting}
+
+\subsection{Procédure de rollback}
+
+En cas de régression, le rollback s'effectue en une commande Railway
+(redéploiement d'une version précédente) ou via Kubernetes
+(\texttt{kubectl rollout undo deployment/<svc> -n solarease-prod}).
+L'ensemble des procédures opérationnelles (rollback, hotfix, rotation
+de secrets, backup PostgreSQL, redémarrage Ollama) est documenté dans le
+fichier \texttt{RUNBOOK.md} à la racine du dépôt.
+
+% ══════════════════════════════════════════════════════════
+\section{Tests de validation DevOps}
+% ══════════════════════════════════════════════════════════
+
+\begin{table}[H]
+  \caption{Résultats des tests de validation DevOps}
+  \label{tab:devops-tests}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|C{1.2cm}|L{4.5cm}|X|C{1.4cm}|}
+    \hline
+    \rowcolor{black!12}
+    \textbf{ID} & \textbf{Cas de test} & \textbf{Résultat attendu} & \textbf{Statut} \\
+    \hline
+    D-01 & \texttt{docker compose up} avec \texttt{.env} valide & Stack complète UP en $<$60s & \ok~OK \\
+    \hline
+    D-02 & PR ouverte sur \texttt{develop} & \texttt{backend-ci} vert sur les 4 services & \ok~OK \\
+    \hline
+    D-03 & Push de tag \texttt{v0.1.0} & Images poussées sur GHCR avec 3 tags & \ok~OK \\
+    \hline
+    D-04 & \texttt{curl localhost:8080/actuator/prometheus} & Métriques au format Prometheus & \ok~OK \\
+    \hline
+    D-05 & Cibles Prometheus & 4 services \texttt{UP} sur \texttt{:9090/targets} & \ok~OK \\
+    \hline
+    D-06 & Dashboard Grafana \og SolarEase Overview \fg & 4 panneaux peuplés en $<$30s & \ok~OK \\
+    \hline
+    D-07 & Logs containers $\rightarrow$ Loki & Lignes filtrables par \texttt{\{service="identity"\}} & \ok~OK \\
+    \hline
+    D-08 & Scan Trivy sur PR & Aucune vulnérabilité CRITICAL non corrigée & \ok~OK \\
+    \hline
+    D-09 & Gitleaks sur PR & Aucun secret détecté & \ok~OK \\
+    \hline
+    D-10 & \texttt{kubectl apply -k k8s/overlays/dev} & Tous les pods passent \texttt{Ready} & \ok~OK \\
+    \hline
+    D-11 & Sondes K8s readiness / liveness & Rollout sans perte de trafic & \ok~OK \\
+    \hline
+    D-12 & Rollback Railway via \texttt{redeploy} & Version précédente restaurée en $<$2 min & \ok~OK \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\begin{conclusionbox}
+La mise en place de la chaîne DevOps a transformé SolarEase d'un assemblage
+de microservices en une plateforme \textit{déployable, observable et
+sécurisée}. Les automatisations CI/CD garantissent un retour rapide sur
+chaque modification, l'observabilité offre une vue temps-réel sur la
+santé du système, l'IaC rend les environnements reproductibles, et la
+stratégie GitFlow + Railway permet des livraisons fréquentes en toute
+confiance. Les perspectives ouvertes par cette base technique incluent
+la mise en place de tests \textit{end-to-end} automatisés (Playwright),
+l'ajout d'un \textit{service mesh} (Istio ou Linkerd) pour la
+résilience inter-services, et l'intégration d'un système d'alerting
+(Alertmanager + Slack) sur les métriques critiques.
+\end{conclusionbox}

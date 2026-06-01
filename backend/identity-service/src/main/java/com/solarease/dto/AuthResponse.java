@@ -21,6 +21,7 @@ public class AuthResponse {
     private UserDto user;
     private String message;
     private String email;
+    private String otpCode;
 
     @Data
     @NoArgsConstructor

@@ -1,0 +1,75 @@
+@startuml seq-cycle-devis
+title Diagramme de séquence -- Cycle complet du devis
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Installateur" as Installer
+actor "Client"        as Client
+participant "Frontend\nInstallateur"  as FE_I
+participant "Frontend\nClient"         as FE_C
+participant "API Gateway"               as GW
+participant "QuoteController"           as QC
+participant "QuoteService"              as QS
+participant "InvoiceService"            as IS
+participant "NotificationService"       as NS
+database  "PostgreSQL"                  as DB
+
+== Création (DRAFT) ==
+Installer -> FE_I : Saisir le devis\n(main d'œuvre, matériaux, TVA)
+FE_I    -> GW : POST /api/quotes (JWT)
+GW      -> QC : Forward
+QC      -> QS : createQuote(req)
+QS      -> DB : INSERT INTO quotes\n(number=QUOTE-2026-XXXXX,\n status=DRAFT)
+DB     --> QS : Quote(id)
+QS     --> QC : QuoteDTO
+QC     --> FE_I : 201 + DTO
+
+== Envoi (SENT) ==
+Installer -> FE_I : Cliquer "Envoyer au client"
+FE_I  -> GW : PUT /api/quotes/{id}/send
+GW    -> QC : Forward
+QC    -> QS : sendQuote(id)
+QS    -> DB : UPDATE quotes SET status=SENT
+QS    -> NS : notifyQuoteSent(client)
+NS    --> FE_C : push notification
+FE_C  --> Client : "Nouveau devis reçu"
+
+== Acceptation (ACCEPTED + INVOICED) ==
+Client -> FE_C : Cliquer "Accepter"
+FE_C  -> GW : PUT /api/quotes/{id}/accept
+GW    -> QC : Forward + role=CLIENT
+QC    -> QS : acceptQuote(id)
+QS    -> DB : Vérifier non expiré
+
+alt Devis expiré
+    QS --> QC : IllegalStateException
+    QC --> FE_C : 400 "Devis expiré"
+end
+
+QS    -> DB : UPDATE quotes SET status=ACCEPTED
+QS    -> IS : generateInvoiceFromQuote(quote)
+IS    -> DB : INSERT INTO invoices\n(number=INV-2026-XXXXX,\n status=SENT, dueDate=+30j)
+DB   --> IS : Invoice(id)
+QS    -> DB : UPDATE quotes SET status=INVOICED
+QS    -> NS : notifyQuoteAccepted(installer)
+QS    -> NS : notifyInvoiceGenerated(client)
+QS   --> QC : QuoteDTO
+QC   --> FE_C : 200 + JSON
+FE_C --> Client : "Devis accepté\nFacture émise"
+
+alt Refus
+    Client -> FE_C : Cliquer "Refuser" + motif
+    FE_C  -> GW : PUT /api/quotes/{id}/reject
+    QS    -> DB : UPDATE quotes SET status=REJECTED
+    QS    -> NS : notifyQuoteRejected(installer, motif)
+end
+
+@enduml

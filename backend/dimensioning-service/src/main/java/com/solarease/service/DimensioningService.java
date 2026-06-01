@@ -39,8 +39,11 @@ public class DimensioningService {
     // Constants for calculation
     private static final double DEFAULT_PANEL_POWER_W = 400.0;
     private static final double DEFAULT_PANEL_AREA_M2 = 1.9;
+    private static final double USABLE_SURFACE_COEFFICIENT = 0.7;
     private static final double AVERAGE_IRRADIANCE = 1600.0; // kWh/kWp/year (Tunisia avg fallback)
-    private static final double CO2_FACTOR_KG_KWH = 0.5; // kg CO2 saved per kWh
+    private static final double ELECTRICITY_PRICE_TND_KWH = 0.28; // Tunisie: 0.25 - 0.30
+    private static final double INSTALLATION_LABOR_RATE = 0.15; // Tunisie: ~15%
+    private static final double CO2_FACTOR_KG_KWH = 0.6; // Tunisie: ~0.6 kg CO2/kWh
 
     @Transactional
     public DimensioningResponse calculateDimensioning(DimensioningRequest request) {
@@ -76,10 +79,11 @@ public class DimensioningService {
             installation = performCalculation(roof, panel, inverter);
         }
 
-        // 2b. Generate AI Recommendation (RAG)
+        // 2b. Generate AI Recommendation (hybrid pgvector RAG)
         com.solarease.dto.FinancialMetrics metrics = financialService.calculateMetrics(installation);
 
         String aiRecommendation = "AI Recommendation Unavailable (Service Down)";
+        com.solarease.rag.InstallerRecommendationDto installerRecommendation = null;
         try {
             DimensioningResponse tempResponse = DimensioningResponse.builder()
                     .installation(installation)
@@ -87,7 +91,10 @@ public class DimensioningService {
                     .financials(metrics)
                     .panelType(isNightPanel ? "NIGHT_PANEL" : "CLASSIC")
                     .build();
-            aiRecommendation = decisionSupportService.generateAiRecommendation(tempResponse);
+            DecisionSupportService.Result rag = decisionSupportService.generate(
+                    tempResponse, panel, inverter);
+            installerRecommendation = rag.recommendation();
+            aiRecommendation = rag.narrativeSummary();
         } catch (Exception e) {
             log.error("Failed to generate AI recommendation: {}", e.getMessage());
         }
@@ -105,7 +112,9 @@ public class DimensioningService {
                 .build();
 
         Dimensioning saved = dimensioningRepository.save(dimensioning);
-        return mapToResponse(saved);
+        DimensioningResponse response = mapToResponse(saved);
+        response.setInstallerRecommendation(installerRecommendation);
+        return response;
     }
 
     /**
@@ -188,7 +197,30 @@ public class DimensioningService {
     public ByteArrayInputStream getDimensioningPdfReport(Long id) {
         Dimensioning dimensioning = dimensioningRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dimensioning not found with id: " + id));
-        return pdfGenerationService.generateDimensioningReport(dimensioning);
+
+        // Reuse the structured recommendation so the PDF can render the kit
+        // table (inverter, cables, Schneider breakers) instead of a single
+        // free-form paragraph. Failures are tolerated -- the PDF still works
+        // with the legacy aiRecommendation field.
+        com.solarease.rag.InstallerRecommendationDto recommendation = null;
+        try {
+            com.solarease.dto.FinancialMetrics metrics =
+                    financialService.calculateMetrics(dimensioning.getSolarInstallation());
+            DimensioningResponse temp = DimensioningResponse.builder()
+                    .installation(dimensioning.getSolarInstallation())
+                    .roof(dimensioning.getRoofCharacteristic())
+                    .financials(metrics)
+                    .panelType(dimensioning.getPanelType())
+                    .build();
+            recommendation = decisionSupportService.generate(
+                    temp, dimensioning.getPanel(), dimensioning.getInverter())
+                    .recommendation();
+        } catch (Exception e) {
+            log.warn("Could not enrich PDF with structured kit, falling back: {}",
+                    e.getMessage());
+        }
+
+        return pdfGenerationService.generateDimensioningReport(dimensioning, recommendation);
     }
 
     private Equipment getPanel(Long panelId) {
@@ -257,7 +289,7 @@ public class DimensioningService {
         double nightCoverageRate = nighttimeConsumption > 0 ? Math.min(1.0, nightCoverage / nighttimeConsumption) : 0;
 
         // Enhanced savings: self-consumed energy saves more (no grid losses)
-        double enhancedAnnualSavings = totalSelfConsumed * 365 * 0.280; // Full STEG price for self-consumed
+        double enhancedAnnualSavings = totalSelfConsumed * 365 * ELECTRICITY_PRICE_TND_KWH;
         double gridSurplus = Math.max(0, dailyProductionKwh - totalSelfConsumed);
         double gridSavings = gridSurplus * 365 * 0.10; // Lower feed-in tariff
         double totalAnnualSavings = enhancedAnnualSavings + gridSavings;
@@ -329,8 +361,8 @@ public class DimensioningService {
         String inverterModel = (inverter != null) ? inverter.getModel() : "Generic Inverter";
 
         // Number of panels that fit in the area
-        // Let's assume 80% usable area due to obstacles/spacing
-        double usableArea = roof.getArea() * 0.8;
+        // Tunisie (validé): ~70% de surface réellement exploitable
+        double usableArea = roof.getArea() * USABLE_SURFACE_COEFFICIENT;
         int panelCount = (int) (usableArea / panelAreaM2);
 
         if (panelCount < 1) {
@@ -380,15 +412,15 @@ public class DimensioningService {
             if (totalCapacityKw > 6.0) finalInverterModel = "Three-Phase Hybrid Inverter 10kW";
         }
 
-        // Savings (Approx 0.2 TND per kWh)
-        double annualSavings = estimatedProduction * 0.2;
+        // Savings (Tunisie: 0.25 - 0.30 TND/kWh)
+        double annualSavings = estimatedProduction * ELECTRICITY_PRICE_TND_KWH;
 
         // Cost Calculation
         double panelPrice = (panel != null && panel.getPrice() != null) ? panel.getPrice().doubleValue() : 450.0;
         double inverterPrice = (inverter != null && inverter.getPrice() != null) ? inverter.getPrice().doubleValue() : 2500.0;
         
         double totalMaterialCost = (panelCount * panelPrice) + inverterPrice;
-        double installationLabor = totalMaterialCost * 0.20; // 20% Markup for installation
+        double installationLabor = totalMaterialCost * INSTALLATION_LABOR_RATE;
         double totalProjectCost = totalMaterialCost + installationLabor;
 
         return SolarInstallation.builder()
@@ -454,6 +486,37 @@ public class DimensioningService {
         return dimensioningRepository.findById(id)
                 .map(this::mapToResponse)
                 .orElseThrow(() -> new EntityNotFoundException("Dimensioning not found with id: " + id));
+    }
+
+    /**
+     * Re-runs the RAG pipeline for an already-persisted dimensioning. Useful
+     * when the catalog or the knowledge base has been refreshed and the
+     * installer wants an updated kit/verdict without redoing the full
+     * dimensioning.
+     */
+    @Transactional
+    public DimensioningResponse regenerateRecommendation(Long id) {
+        Dimensioning d = dimensioningRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Dimensioning not found with id: " + id));
+
+        com.solarease.dto.FinancialMetrics metrics =
+                financialService.calculateMetrics(d.getSolarInstallation());
+        DimensioningResponse temp = DimensioningResponse.builder()
+                .installation(d.getSolarInstallation())
+                .roof(d.getRoofCharacteristic())
+                .financials(metrics)
+                .panelType(d.getPanelType())
+                .build();
+
+        DecisionSupportService.Result rag = decisionSupportService.generate(
+                temp, d.getPanel(), d.getInverter());
+        d.setAiRecommendation(rag.narrativeSummary());
+        Dimensioning saved = dimensioningRepository.save(d);
+
+        DimensioningResponse response = mapToResponse(saved);
+        response.setInstallerRecommendation(rag.recommendation());
+        return response;
     }
 
     private DimensioningResponse mapToResponse(Dimensioning d) {

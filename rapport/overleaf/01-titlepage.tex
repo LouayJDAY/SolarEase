@@ -1,0 +1,71 @@
+% ============================================================
+%  01-titlepage.tex  —  Page de garde ISET Nabeul
+% ============================================================
+\begin{titlepage}
+\thispagestyle{empty}
+\pagecolor{white}
+
+\vspace*{0.5cm}
+
+% ── Zone de logo ──────────────────────────────────────────
+\begin{center}
+    \IfFileExists{Screenshot from 2026-05-05 13-11-33.png}{%
+        \includegraphics[width=0.6\linewidth]{\detokenize{Screenshot from 2026-05-05 13-11-33.png}}%
+    }{%
+        \fbox{\parbox{0.6\linewidth}{\centering Logo manquant\\(Screenshot from 2026-05-05 13-11-33.png)}}%
+    }
+\end{center}
+
+\vspace{0.8cm}
+
+\begin{center}
+    {\fontsize{14}{16}\selectfont Département Technologies de l'Informatique}
+\end{center}
+
+\vspace{0.8cm}
+\begin{flushright}
+  \textbf{Code : DSI21/25} 
+\end{flushright}
+
+\vspace{0.8cm}
+
+\begin{center}
+    {\large PARCOURS}\\[0.2cm]
+    {\Large \textbf{DEVELOPPEMENT SYSTEMES D'INFORMATIONS}}\\[1.5cm]
+    
+    {\Large Projet de Fin de Parcours}\\[1.5cm]
+    
+    {\large INTITULE}\\[0.4cm]
+    % Titre adapté à votre projet SOLAREASE
+    {\Large \textbf{PLATEFORME INTELLIGENTE DE DIMENSIONNEMENT\\[0.15cm] ET DE PILOTAGE COMMERCIAL SOLAIRE "SOLAREASE"}}\\[1.5cm]
+    
+    {\large ORGANISME D'ACCUEIL}\\[0.4cm]
+    {\Large \textbf{\organisme}}\\[1.5cm]
+    
+    {\large REALISE PAR}\\[0.4cm]
+    {\Large \textbf{\auteur}}\\[1.5cm]
+\end{center}
+
+\begin{center}
+\begin{minipage}[t]{0.45\textwidth}
+    \begin{center}
+        {\large ENCADRANT ACADEMIQUE}\\[0.4cm]
+        {\large \textbf{\encadreurAcad}}
+    \end{center}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.45\textwidth}
+    \begin{center}
+        {\large ENCADRANT PROFESSIONNEL}\\[0.4cm]
+        {\large \textbf{\encadreurProf}}
+    \end{center}
+\end{minipage}
+\end{center}
+
+\vfill
+\begin{center}
+    {\large ANNEE UNIVERSITAIRE \anneescolaire}
+\end{center}
+
+\end{titlepage}
+\cleardoublepage

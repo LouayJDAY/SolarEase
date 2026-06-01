@@ -1,0 +1,85 @@
+@startuml class-sprint5
+title Diagramme de classes global -- Sprint 5
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+    FontSize        12
+}
+
+class Client {
+    - id : Long
+    - email : String
+    - nom : String
+    - prenom : String
+}
+
+class Demande {
+    - id : Long
+    - clientEmail : String
+    - description : String
+    - localisation : String
+    - puissanceCrete : Double
+    - budget : Double
+    - statut : DemandStatus
+    - dateCreation : Date
+    - projetId : Long
+}
+
+class Devis {
+    - id : Long
+    - numero : String
+    - projetId : Long
+    - clientId : Long
+    - montantTotal : Double
+    - statut : QuoteStatus
+    - dateValidite : Date
+}
+
+class Facture {
+    - id : Long
+    - numero : String
+    - devisId : Long
+    - montant : Double
+    - dateEmission : Date
+    - dateEcheance : Date
+    - statut : String
+}
+
+class Projet {
+    - id : Long
+    - nom : String
+}
+
+enum DemandStatus {
+    NOUVELLE
+    A_COMPLETER
+    VALIDEE
+    REJETEE
+}
+
+enum QuoteStatus {
+    DRAFT
+    SENT
+    ACCEPTED
+    REJECTED
+    INVOICED
+}
+
+Client   "1" -- "0..*" Demande : soumet >
+Client   "1" -- "0..*" Devis   : reçoit >
+Client   "1" -- "0..*" Facture : reçoit >
+
+Projet   "1" -- "0..*" Devis   : porte >
+Projet   "1" -- "0..*" Facture : porte >
+
+Demande  "1" -- "0..1" Devis   : produit >
+Devis    "1" -- "0..1" Facture : génère >
+
+Demande "*" -- "1" DemandStatus
+Devis   "*" -- "1" QuoteStatus
+
+@enduml

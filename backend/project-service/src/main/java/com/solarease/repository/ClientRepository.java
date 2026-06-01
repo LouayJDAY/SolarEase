@@ -28,5 +28,19 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             @Param("search") String search,
             Pageable pageable);
 
+    @Query("SELECT c FROM Client c " +
+           "WHERE :search IS NULL OR LOWER(CAST(c.firstName AS string)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           "   OR LOWER(CAST(c.lastName AS string)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           "   OR LOWER(CAST(c.email AS string)) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))")
+    Page<Client> findAllWithSearch(
+            @Param("search") String search,
+            Pageable pageable);
+
     long countByInstallerId(String installerId);
+
+    long countByCreatedAtAfter(java.time.LocalDateTime since);
+
+    long countByInstallerIdAndCreatedAtAfter(String installerId, java.time.LocalDateTime since);
+
+    Optional<Client> findByUserId(String userId);
 }

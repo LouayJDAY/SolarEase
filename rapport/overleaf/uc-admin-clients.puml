@@ -1,0 +1,32 @@
+@startuml uc-admin-clients
+title Raffinement -- Gérer les clients
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Admin" as Admin
+
+rectangle "Gestion des clients" {
+    usecase "Créer une fiche client"          as Create
+    usecase "Lister / Rechercher\nles clients" as List
+    usecase "Consulter une fiche client"      as View
+    usecase "Modifier une fiche client"       as Edit
+    usecase "Supprimer une fiche client"      as Delete
+}
+
+Admin --> Create
+Admin --> List
+Admin --> View
+Admin --> Edit
+Admin --> Delete
+
+@enduml

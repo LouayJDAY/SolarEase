@@ -1,0 +1,459 @@
+% ============================================================
+%  07-chapitre1.tex  —  Cadre général et étude de l'existant
+% ============================================================
+\chapter{Cadre Général et Étude de l'Existant}
+
+\begin{chapterintro}
+  Ce premier chapitre établit le cadre général du projet SolarEase. Il présente
+  l'organisme d'accueil, analyse le contexte du marché photovoltaïque, formule
+  la problématique métier, étudie les solutions existantes et justifie la
+  création d'une nouvelle plateforme unifiée.
+\end{chapterintro}
+
+% ──────────────────────────────────────────────────────────
+\section{Présentation de l'Organisme d'Accueil}
+
+\subsection{Informations générales}
+
+\textbf{\organisme} est une jeune entreprise tunisienne fondée en
+\textbf{2024} par \textbf{Marwen Zitouni} et \textbf{Iheb Haouech},
+co-fondateurs et co-CEO. Implantée en Tunisie, elle se positionne sur trois
+domaines technologiques complémentaires~: le \textbf{développement
+logiciel}, les \textbf{solutions photovoltaïques} et les
+\textbf{technologies intelligentes} (domotique et objets connectés).
+
+L'entreprise adopte une approche \textit{full-stack} de l'innovation~:
+de la conception logicielle jusqu'à l'intégration énergétique et la
+recherche \& développement matérielle, en passant par le marketing
+et la communication digitale. Cette transversalité lui permet de proposer
+à ses clients des offres intégrées combinant logiciel, énergie et
+domotique au sein d'un même projet.
+
+\begin{table}[H]
+  \caption{Fiche d'identité de \organisme}
+  \label{tab:fiche-entreprise}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|L{4.2cm}|X|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Élément}} &
+    \textcolor{white}{\textbf{Description}} \\
+    \hline
+    Raison sociale & X\&V Electronics (XV Electronics) \\
+    \hline
+    Forme juridique & Société tunisienne \\
+    \hline
+    Année de création & 2024 \\
+    \hline
+    Co-fondateurs (CEO) & Marwen Zitouni \& Iheb Haouech \\
+    \hline
+    Secteurs d'activité &
+    Développement logiciel \(\bullet\)~Solutions photovoltaïques
+    \(\bullet\)~Domotique \& objets connectés \(\bullet\)~R\&D \\
+    \hline
+    Cible géographique &
+    Tunisie, avec ambition régionale Afrique du Nord \\
+    \hline
+    Clientèle &
+    Résidentielle, commerciale et industrielle (B2B et B2C) \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Mission, vision et valeurs}
+
+\noindent\textbf{Mission}~: créer des solutions technologiques innovantes
+et adaptables pour les entreprises locales et internationales, en
+combinant logiciel, énergie renouvelable et domotique au sein d'une
+approche intégrée entre R\&D, production et marketing afin de générer
+des résultats durables.
+
+\noindent\textbf{Vision}~: devenir une référence en \textbf{Afrique du Nord}
+dans l'intelligence digitale, l'énergie renouvelable et l'innovation
+domotique en proposant des solutions sur mesure pour le marché tunisien
+puis régional.
+
+\noindent\textbf{Valeurs fondatrices}~:
+\begin{itemize}
+  \item \textbf{Innovation}~: prototypage de panneaux intelligents,
+    intégration domotique et exploration de technologies émergentes
+    (IA, IoT)~;
+  \item \textbf{Qualité et fiabilité}~: choix des meilleures marques,
+    tests rigoureux avant déploiement, suivi maintenance~;
+  \item \textbf{Esprit d'équipe}~: collaboration étroite entre les pôles
+    IT, énergie, R\&D et marketing~;
+  \item \textbf{Satisfaction client}~: solutions adaptées aux besoins
+    réels, accompagnement et support continu~;
+  \item \textbf{Développement durable}~: utilisation responsable de
+    l'énergie et promotion des sources renouvelables.
+\end{itemize}
+
+\subsection{Domaine d'activité}
+
+\organisme{} structure son offre autour de quatre départements
+opérationnels qui se complètent~:
+
+\paragraph{a)~IT \& Développement logiciel.}
+Conception et réalisation de plateformes web, d'applications mobiles,
+de logiciels de gestion et de solutions SaaS. L'équipe développe
+notamment des outils d'automatisation et de scalabilité tels que
+\textit{LogiFlow} (suivi logistique), une plateforme tunisienne
+inspirée d'Airbnb, des applications de livraison et des ERP sur mesure.
+\textbf{SolarEase}, le projet objet de ce rapport, s'inscrit naturellement
+dans cette activité IT en combinant développement logiciel et expertise
+métier photovoltaïque.
+
+\paragraph{b)~Solutions photovoltaïques.}
+Études énergétiques, conception et installation de panneaux solaires
+pour résidences, usines et entreprises. Le département assure également
+la maintenance, l'optimisation des installations et l'intégration de
+systèmes intelligents (supervision à distance, pilotage de la
+consommation). L'engagement écologique se traduit par le choix des
+meilleures marques et de solutions à fort rendement énergétique.
+
+\paragraph{c)~R\&D et innovation.}
+Prototypage de panneaux intelligents à \textbf{production nocturne},
+innovations domotiques et tests de nouvelles technologies énergétiques.
+C'est précisément dans ce département qu'est née la fonctionnalité
+\textbf{Night Panel} intégrée à SolarEase, qui simule la production
+résiduelle d'un panneau associé à un stockage par batterie.
+
+\paragraph{d)~Marketing \& branding.}
+Gestion des réseaux sociaux, identité visuelle, publicité digitale et
+campagnes orientées conversion. L'équipe travaille en collaboration
+étroite avec l'IT et la R\&D pour lancer rapidement les produits
+commercialisables et soutenir la croissance de l'entreprise.
+
+\subsection{Organisation interne}
+
+L'entreprise adopte une structure simple et horizontale, adaptée à
+une jeune société technologique. Les deux co-fondateurs assurent
+conjointement la direction générale et coordonnent quatre départements
+opérationnels, comme l'illustre la figure~\ref{fig:organigramme}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+      node distance=1.4cm and 2cm,
+      box/.style={draw=isetblue, fill=isetblue!10, rounded corners=4pt,
+                  minimum width=3.8cm, minimum height=1.1cm,
+                  font=\small\bfseries, align=center, text width=3.6cm},
+      topbox/.style={box, fill=isetblue, text=white,
+                     minimum width=8cm, text width=7.6cm},
+      link/.style={-latex, thick, isetblue},
+      dlink/.style={-latex, dashed, gray, thin}
+    ]
+    \node[topbox] (dg)
+      {Direction Générale\\
+       {\footnotesize\mdseries Marwen Zitouni \& Iheb Haouech (co-CEO)}};
+
+    \node[box, below=2cm of dg, xshift=-6cm] (it)
+      {Pôle IT\\
+       {\footnotesize Plateformes web,\\applis mobiles, SaaS}};
+    \node[box, below=2cm of dg, xshift=-2cm] (energie)
+      {Pôle Énergie\\
+       {\footnotesize Installations PV,\\maintenance, optim.}};
+    \node[box, below=2cm of dg, xshift=2cm] (rd)
+      {Pôle R\&D\\
+       {\footnotesize Night Panel,\\domotique, prototypes}};
+    \node[box, below=2cm of dg, xshift=6cm] (mkt)
+      {Pôle Marketing\\
+       {\footnotesize Branding, social,\\publicité digitale}};
+
+    \draw[link] (dg) -- (it);
+    \draw[link] (dg) -- (energie);
+    \draw[link] (dg) -- (rd);
+    \draw[link] (dg) -- (mkt);
+
+    \draw[dlink] (it.east) -- (energie.west)
+      node[midway, above, font=\tiny\itshape]{intégration};
+    \draw[dlink] (energie.east) -- (rd.west)
+      node[midway, above, font=\tiny\itshape]{R\&D};
+    \draw[dlink] (rd.east) -- (mkt.west)
+      node[midway, above, font=\tiny\itshape]{go-to-market};
+  \end{tikzpicture}
+  \caption{Organigramme de \organisme}
+  \label{fig:organigramme}
+\end{figure}
+
+\begin{table}[H]
+  \caption{Rôles et responsabilités par pôle}
+  \label{tab:roles-organisation}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|L{3.8cm}|X|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Pôle}} &
+    \textcolor{white}{\textbf{Responsabilités principales}} \\
+    \hline
+    Direction Générale &
+    Pilotage stratégique, vision long terme, relations institutionnelles,
+    validation des offres majeures et suivi financier global. Assurée
+    conjointement par les deux co-fondateurs \\
+    \hline
+    Pôle IT \&\@ Développement &
+    Conception et développement de plateformes web, applications mobiles,
+    logiciels de gestion, ERP et solutions SaaS. Accent sur
+    l'automatisation et la scalabilité \\
+    \hline
+    Pôle Énergie (Photovoltaïque) &
+    Études énergétiques, conception, installation et maintenance de
+    systèmes photovoltaïques pour clients résidentiels, commerciaux
+    et industriels \\
+    \hline
+    Pôle R\&D &
+    Prototypage de panneaux intelligents (production nocturne),
+    innovations domotiques, tests de nouvelles technologies
+    énergétiques, alimentation des autres pôles en innovations
+    commercialisables \\
+    \hline
+    Pôle Marketing \&\@ Branding &
+    Gestion des réseaux sociaux, identité visuelle, publicité
+    digitale, campagnes de conversion et accompagnement du lancement
+    des produits \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\noindent\textbf{Processus décisionnel}~: les décisions stratégiques sont
+prises conjointement par les deux co-CEO en concertation avec les
+responsables de pôles. Les choix techniques sont validés par les pôles
+IT, Énergie ou R\&D selon leur nature, après revue et tests.
+
+\noindent\textbf{Positionnement du projet SolarEase au sein de
+\organisme}~: SolarEase est un projet \textbf{transverse} qui mobilise
+trois pôles de l'entreprise~: le pôle \emph{IT \& Développement} pour
+la conception et la réalisation logicielle de la plateforme, le pôle
+\emph{Énergie} pour l'expertise métier (dimensionnement, choix des
+équipements) et le pôle \emph{R\&D} pour la fonctionnalité Night Panel.
+Le pôle \emph{Marketing} est sollicité pour la communication autour du
+produit et son éventuelle commercialisation.
+
+% ──────────────────────────────────────────────────────────
+\section{Contexte et Enjeux du Projet}
+
+\subsection{Le marché photovoltaïque en Tunisie}
+
+Le plan solaire tunisien vise à porter la part des énergies renouvelables à
+\textbf{35\%} de la production électrique nationale à l'horizon~2030. Dans ce
+contexte, le nombre de sociétés d'installation photovoltaïque a fortement
+progressé ces dernières années. La concurrence s'intensifie, et les sociétés
+doivent impérativement professionnaliser leurs processus commerciaux et
+techniques pour rester compétitives.
+
+\subsection{Les enjeux opérationnels}
+
+Les principaux défis auxquels font face les installateurs sont~:
+
+\begin{table}[H]
+  \caption{Enjeux opérationnels des installateurs photovoltaïques}
+  \label{tab:enjeux}
+  \centering
+  \begin{tabularx}{\textwidth}{L{3.5cm} X L{3cm}}
+    \toprule
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Enjeu}} &
+    \textcolor{white}{\textbf{Description}} &
+    \textcolor{white}{\textbf{Impact}} \\
+    \midrule
+    Rapidité de traitement & Délai entre la demande client et la remise d'une offre & Perte de clients \\
+    \addlinespace
+    Précision technique & Erreurs de dimensionnement engendrant des sur-coûts & Litiges, insatisfaction \\
+    \addlinespace
+    Professionnalisme & Qualité variable des devis et propositions & Image et crédibilité \\
+    \addlinespace
+    Traçabilité & Difficulté à retrouver l'historique d'un dossier & Risque opérationnel \\
+    \addlinespace
+    Rentabilité & Absence de projection financière claire & Mauvaise argumentation \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ──────────────────────────────────────────────────────────
+\section{Problématique et Objectifs}
+
+\subsection{Problématique}
+
+Les installateurs photovoltaïques en Tunisie utilisent aujourd'hui une multitude
+d'outils hétérogènes et non intégrés (tableurs, simulateurs isolés, CRM génériques,
+documents bureautiques). Cette fragmentation engendre des erreurs de dimensionnement,
+des pertes de temps considérables, une absence de traçabilité et une image peu
+professionnelle vis-à-vis du client final.
+
+La problématique peut être formulée ainsi~:
+
+\begin{center}
+  \begin{tikzpicture}
+    \node[draw=isetblue, fill=isetblue!8, rounded corners=6pt,
+          inner sep=10pt, text width=0.8\textwidth, align=center,
+          font=\itshape] {
+      Comment concevoir et réaliser une plateforme web unifiée permettant
+      à un installateur photovoltaïque de gérer l'intégralité de son cycle
+      métier --- du premier contact client jusqu'au rapport de dimensionnement
+      --- en s'appuyant sur des données fiables (PVGIS) et des recommandations
+      intelligentes (IA)~?
+    };
+  \end{tikzpicture}
+\end{center}
+
+\subsection{Objectifs du projet}
+
+Pour répondre à cette problématique, le projet SolarEase fixe les objectifs suivants~:
+
+\begin{enumerate}
+  \item Offrir une authentification sécurisée (JWT + OTP) avec gestion des rôles~;
+  \item Centraliser la gestion des clients et des projets solaires dans un seul outil~;
+  \item Automatiser le calcul de dimensionnement photovoltaïque à partir des données
+    d'irradiation PVGIS~;
+  \item Proposer un mode \textit{Night Panel} simulant le stockage par batterie~;
+  \item Fournir une analyse financière complète (ROI, payback, cash-flow sur 25 ans)~;
+  \item Générer automatiquement un rapport PDF professionnel et exploitable~;
+  \item Intégrer une recommandation IA contextuelle via un LLM local (Ollama)~;
+  \item Offrir un espace client dédié pour la consultation des projets et documents.
+\end{enumerate}
+
+% ──────────────────────────────────────────────────────────
+\section{Analyse Critique de l'Existant}
+
+\subsection{Outils actuellement utilisés}
+
+L'analyse de l'environnement de travail révèle que les sociétés s'appuient
+sur des outils non intégrés~:
+
+\textbf{a)~Tableurs (Excel/Sheets)~:} La plupart des installateurs utilisent
+des tableurs maison pour estimer la surface de toiture, le nombre de panneaux
+et le coût d'installation. Ces outils sont sujets aux erreurs humaines, difficiles
+à maintenir et non standardisés.
+
+\textbf{b)~Simulateurs isolés~:} Des logiciels comme PVSyst ou PVGIS permettent
+des calculs précis mais sont complexes à prendre en main et ne sont pas reliés
+au processus commercial.
+
+\textbf{c)~CRM généralistes~:} Les CRM de type Salesforce ou HubSpot offrent
+une bonne gestion de la relation client mais ne disposent d'aucune logique
+de dimensionnement solaire intégrée.
+
+\textbf{d)~Documents bureautiques~:} Les propositions commerciales sont rédigées
+manuellement sous Word, sans standardisation ni calcul automatique.
+
+\subsection{Tableau comparatif des solutions existantes}
+
+\begin{table}[H]
+  \caption{Comparaison des solutions existantes}
+  \label{tab:comparatif}
+  \centering
+  \small
+  \setlength{\tabcolsep}{8pt}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabularx}{\textwidth}{L{3.6cm} c c c c}
+    \toprule
+    \rowcolor{figblue}
+    \multicolumn{1}{>{\centering\arraybackslash}p{3.6cm}}{\textcolor{white}{\textbf{Critère}}} &
+    \multicolumn{1}{>{\centering\arraybackslash}p{1.6cm}}{\textcolor{white}{\textbf{Excel}}} &
+    \multicolumn{1}{>{\centering\arraybackslash}p{1.6cm}}{\textcolor{white}{\textbf{PVSyst}}} &
+    \multicolumn{1}{>{\centering\arraybackslash}p{2.0cm}}{\textcolor{white}{\textbf{CRM général}}} &
+    \multicolumn{1}{>{\centering\arraybackslash}p{2.0cm}}{\textcolor{white}{\textbf{SolarEase}}} \\
+    \midrule
+    Dimensionnement & \textcolor{orange}{Partiel} & \textcolor{green!60!black}{Oui} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Gestion client & \textcolor{orange}{Partiel} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Analyse financière & \textcolor{orange}{Manuel} & \textcolor{orange}{Partiel} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Génération PDF & \textcolor{orange}{Partiel} & \textcolor{orange}{Partiel} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Aide IA & \textcolor{red!70!black}{Non} & \textcolor{red!70!black}{Non} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Données PVGIS & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Accès web & \textcolor{orange}{Partiel} & \textcolor{red!70!black}{Non} & \textcolor{green!60!black}{Oui} & \textcolor{green!60!black}{Oui} \\
+    \addlinespace
+    Coût & Faible & \textcolor{red!70!black}{Élevé} & \textcolor{red!70!black}{Élevé} & \textcolor{green!60!black}{Adapté} \\
+    \bottomrule
+  \end{tabularx}
+  \vspace{6pt}
+  \raggedright\footnotesize{Légende~: \textcolor{green!60!black}{Oui} = fonctionnalité complète; \textcolor{orange}{Partiel} = couverture partielle; \textcolor{red!70!black}{Non} = absence.}
+\end{table}
+
+\subsection{Conclusion de l'analyse}
+
+L'étude de l'existant révèle une lacune claire~: \textbf{aucune solution
+ne couvre l'intégralité du cycle métier} d'un installateur photovoltaïque
+en une plateforme unique, accessible et abordable. SolarEase ambitionne
+de combler ce vide en proposant une solution unifiée, sécurisée et intelligente.
+
+% ──────────────────────────────────────────────────────────
+\section{Positionnement et Apport de SolarEase}
+
+SolarEase se distingue des solutions existantes par~:
+\begin{itemize}
+  \item \textbf{L'intégration complète}~: du premier contact client jusqu'au
+    rapport PDF final, en passant par le dimensionnement et l'analyse financière~;
+  \item \textbf{Le calcul basé sur des données réelles}~: connexion à l'API
+    PVGIS de la Commission Européenne pour des données d'irradiance précises~;
+  \item \textbf{L'innovation Night Panel}~: simulation et comparaison des
+    panneaux avec stockage par batterie intégré~;
+  \item \textbf{L'intelligence artificielle}~: recommandations contextualisées
+    générées par un LLM local (Ollama / TinyLLaMA)~;
+  \item \textbf{L'architecture moderne}~: microservices Spring Boot, frontend
+    React TypeScript, déploiement Docker Compose.
+\end{itemize}
+
+\begin{center}
+  \begin{tikzpicture}
+    \node[draw=isetblue, fill=isetblue!10, rounded corners=8pt,
+          inner sep=12pt, text width=0.75\textwidth, align=center,
+          font=\itshape] {
+      SolarEase fusionne les volets métier et technique dans un flux
+      unique et automatisé~: de l'inscription jusqu'à l'édition
+      d'un rapport PDF exploitable par le client final.
+    };
+  \end{tikzpicture}
+\end{center}
+
+% ──────────────────────────────────────────────────────────
+\section{Méthodologie de Travail}
+
+\subsection{Les méthodes agiles}
+
+La méthode \textbf{Agile} est une approche de gestion de projet qui privilégie
+la collaboration, la flexibilité et la livraison continue de valeur. Elle permet
+à l'équipe de s'adapter en continu aux retours et aux évolutions des besoins,
+sans figer un plan rigide dès le départ.
+
+\subsection{La méthodologie Kanban}
+
+\textbf{Kanban} est une méthode Agile à flux tiré, originellement développée
+par Toyota pour optimiser les chaînes de production. Adaptée au développement
+logiciel, elle repose sur la visualisation du travail sur un tableau divisé en
+colonnes représentant les états successifs de chaque tâche.
+
+Les principes fondamentaux de Kanban sont~:
+\begin{itemize}
+  \item \textbf{Visualisation du flux}~: toutes les tâches sont visibles
+    sur le tableau (colonne À FAIRE, EN COURS, TERMINÉ)~;
+  \item \textbf{Limitation du WIP}~: le nombre de tâches simultanées en
+    cours est limité pour éviter la surcharge~;
+  \item \textbf{Flux continu}~: contrairement à Scrum, il n'y a pas de
+    cycles fixes~; les tâches avancent au rythme de la capacité réelle~;
+  \item \textbf{Amélioration continue}~: le tableau permet d'identifier
+    les goulots d'étranglement et d'y remédier rapidement.
+\end{itemize}
+
+Pour le projet SolarEase, le tableau Kanban a été géré sur \textbf{Jira}
+(plateforme Atlassian). Le détail du Product Backlog, de l'équipe et de la
+planification des sprints est présenté au chapitre suivant (section~2.3).
+
+\section*{Conclusion}
+
+Ce chapitre a permis de poser le cadre général du projet en présentant
+l'organisme d'accueil, le contexte du marché photovoltaïque tunisien et les
+enjeux opérationnels des installateurs. L'analyse comparative des solutions
+existantes confirme l'absence d'un outil intégré couvrant l'intégralité du
+cycle métier. Face à ce constat, SolarEase se positionne comme une plateforme
+unifiée alliant dimensionnement solaire, gestion de projets et intelligence
+artificielle. La méthode Kanban, pilotée sur Jira, assure un suivi visuel et
+continu du flux de développement. Le chapitre suivant détaille la spécification
+des besoins et l'architecture logicielle retenue.
+
+\cleardoublepage

@@ -1,0 +1,245 @@
+% ============================================================
+%  15-annexes.tex  —  Annexes
+% ============================================================
+\appendix
+\renewcommand{\chaptername}{Annexe}
+
+% ── ANNEXE A ──────────────────────────────────────────────
+\chapter{Récapitulatif Complet des Endpoints API}
+
+\section*{A.1 Identity Service (Port 8081)}
+
+\begin{table}[H]
+  \caption{Endpoints Identity Service}
+  \centering
+  \begin{tabularx}{\textwidth}{|C{1.5cm}|L{5.5cm}|X|C{2cm}|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Méthode}} &
+    \textcolor{white}{\textbf{Route}} &
+    \textcolor{white}{\textbf{Description}} &
+    \textcolor{white}{\textbf{Auth}} \\
+    \hline
+    POST & /api/auth/register & Inscription + OTP & Non \\
+    \hline
+    POST & /api/auth/verify-otp & Validation OTP & Non \\
+    \hline
+    POST & /api/auth/login & Connexion JWT & Non \\
+    \hline
+    POST & /api/auth/refresh & Refresh token & Non \\
+    \hline
+    POST & /api/auth/resend-otp & Renvoi OTP & Non \\
+    \hline
+    GET & /api/auth/me & Profil utilisateur & JWT \\
+    \hline
+    PUT & /api/auth/me & MAJ profil & JWT \\
+    \hline
+    PUT & /api/auth/me/password & Changement MD passe & JWT \\
+    \hline
+    GET & /api/auth/health & Health check & Non \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section*{A.2 Project Service (Port 8082)}
+
+\begin{table}[H]
+  \caption{Endpoints Project Service}
+  \centering
+  \begin{tabularx}{\textwidth}{|C{1.5cm}|L{5.5cm}|X|C{2cm}|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Méthode}} &
+    \textcolor{white}{\textbf{Route}} &
+    \textcolor{white}{\textbf{Description}} &
+    \textcolor{white}{\textbf{Auth}} \\
+    \hline
+    GET & /api/clients & Liste clients paginée & JWT \\
+    \hline
+    POST & /api/clients & Créer un client & JWT \\
+    \hline
+    GET & /api/clients/\{id\} & Détail client & JWT \\
+    \hline
+    PUT & /api/clients/\{id\} & Modifier client & JWT \\
+    \hline
+    DELETE & /api/clients/\{id\} & Supprimer client & JWT \\
+    \hline
+    GET & /api/projects & Liste projets & JWT \\
+    \hline
+    POST & /api/projects & Créer projet & JWT \\
+    \hline
+    GET & /api/projects/\{id\} & Détail projet & JWT \\
+    \hline
+    PATCH & /api/projects/\{id\}/status & Changer statut & JWT \\
+    \hline
+    GET & /api/projects/dashboard/stats & KPI tableau de bord & JWT \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section*{A.3 Dimensioning Service (Port 8083)}
+
+\begin{table}[H]
+  \caption{Endpoints Dimensioning Service}
+  \centering
+  \begin{tabularx}{\textwidth}{|C{1.5cm}|L{6cm}|X|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Méthode}} &
+    \textcolor{white}{\textbf{Route}} &
+    \textcolor{white}{\textbf{Description}} \\
+    \hline
+    POST & /api/dimensioning/calculate & Calcul standard + Night Panel \\
+    \hline
+    POST & /api/dimensioning/compare & Comparaison Classique vs Night Panel \\
+    \hline
+    GET & /api/dimensioning/project/\{projectId\} & Historique par projet \\
+    \hline
+    GET & /api/dimensioning/\{id\} & Résultat par ID \\
+    \hline
+    GET & /api/dimensioning/\{id\}/pdf & Télécharger rapport PDF \\
+    \hline
+    GET & /api/equipment & Liste catalogue équipements \\
+    \hline
+    GET & /api/equipment/\{id\} & Détail équipement \\
+    \hline
+    GET & /api/equipment/type/\{type\} & Par type (SOLAR\_PANEL, INVERTER...) \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+% ── ANNEXE B ──────────────────────────────────────────────
+\chapter{Matrice de Tests Complète}
+
+\begin{longtable}{|C{1.2cm}|L{3cm}|L{3.5cm}|L{4.5cm}|C{1.8cm}|}
+  \caption{Matrice de tests SolarEase}
+  \label{tab:tests-matrix} \\
+  \hline
+  \rowcolor{figblue}
+  \textcolor{white}{\textbf{ID}} &
+  \textcolor{white}{\textbf{Module}} &
+  \textcolor{white}{\textbf{Précondition}} &
+  \textcolor{white}{\textbf{Résultat attendu}} &
+  \textcolor{white}{\textbf{Statut}} \\
+  \hline
+  \endfirsthead
+  \hline
+  \rowcolor{figblue}
+  \textcolor{white}{\textbf{ID}} &
+  \textcolor{white}{\textbf{Module}} &
+  \textcolor{white}{\textbf{Précondition}} &
+  \textcolor{white}{\textbf{Résultat attendu}} &
+  \textcolor{white}{\textbf{Statut}} \\
+  \hline
+  \endhead
+  T01 & Auth/Register & Email valide, pwd fort & Compte créé, OTP envoyé & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T02 & Auth/OTP & OTP correct et non expiré & Compte activé, JWT retourné & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T03 & Auth/Login & Compte activé, credentials valides & Access + Refresh token & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T04 & Auth/Login & Mot de passe invalide & Rejet 401 & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T05 & Auth/Refresh & Token valide & Nouveau access token & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T06 & Auth/Refresh & Token expiré & Session invalidée & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T07 & Client/Create & Données complètes & Client créé 201 & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T08 & Client/Create & Champ obligatoire manquant & Rejet 400 explicite & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T09 & Client/List & Utilisateur authentifié & Liste paginée & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T10 & Client/Update & Client existant & Données mises à jour & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T11 & Client/Delete & Client existant & Client supprimé & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T12 & Project/Create & Client existant & Projet CREATED & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T13 & Project/Status & Projet CREATED & Passage IN\_PROGRESS & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T14 & Project/Stats & Projets existants & KPI calculés & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T15 & Dim/Standard & Paramètres cohérents & Résultat complet & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T16 & Dim/NightPanel & nightPanelId présent & Stockage calculé & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T17 & Dim/Compare & Données complètes & Tableau comparatif + courbes & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T18 & Dim/PVGIS & Coordonnées GPS valides & Production PVGIS utilisée & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T19 & Dim/Fallback & PVGIS indisponible & Calcul statique activé & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T20 & Dim/PDF & Simulation existante & PDF téléchargeable & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T21 & IA/Ollama & LLM actif, contexte complet & Recommandation reçue & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T22 & IA/Fallback & Ollama arrêté & Message dégradé, pas de crash & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T23 & Gateway/Valid & Token JWT valide & Routage autorisé & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+  T24 & Gateway/Invalid & Token absent ou invalide & Rejet 401 & \textcolor{green!70!black}{\checkmark} OK \\
+  \hline
+\end{longtable}
+
+% ── ANNEXE C ──────────────────────────────────────────────
+\chapter{Configuration Docker Compose}
+
+\begin{tcolorbox}[colback=black!5, colframe=figblue!80!black, arc=4pt, 
+                  title={\textbf{docker-compose.yml} -- Extrait de l'environnement},
+                  colbacktitle=figblue, fonttitle=\small\ttfamily]
+\begin{lstlisting}[language=bash]
+services:
+  postgres-identity:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: solarease_identity
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+
+  identity-service:
+    build: ./identity-service
+    environment:
+      PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://
+        postgres-identity:5432/solarease_identity
+      APP_JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      postgres-identity:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+  dimensioning-service:
+    build: ./dimensioning-service
+    environment:
+      PORT: 8083
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: tinyllama:latest
+    depends_on:
+      - postgres-dimensioning
+      - ollama
+    ports:
+      - "8083:8083"
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+
+  gateway-service:
+    build: ./gateway-service
+    environment:
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      PROJECT_SERVICE_URL: http://project-service:8082
+      DIMENSIONING_SERVICE_URL: http://dimensioning-service:8083
+    ports:
+      - "8080:8080"
+\end{lstlisting}
+\end{tcolorbox}
+
+\cleardoublepage

@@ -1,0 +1,143 @@
+% ============================================================
+%  13-conclusion.tex  —  Conclusion générale et perspectives
+% ============================================================
+\chapterstar{Conclusion Générale et Perspectives}
+
+\begin{chapterintro}
+  Ce chapitre clôture le rapport en synthétisant les réalisations du projet
+  SolarEase, en dressant un bilan critique et en exposant les perspectives
+  d'évolution à court et moyen terme.
+\end{chapterintro}
+
+\section*{Synthèse des réalisations}
+
+Le projet \textbf{SolarEase} a permis de concevoir et de réaliser une
+plateforme web complète répondant aux besoins des sociétés d'installation
+de panneaux solaires. Organisé en sprints Kanban successifs, le travail
+accompli couvre~:
+
+\begin{itemize}
+  \item \textbf{Chapitre~3 (Sprints 1 et 2)~:} socle technique et gestion
+    métier~: authentification sécurisée (inscription client OTP, comptes
+    installateurs par l'admin, JWT, Gateway), gestion des clients et
+    projets (CRUD, cycle de vie 6 statuts, tableau de bord KPI)~;
+  \item \textbf{Chapitre~4 (Sprints 3, 4 et 5)~:} cœur métier et
+    collaboration~: moteur de dimensionnement photovoltaïque (données PVGIS
+    réelles, modèle Night Panel, analyse financière sur 25 ans), approche
+    RAG \textbf{hybride} pour les recommandations IA (sélection
+    déterministe sur le catalogue société + base vectorielle
+    \texttt{pgvector} + Ollama), génération automatique de rapports PDF
+    professionnels, suivi terrain avec mises à jour de progression,
+    messagerie temps réel (WebSocket), centre de notifications, espace
+    client dédié avec stepper de suivi, gestion des demandes solaires,
+    devis avec acceptation client et facturation automatique~;
+  \item \textbf{DevOps (Chapitre~5)~:} industrialisation complète de la
+    chaîne logicielle backend~: containerisation multi-stage des 4
+    microservices, pipeline CI/CD GitHub Actions (build, tests, scans
+    Trivy/Gitleaks, publication d'images sur GHCR), stack d'observabilité
+    (Spring Actuator + Prometheus + Grafana + Loki), qualité (JaCoCo),
+    Infrastructure as Code (Kubernetes + Kustomize, overlays dev/prod),
+    déploiement automatique Railway sur les branches \texttt{develop} et
+    les tags \texttt{v*.*.*}. Le frontend React/Vite reste un projet
+    léger livré en continu sur Vercel.
+\end{itemize}
+
+\section*{Bilan des objectifs atteints}
+
+\begin{table}[H]
+  \caption{Bilan des objectifs du projet SolarEase}
+  \label{tab:bilan}
+  \centering
+  \begin{tabularx}{\textwidth}{|L{5cm}|C{2cm}|X|}
+    \hline
+    \rowcolor{figblue}
+    \textcolor{white}{\textbf{Objectif}} &
+    \textcolor{white}{\textbf{Atteint}} &
+    \textcolor{white}{\textbf{Commentaire}} \\
+    \hline
+    Authentification sécurisée JWT+OTP & \textcolor{green!70!black}{\checkmark} Oui & Entièrement fonctionnel \\
+    \hline
+    Gestion clients et projets & \textcolor{green!70!black}{\checkmark} Oui & CRUD + cycle de vie \\
+    \hline
+    Moteur de dimensionnement & \textcolor{green!70!black}{\checkmark} Oui & PVGIS + fallback \\
+    \hline
+    Innovation Night Panel & \textcolor{green!70!black}{\checkmark} Oui & Formules validées \\
+    \hline
+    Analyse financière 25 ans & \textcolor{green!70!black}{\checkmark} Oui & ROI, payback, cash-flow \\
+    \hline
+    Génération rapport PDF & \textcolor{green!70!black}{\checkmark} Oui & Téléchargement direct \\
+    \hline
+    Recommandation IA & \textcolor{green!70!black}{\checkmark} Oui & Ollama en fallback contrôlé \\
+    \hline
+    Architecture microservices & \textcolor{green!70!black}{\checkmark} Oui & 4 services + Docker Compose \\
+    \hline
+    Pipeline CI/CD automatisé & \textcolor{green!70!black}{\checkmark} Oui & GitHub Actions + GHCR \\
+    \hline
+    Observabilité (métriques + logs) & \textcolor{green!70!black}{\checkmark} Oui & Prometheus + Grafana + Loki \\
+    \hline
+    Infrastructure as Code & \textcolor{green!70!black}{\checkmark} Oui & Kustomize (base + overlays) \\
+    \hline
+    Déploiement multi-environnement & \textcolor{green!70!black}{\checkmark} Oui & Railway staging + prod \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section*{Bilan critique}
+
+\textbf{Points forts~:}
+\begin{itemize}
+  \item Architecture moderne, découplée et évolutive~;
+  \item Données de production basées sur PVGIS (source officielle européenne)~;
+  \item Innovation significative avec le mode Night~Panel et la couverture nocturne~;
+  \item Expérience utilisateur professionnelle avec deux espaces distincts~;
+  \item Résilience assurée par les mécanismes de fallback (PVGIS et IA).
+\end{itemize}
+
+\textbf{Limites identifiées~:}
+\begin{itemize}
+  \item Dépendance partielle à des services externes (PVGIS, Ollama)~;
+  \item Paramètres de calibration (prix kWh, taux dégradation) à valider avec
+    chaque société partenaire~;
+  \item Absence de tests de charge exhaustifs en conditions de production.
+\end{itemize}
+
+\section*{Perspectives d'évolution}
+
+À court terme~:
+\begin{itemize}
+  \item Intégration d'un \textbf{tableau de bord analytique avancé} avec
+    visualisations des économies réalisées~;
+  \item Enrichissement de la \textbf{base de connaissances IA} avec des
+    données spécifiques au marché tunisien~;
+  \item Ajout d'un \textbf{module de signature électronique} pour les devis.
+\end{itemize}
+
+À moyen terme~:
+\begin{itemize}
+  \item \textbf{Architecture multi-tenant} pour servir plusieurs sociétés
+    d'installation depuis une même instance~;
+  \item \textbf{Application mobile} React Native pour les commerciaux terrain~;
+  \item Mise en place d'\textbf{Alertmanager} couplé à Slack/Teams pour les
+    alertes critiques sur les métriques Prometheus déjà collectées~;
+  \item Tests \textbf{end-to-end} automatisés (Playwright) intégrés au
+    pipeline GitHub Actions~;
+  \item Adoption d'un \textbf{service mesh} (Istio ou Linkerd) pour la
+    résilience inter-services en production~;
+  \item Connexion aux systèmes de \textbf{monitoring en temps réel} des
+    installations existantes.
+\end{itemize}
+
+\vspace{0.8cm}
+\begin{center}
+  \begin{tcolorbox}[colback=isetblue!8, colframe=isetblue,
+      width=0.9\textwidth, halign=center, fontupper=\itshape]
+    SolarEase démontre qu'il est possible de développer, en solo, une
+    plateforme professionnelle complète en appliquant rigoureusement les
+    bonnes pratiques d'ingénierie logicielle~: architecture microservices,
+    sécurité centralisée, tests automatisés et déploiement conteneurisé.
+    Ce projet constitue une base solide et extensible pour une mise en
+    production réelle dans le secteur des énergies renouvelables.
+  \end{tcolorbox}
+\end{center}
+
+\cleardoublepage

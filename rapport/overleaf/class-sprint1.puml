@@ -1,0 +1,62 @@
+@startuml class-sprint1
+title Diagramme de classes global -- Sprint 1
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+    FontSize        12
+}
+
+class Utilisateur {
+    - Role : String
+    - Prenom : String
+    - Nom : String
+    - NomUtilisateur : String
+    - Email : String
+    - MotDePasse : String
+    --
+    + SeConnecter() : void
+    + SInscrire() : void
+}
+
+class Admin {
+    --
+    + AjouterInstallateur(Installateur i)
+    + ModifierInstallateur(Long id)
+    + SupprimerInstallateur(Long id)
+    + ListerInstallateurs()
+}
+
+class Installateur {
+    - Telephone : String
+    - Statut : String
+    --
+}
+
+class Client {
+    - Telephone : String
+    - Adresse : String
+    --
+    + ModifierProfil()
+    + ChangerMotDePasse()
+}
+
+class OTP {
+    - Code : String
+    - DateExpiration : Date
+    - Utilise : boolean
+    --
+    + EstValide() : boolean
+    + EstExpire() : boolean
+}
+
+Utilisateur <|-- Admin
+Utilisateur <|-- Installateur
+Utilisateur <|-- Client
+
+Utilisateur "1" -- "0..*" OTP : possede >
+
+@enduml

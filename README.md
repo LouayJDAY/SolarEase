@@ -1,240 +1,74 @@
-# ☀️ SolarEase - Plateforme Intelligente de Dimensionnement Solaire
+# SolarEase
 
-**Développement d'une plateforme intelligente d'aide à la vente et au dimensionnement solaire dédiée aux sociétés d'installation de panneaux solaires et à leurs clients.**
-
----
-
-## 📋 Vue d'ensemble
-
-SolarEase est une plateforme complète qui aide les installateurs solaires à:
-- 💰 **Vendre** efficacement des solutions solaires
-- 📊 **Dimensionner** des installations avec précision
-- 📈 **Générer des devis** professionnels
-- 📱 **Gérer** les clients et projets
+Web platform for managing solar panel installation projects.
+Multi-tenant SaaS with three roles (Admin, Installer, Client), photovoltaic
+sizing engine (PVGIS), AI-powered recommendations (RAG / Ollama) and PDF
+report generation.
 
 ---
 
-## 🏗️ Architecture Microservices
+## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway (Port 8080)                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────┐ │
-│  │ Identity Service│  │ Projects Service │  │ Dimensioning│
-│  │   (Port 8081)   │  │   (Port 8082)    │  │ Service     │
-│  └────────┬────────┘  └────────┬─────────┘  │ (Port 8083)│
-│           │                     │            └────────────┘
-│           ▼                     ▼                   ▼       │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌────────────┐ │
-│  │ solarease_      │  │ solarease_       │  │solarease_  │ │
-│  │ identity (DB)   │  │ projects (DB)    │  │dimensioning│ │
-│  └─────────────────┘  └──────────────────┘  │(DB)        │ │
-│                                              └────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+- **Frontend** -- React 18 + Vite 6 + Tailwind 4 (`SolarEase Web App Design (2)/`)
+- **API Gateway** -- Spring Cloud Gateway, port 8080 (`backend/gateway-service`)
+- **Identity Service** -- Spring Boot 3, JWT + OTP, port 8081 (`backend/identity-service`)
+- **Project Service** -- Spring Boot 3, Flyway, WebSocket, port 8082 (`backend/project-service`)
+- **Dimensioning Service** -- Spring Boot 3, PVGIS, Ollama, iText PDF, port 8083 (`backend/dimensioning-service`)
+- **3 x PostgreSQL** -- one DB per microservice (`postgres-identity`, `postgres-project`, `postgres-dimensioning`)
+- **Ollama** -- local LLM runtime for RAG-augmented recommendations
+- **n8n** -- workflow automation (optional)
 
 ---
 
-## 🛠️ Stack Technique
+## Quick start (local)
 
-### Backend
-- **Framework:** Spring Boot 3.2
-- **Language:** Java 17 LTS
-- **Build:** Maven
-- **Database:** PostgreSQL 16
-- **Authentication:** JWT + Spring Security
-- **API:** RESTful + Swagger/OpenAPI
-
-### Frontend
-- **Framework:** React 18
-- **Build Tool:** Vite
-- **Language:** TypeScript
-- **Styling:** TailwindCSS
-- **UI Components:** Radix UI
-- **Router:** React Router v6
-
-### Infrastructure
-- **Container:** Docker + Docker Compose
-- **Version Control:** Git + GitHub (Gitflow)
-- **Project Management:** Jira Kanban
-- **Database GUI:** DBeaver
-
----
-
-## 📦 Bases de Données
-
-### 1. **solarease_identity**
-Gestion d'authentification et des utilisateurs
-```sql
-- users (id, uuid, email, password_hash, role)
-- companies (id, name, registration_number)
-- refresh_tokens (id, user_id, token, expiry)
-```
-
-### 2. **solarease_projects**
-Gestion des clients et projets
-```sql
-- clients (id, uuid, first_name, last_name, email)
-- projects (id, uuid, client_id, name, status)
-- quotes (id, project_id, total_amount, pdf_url)
-- quote_items (id, quote_id, description, unit_price)
-```
-
-### 3. **solarease_dimensioning**
-Calculs techniques et simulations
-```sql
-- installations (id, project_id, peak_power, panel_count)
-- simulations (id, installation_id, estimated_production)
-- solar_panels_catalog (id, name, power_rating, efficiency)
-- inverters_catalog (id, name, power_rating, efficiency)
-```
-
----
-
-## 🚀 Démarrage Rapide
-
-### Prérequis
-- Java 17 JDK
-- Maven 3.8+
-- PostgreSQL 16
-- Node.js 18+
-- Git
-
-### Installation
-
-1. **Cloner le repository**
 ```bash
-git clone https://github.com/LouayJDAY/SolarEase.git
-cd SolarEase
+# 1. Configure secrets
+cp backend/.env.example backend/.env
+# Edit backend/.env
+
+# 2. Start the full stack
+docker compose -f backend/docker-compose.yml up -d
+
+# 3. Open
+#   Frontend: http://localhost:5173
+#   Gateway:  http://localhost:8080
 ```
 
-2. **Configurer PostgreSQL**
+Need observability? Start the optional stack:
+
 ```bash
-psql -U postgres
-CREATE DATABASE solarease_identity;
-CREATE DATABASE solarease_projects;
-CREATE DATABASE solarease_dimensioning;
-```
-
-3. **Backend - Identity Service**
-```bash
-cd identity-service
-mvn clean package
-java -jar target/identity-service.jar
-# Accessible: http://localhost:8081
-```
-
-4. **Backend - Projects Service**
-```bash
-cd project-service
-mvn clean package
-java -jar target/project-service.jar
-# Accessible: http://localhost:8082
-```
-
-5. **Backend - Dimensioning Service**
-```bash
-cd dimensioning-service
-mvn clean package
-java -jar target/dimensioning-service.jar
-# Accessible: http://localhost:8083
-```
-
-6. **Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-# Accessible: http://localhost:3000
+docker compose \
+  -f backend/docker-compose.yml \
+  -f backend/observability/docker-compose.observability.yml \
+  up -d
+# Prometheus http://localhost:9090
+# Grafana    http://localhost:3000  (admin / admin)
 ```
 
 ---
 
-## 📖 Documentation
+## DevOps
 
-- [Architecture](./docs/ARCHITECTURE.md)
-- [API Documentation](./docs/API.md)
-- [Database Schema](./docs/SCHEMA.md)
-- [Git Workflow](./CONTRIBUTING.md)
+- **CI/CD** -- GitHub Actions (`.github/workflows/`) for the 4 backend services
+- **Containers** -- Dockerfiles for the 4 backend services
+- **Observability** -- Spring Actuator + Micrometer Prometheus + Grafana + Loki
+- **IaC** -- Kubernetes manifests with Kustomize (`k8s/base` + `k8s/overlays/{dev,prod}`) for the backend
+- **Quality** -- JaCoCo (backend), Trivy scans
+- **Deployment** -- backend on Railway (staging on `develop`, prod on `v*.*.*` tags) ; frontend on Vercel (`vercel.json`)
 
----
-
-## 🔄 Git Workflow (Gitflow)
-
-```
-main (Production)
-  ↑
-  └─ release/v1.0
-       ↑
-develop (Development)
-  ↑
-  ├─ feature/auth
-  ├─ feature/projects
-  ├─ feature/dimensioning
-  └─ bugfix/xyz
-```
-
-**Commandes principales:**
-```bash
-# Créer une feature
-git checkout develop
-git checkout -b feature/nom-feature
-# ... travail ...
-git push origin feature/nom-feature
-
-# Merger dans develop
-git checkout develop
-git merge feature/nom-feature
-
-# Release (main)
-git checkout main
-git merge develop
-git tag v1.0.0
-git push origin main --tags
-```
+See [RUNBOOK.md](RUNBOOK.md) for operations procedures.
 
 ---
 
-## 📊 Kanban Board
+## Branching strategy
 
-Tous les sprints et tâches sont gérés via **Jira Kanban**:
-- 📋 À FAIRE
-- 🔄 EN COURS
-- 👀 À RÉVISER
-- ✅ TERMINÉ
-
-**Sprint 1 Focus:** Identity Service (Authentication)
+- `main` -- protected, production
+- `develop` -- integration, auto-deploys to staging
+- `feature/SOLAR-<id>-<slug>` -- short-lived feature branches merged into `develop` via PR
 
 ---
 
-## 📝 Contribution
+## License
 
-Voir [CONTRIBUTING.md](./CONTRIBUTING.md) pour les guidelines
-
----
-
-## 📄 Licence
-
-MIT License - Voir LICENSE.md
-
----
-
-## 👥 Équipe
-
-- **Développeur:** Louay (Solo PFE Project)
-- **Email:** louay@solarease.com
-- **GitHub:** [@LouayJDAY](https://github.com/LouayJDAY)
-
----
-
-## 📞 Support
-
-Pour questions ou support:
-- Email: louay@solarease.com
-- GitHub Issues: [Créer une issue](https://github.com/LouayJDAY/SolarEase/issues)
-
----
-
-**Dernière mise à jour:** 3 Février 2026
+Internal academic project (PFE). See report under `rapport/overleaf/`.

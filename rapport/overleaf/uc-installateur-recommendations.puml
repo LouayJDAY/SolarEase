@@ -1,0 +1,37 @@
+@startuml uc-installateur-recommendations
+title Raffinement -- Obtenir les recommandations IA
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+
+rectangle "Recommandations IA (RAG + Ollama)" {
+    usecase "Demander les\nrecommandations IA" as Ask
+    usecase "Consulter les\npanneaux suggérés"  as Panels
+    usecase "Consulter les conseils\nd'entretien"   as Maintenance
+    usecase "Consulter le retour\nsur investissement" as ROI
+    usecase "Régénérer les\nrecommandations" as Regen
+}
+
+Installer --> Ask
+Installer --> Panels
+Installer --> Maintenance
+Installer --> ROI
+Installer --> Regen
+
+Panels       ..> Ask : <<extend>>
+Maintenance  ..> Ask : <<extend>>
+ROI          ..> Ask : <<extend>>
+Regen        ..> Ask : <<extend>>
+
+@enduml

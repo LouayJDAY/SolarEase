@@ -48,6 +48,8 @@ class DimensioningControllerTest {
         request.setInclination(30.0);
         request.setOrientation(Orientation.SOUTH);
         request.setRoofType(RoofType.FLAT);
+        request.setLatitude(36.8);
+        request.setLongitude(10.18);
 
         SolarInstallation installation = SolarInstallation.builder()
                 .panelCount(10)

@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-service
+  namespace: solarease
+  labels:
+    app: gateway-service
+    app.kubernetes.io/part-of: solarease
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway-service
+  template:
+    metadata:
+      labels:
+        app: gateway-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: gateway-service
+          image: ghcr.io/louayjday/solarease/gateway-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: { name: solarease-secrets, key: JWT_SECRET }
+            - name: IDENTITY_SERVICE_URL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: IDENTITY_SERVICE_URL }
+            - name: PROJECT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: PROJECT_SERVICE_URL }
+            - name: DIMENSIONING_SERVICE_URL
+              valueFrom:
+                configMapKeyRef: { name: solarease-config, key: DIMENSIONING_SERVICE_URL }
+            - name: PROJECT_SERVICE_HOST
+              value: project-service
+            - name: PROJECT_SERVICE_WS_PORT
+              value: "8082"
+          startupProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 200m, memory: 384Mi }
+            limits: { cpu: 1000m, memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: solarease
+  labels:
+    app: gateway-service
+spec:
+  selector:
+    app: gateway-service
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http

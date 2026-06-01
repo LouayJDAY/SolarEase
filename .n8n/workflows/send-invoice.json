@@ -1,0 +1,130 @@
+{
+  "name": "Send Invoice on Project Validated",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/project-validated",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "=\"http://project-service:8082/api/projects/\" + $node[\"Webhook Trigger\"].json[\"projectId\"] + \"/invoice\"",
+        "responseFormat": "json",
+        "jsonParseResponse": true
+      },
+      "name": "Get Invoice Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "={{$json[\"pdfUrl\"]}}",
+        "responseFormat": "file",
+        "binaryPropertyName": "invoicePdf"
+      },
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "invoices@yourcompany.com",
+        "toEmail": "={{$node[\"Webhook Trigger\"].json[\"clientEmail\"]}}",
+        "subject": "Votre facture pour le projet {{$node[\"Webhook Trigger\"].json[\"projectId\"]}}",
+        "text": "Bonjour,\n\nVeuillez trouver ci-joint la facture pour votre projet.\n\nCordialement,\nL'équipe",
+        "attachment": [
+          {
+            "binaryProperty": "invoicePdf",
+            "fileName": "invoice-{{$node[\"Webhook Trigger\"].json[\"projectId\"]}}.pdf"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [1040, 300],
+      "credentials": {
+        "smtp": {
+          "id": "SMTP_CREDENTIAL_PLACEHOLDER",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO invoice_logs(project_id, client_email, status, created_at) VALUES ('{{$node[\"Webhook Trigger\"].json[\"projectId\"]}}', '{{$node[\"Webhook Trigger\"].json[\"clientEmail\"]}}', 'sent', now())"
+      },
+      "name": "Log Sent Invoice",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1280, 300],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_PLACEHOLDER",
+          "name": "Postgres DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Invoice Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Invoice Metadata": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Log Sent Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "send-invoice-workflow"
+}

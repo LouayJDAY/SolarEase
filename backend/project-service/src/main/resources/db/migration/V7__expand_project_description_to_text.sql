@@ -1,0 +1,2 @@
+ALTER TABLE projects
+    ALTER COLUMN description TYPE TEXT;

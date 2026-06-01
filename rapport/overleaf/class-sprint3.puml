@@ -1,0 +1,78 @@
+@startuml class-sprint3
+title Diagramme de classes global -- Sprint 3
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+    FontSize        12
+}
+
+class Installateur {
+    - Email : String
+    - NomUtilisateur : String
+    --
+    + LancerDimensionnement()
+    + ObtenirRecommandationsIA()
+    + TelechargerRapportPDF()
+}
+
+class Dimensionnement {
+    - id : Long
+    - projetId : Long
+    - puissanceCrete : Double
+    - nbPanneaux : Integer
+    - surface : Double
+    - coutEstime : Double
+    - ghi : Double
+    - dateCalcul : Date
+    --
+    + Calculer()
+    + GenererPDF()
+}
+
+class Consommation {
+    - id : Long
+    - dimensionnementId : Long
+    - appareil : String
+    - puissanceW : Double
+    - heuresParJour : Double
+    - quantite : Integer
+    --
+}
+
+class Recommandation {
+    - id : Long
+    - dimensionnementId : Long
+    - panneauxSuggeres : String
+    - entretien : String
+    - retourInvestissement : String
+    - dateGeneration : Date
+    --
+}
+
+class RapportPDF {
+    - id : Long
+    - dimensionnementId : Long
+    - fichierUrl : String
+    - dateGeneration : Date
+    --
+    + Telecharger()
+}
+
+class PvgisData {
+    - latitude : Double
+    - longitude : Double
+    - ghiMensuel : Double[]
+    - kwhParKwc : Double
+}
+
+Installateur "1" -- "0..*" Dimensionnement : effectue >
+Dimensionnement "1" -- "0..*" Consommation : agrège >
+Dimensionnement "1" -- "0..1" Recommandation : génère >
+Dimensionnement "1" -- "0..1" RapportPDF : produit >
+Dimensionnement "1" -- "1" PvgisData : utilise >
+
+@enduml

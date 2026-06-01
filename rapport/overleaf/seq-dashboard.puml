@@ -1,0 +1,54 @@
+@startuml seq-dashboard
+title Diagramme de séquence -- Consulter le tableau de bord
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor Admin
+participant "Frontend\n(React)"        as FE
+participant "API Gateway"               as GW
+participant "ProjectController"         as PC
+participant "AccessControlService"      as ACS
+participant "ProjectService"            as PS
+participant "ClientRepository"          as CR
+participant "ProjectRepository"         as PR
+database  "PostgreSQL"                  as DB
+
+Admin -> FE : Accéder à\n"Tableau de bord"
+FE    -> GW : GET /api/projects/dashboard/stats\n(JWT)
+GW    -> GW : Valider JWT
+GW    -> PC : Forward + X-User-Role
+PC    -> ACS : requireAnyRole("ADMIN")
+ACS  --> PC : OK
+PC    -> PS : getDashboardStats()
+
+PS    -> CR : count()
+CR    -> DB : SELECT count(*)\nFROM items_client
+DB   --> CR : totalClients
+
+PS    -> PR : countByStatusIn(...)
+PR    -> DB : SELECT count(*)\nWHERE status IN (...)
+DB   --> PR : activeProjects
+
+PS    -> PR : countByStatus(COMPLETED)
+PR    -> DB : SELECT count(*)\nWHERE status='COMPLETED'
+DB   --> PR : completedProjects
+
+PS    -> PR : countByCreatedAtAfter(firstDayMonth)
+PR    -> DB : SELECT count(*)\nWHERE created_at >= ?
+DB   --> PR : thisMonth
+
+PS    -> PS : Construire DashboardStatsResponse\n(totalClients, activeProjects,\n completedProjects, thisMonth)
+PS   --> PC : DashboardStatsResponse
+PC   --> GW : 200 OK + JSON
+GW   --> FE : 200 + statistiques
+FE   --> Admin : Afficher cartes KPI\n+ graphiques
+
+@enduml

@@ -21,6 +21,8 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
             "/api/auth/refresh",
             "/api/auth/resend-otp",
             "/api/auth/health",
+            "/api/demands/public",
+            "/api/dimensioning/invoices/parse",
             "/health"
     };
 
@@ -68,9 +70,11 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
             Claims claims = jwtTokenValidator.getClaimsFromToken(token);
             if (claims != null) {
                 ServerHttpRequest modifiedRequest = request.mutate()
-                        .header("X-User-Id", claims.getSubject())
-                        .header("X-User-Email", claims.get("email", String.class))
-                        .header("X-User-Role", claims.get("role", String.class))
+                        .headers(httpHeaders -> {
+                            httpHeaders.set("X-User-Id", claims.getSubject());
+                            httpHeaders.set("X-User-Email", claims.get("email", String.class));
+                            httpHeaders.set("X-User-Role", claims.get("role", String.class));
+                        })
                         .build();
 
                 return chain.filter(exchange.mutate().request(modifiedRequest).build());

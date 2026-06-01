@@ -1,0 +1,53 @@
+@startuml seq-creer-projet
+title Diagramme de séquence -- Créer un projet et l'affecter à un installateur
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor Admin
+participant "Frontend\n(React)"        as FE
+participant "API Gateway"               as GW
+participant "Identity Service"          as ID
+participant "ProjectController"         as PC
+participant "AccessControlService"      as ACS
+participant "ProjectService"            as PS
+participant "ClientRepository"          as CR
+participant "ProjectRepository"         as PR
+database  "PostgreSQL"                  as DB
+
+Admin -> FE : Cliquer "Nouveau projet"
+FE    -> GW : GET /api/auth/installers (JWT)
+GW    -> ID : Forward + role=ADMIN
+ID   --> GW : Liste des installateurs
+GW   --> FE : 200 + JSON
+FE   --> Admin : Afficher dropdown\nclient + installateur
+
+Admin -> FE : Remplir formulaire\n(client, installateur, localisation,\n puissance, surface, budget)
+FE    -> GW : POST /api/projects/admin/assign\n(JWT)
+GW    -> GW : Valider JWT
+GW    -> PC : Forward + X-User-Role
+PC    -> ACS : requireAnyRole("ADMIN")
+ACS  --> PC : OK
+PC    -> PS : createAndAssign(ProjectRequest)
+PS    -> CR : findById(clientId)
+CR    -> DB : SELECT * FROM items_client
+DB   --> CR : Client trouvé
+CR   --> PS : Client
+PS    -> PS : project.status = CREATED\nproject.installerId = ...\nproject.assignedByAdminId = ...
+PS    -> PR : save(Project)
+PR    -> DB : INSERT INTO projects
+DB   --> PR : Project(id)
+PR   --> PS : Project persisté
+PS   --> PC : ProjectResponse
+PC   --> GW : 201 Created
+GW   --> FE : 201 + ProjectResponse
+FE   --> Admin : Projet créé et\naffecté à l'installateur
+
+@enduml

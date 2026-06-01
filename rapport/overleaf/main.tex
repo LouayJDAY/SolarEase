@@ -1,0 +1,345 @@
+% ============================================================
+%  SolarEase — Rapport PFE — ISET Nabeul — DSI 2025/2026
+%  CONFORME GUIDE ISET 2023 : Noir/blanc strict (Con.7)
+%  Police : Times New Roman 12pt (Con.11)
+%  Interligne : 1.5 (Con.11) | Marges : 2.5cm (Con.13)
+%  Pages hors annexes : 60–90 (Con.16)
+%  Compilateur : pdfLaTeX | Encodage : UTF-8
+% ============================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ── Encodage & langue ──────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+
+% ── Police Times New Roman — CON.11 ────────────────────────
+\usepackage{mathptmx}
+
+% ── Mise en page — CON.11, CON.13 ──────────────────────────
+\usepackage[
+  top=2.5cm, bottom=2.5cm,
+  left=2.5cm, right=2.5cm,
+  headheight=14pt
+]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Espacement paragraphes — CON.11 (6pt avant/après) ──────
+\usepackage{parskip}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+
+% ── Couleurs — CON.7 : NOIR uniquement dans le texte ───────
+\usepackage[dvipsnames,table]{xcolor}
+\colorlet{figblue}{blue!55!black}
+\colorlet{figred}{red!70!black}
+\colorlet{figgreen}{green!50!black}
+\colorlet{figgold}{orange!80!yellow}
+\colorlet{isetblue}{black}
+\colorlet{isetgold}{black}
+\colorlet{lightblue}{white}
+\colorlet{darkgray}{black}
+\colorlet{sectionbg}{white}
+\colorlet{accentgreen}{black}
+
+% ── En-têtes et pieds de page ──────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{\leftmark}}
+\fancyhead[R]{\small\textbf{SolarEase}}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[R]{\tiny DSI 2025/2026}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\fancypagestyle{chapterfirst}{%
+  \fancyhf{}
+  \fancyfoot[C]{\small\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% ── Style des chapitres (noir, conforme CON.7) ─────────────
+\usepackage{titlesec}
+
+% Chapitre numéroté
+\titleformat{\chapter}[display]
+  {\normalfont\thispagestyle{chapterfirst}}
+  {\hrule height 1.5pt\vspace{8pt}\fontsize{60}{60}\selectfont\bfseries\filright\thechapter}
+  {10pt}
+  {\hrule height 0.4pt\vspace{6pt}\LARGE\bfseries}
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+% Chapitre non numéroté
+\titleformat{name=\chapter,numberless}[display]
+  {\normalfont\thispagestyle{chapterfirst}}
+  {\hrule height 1.5pt}
+  {10pt}
+  {\LARGE\bfseries}
+\titlespacing*{name=\chapter,numberless}{0pt}{-20pt}{30pt}
+
+% Sections
+\titleformat{\section}
+  {\normalfont\large\bfseries}
+  {\thesection}
+  {0.8em}
+  {}
+  [\vspace{2pt}\hrule height 0.4pt]
+
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries}
+  {\thesubsection}
+  {0.6em}
+  {}
+
+\titleformat{\subsubsection}
+  {\normalfont\small\bfseries\itshape}
+  {}
+  {0pt}
+  {$\blacktriangleright$\enspace}
+
+% Header
+\makeatletter
+\renewcommand{\chaptermark}[1]{%
+  \markboth{Chapitre~\thechapter\ -- \MakeUppercase{#1}}{}%
+}
+\makeatother
+
+% ── Graphiques & figures ───────────────────────────────────
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup[figure]{
+  labelfont={bf}, name=Figure,
+  labelsep=period, position=below, font=small, skip=6pt
+}
+\captionsetup[table]{
+  labelfont={bf}, name=Tableau,
+  labelsep=period, position=above, font=small, skip=4pt
+}
+
+% ── Tableaux ───────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\renewcommand{\arraystretch}{1.35}
+\newcommand{\tableheader}{\rowcolor{black!12}}
+\newcommand{\thead}[1]{\textbf{#1}}
+\newcommand{\theadrow}{\rowcolor{black!10}}
+
+% ── Listes ─────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=1.8em, topsep=4pt, itemsep=2pt}
+\setlist[enumerate]{leftmargin=1.8em, topsep=4pt, itemsep=2pt}
+
+% ── Code source ────────────────────────────────────────────
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape,
+  stringstyle=\normalfont,
+  backgroundcolor=\color{black!5},
+  frame=single, framesep=4pt,
+  rulecolor=\color{black!30},
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=8pt,
+  breaklines=true,
+  captionpos=b,
+  showstringspaces=false,
+  tabsize=2,
+  extendedchars=true,
+  literate={é}{{\'e}}1 {è}{{\`e}}1 {à}{{\`a}}1
+           {ê}{{\^e}}1 {ô}{{\^o}}1 {û}{{\^u}}1
+           {â}{{\^a}}1 {î}{{\^i}}1 {ç}{{\c{c}}}1
+}
+
+% ── Boîtes — NOIR uniquement (bordures simples) ─────────────
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{chapterintro}{
+  breakable,
+  colback=white, colframe=black, arc=0pt,
+  boxrule=0.8pt,
+  left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fontupper=\itshape\small,
+  borderline west={3pt}{0pt}{black},
+}
+
+\newtcolorbox{kanbanbox}[2][]{
+  breakable,
+  colback=white, colframe=black, arc=0pt,
+  boxrule=0.8pt,
+  fonttitle=\bfseries\small,
+  colbacktitle=black!12, coltitle=black,
+  attach boxed title to top left={yshift=-2mm, xshift=6mm},
+  boxed title style={arc=0pt, boxrule=0.6pt},
+  title={#2}, #1,
+  left=4pt, right=4pt, top=8pt, bottom=4pt,
+}
+
+\newtcolorbox{notebox}{
+  breakable,
+  colback=white, colframe=black, arc=0pt,
+  boxrule=0.6pt,
+  fonttitle=\bfseries\small,
+  colbacktitle=black!12, coltitle=black,
+  title={Remarque},
+  attach boxed title to top left={yshift=-2mm, xshift=6mm},
+  boxed title style={arc=0pt, boxrule=0.6pt},
+  left=8pt, right=8pt, top=8pt, bottom=6pt,
+}
+
+\newtcolorbox{conclusionbox}{
+  breakable,
+  colback=white, colframe=black, arc=0pt,
+  boxrule=0pt,
+  borderline west={3pt}{0pt}{black},
+  left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fontupper=\itshape\small,
+}
+
+\newtcolorbox{resultbox}[1][]{
+  breakable,
+  colback=white, colframe=black, arc=0pt,
+  boxrule=0.6pt,
+  left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fontupper=\small, #1
+}
+
+% ── TikZ — couleurs UNIQUEMENT pour figures/diagrammes ─────
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes, calc, fit, backgrounds, shadows}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% ── Maths ──────────────────────────────────────────────────
+\usepackage{amsmath, amssymb}
+
+% ── Typographie ────────────────────────────────────────────
+\usepackage{microtype}
+
+% ── Sommaire (style Deutza) ────────────────────────────────
+\usepackage[titles]{tocloft}
+\addto\captionsfrench{\renewcommand{\contentsname}{Sommaire}}
+% Chapitres : "Chapitre X :   Titre ........... page"
+\renewcommand{\cftchappresnum}{Chapitre }
+\renewcommand{\cftchapaftersnum}{ :\quad}
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftchappagefont}{\bfseries}
+\renewcommand{\cftchapdotsep}{\cftdotsep}
+\renewcommand{\cftchapnumwidth}{6em}
+\setlength{\cftbeforechapskip}{8pt}
+% Sections
+\setlength{\cftsecindent}{2em}
+\setlength{\cftsecnumwidth}{2.5em}
+% Sous-sections
+\setlength{\cftsubsecindent}{4.5em}
+\setlength{\cftsubsecnumwidth}{3.2em}
+
+% ── Divers ─────────────────────────────────────────────────
+\usepackage{lscape}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=false,
+  pdfborder={0 0 0},
+  pdftitle={SolarEase -- Rapport PFE ISET Nabeul},
+  pdfauthor={Louay JDAY},
+}
+
+% ── Commande pour chapitres sans numéro ────────────────────
+\newcommand{\chapterstar}[1]{%
+  \chapter*{#1}%
+  \addcontentsline{toc}{chapter}{#1}%
+  \markboth{\MakeUppercase{#1}}{}%
+}
+
+% ── Informations du rapport ────────────────────────────────
+\newcommand{\auteur}{Louay JDAY}
+\newcommand{\encadreurAcad}{A compléter}
+\newcommand{\encadreurProf}{A compléter}
+\newcommand{\organisme}{XV Electronics}
+\newcommand{\anneescolaire}{2025 / 2026}
+
+% ── Commandes utilitaires (texte noir) ─────────────────────
+\newcommand{\tech}[1]{\textbf{\texttt{#1}}}
+\newcommand{\concept}[1]{\textbf{#1}}
+\newcommand{\ok}{$\checkmark$}
+\newcommand{\nok}{$\times$}
+\newcommand{\partiel}{$\sim$}
+
+% ── Page de garde par chapitre (style Deutza) ───────────────
+\newcommand{\chapterpage}[2]{%
+  \clearpage
+  \thispagestyle{empty}
+  \vspace*{\fill}
+  \begin{center}
+    \rule{0.6\textwidth}{1.5pt}\\[24pt]
+    {\LARGE\bfseries Chapitre #1}\\[16pt]
+    \rule{0.3\textwidth}{0.6pt}\\[20pt]
+    {\Large\itshape #2}\\[24pt]
+    \rule{0.6\textwidth}{1.5pt}
+  \end{center}
+  \vspace*{\fill}
+  \clearpage
+}
+
+% ── Couleurs diagrammes TikZ (autorisées dans figures) ──────
+\tikzset{
+  diagblue/.style={draw=figblue, fill=figblue!10},
+  diagarrow/.style={->, thick, figblue},
+}
+
+% ── Empêcher pages blanches automatiques (oneside) ──────────
+\let\cleardoublepage\clearpage
+
+% ============================================================
+\begin{document}
+\pagenumbering{Roman}
+
+% ── Pages préliminaires (numérotation romaine) ──────────────
+\include{01-titlepage}
+\include{02-dedicace}
+\include{03-remerciements}
+\include{04-resume}
+\include{05-toc}
+
+% ── Introduction générale (numérotation romaine) ────────────
+\include{06-introduction}
+
+% ── Corps du rapport (numérotation arabe à partir de 1) ─────
+\clearpage
+\pagenumbering{arabic}
+
+\chapterpage{1}{Cadre G\'en\'eral et \'Etude de l'Existant}
+\include{07-chapitre1}
+
+\chapterpage{2}{Sp\'ecification des Besoins et Architecture}
+\include{08-chapitre2}
+
+\chapterpage{3}{Sprints 1 et 2~: Fondation et Gestion Client/Projet}
+\include{09-release1}
+
+\chapterpage{4}{Sprints 3, 4 et 5~: Dimensionnement, Collaboration et Espace Client}
+\include{11-release3}
+
+\chapterpage{5}{DevOps et mise en production}
+\include{12-devops}
+
+% ── Conclusion générale ─────────────────────────────────────
+\include{13-conclusion}
+
+% ── Bibliographie ───────────────────────────────────────────
+\include{14-bibliographie}
+
+% ── Annexes ─────────────────────────────────────────────────
+\include{15-annexes}
+
+\end{document}

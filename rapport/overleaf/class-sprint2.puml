@@ -1,0 +1,85 @@
+@startuml class-sprint2
+title Diagramme de classes global -- Sprint 2
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+    FontSize        12
+}
+
+class Admin {
+    - Email : String
+    - NomUtilisateur : String
+    --
+    + CreerClient()
+    + ModifierClient()
+    + SupprimerClient()
+    + ListerClients()
+    + CreerProjet()
+    + AffecterInstallateur()
+    + ConsulterTableauBord()
+}
+
+class Client {
+    - id : Long
+    - Prenom : String
+    - Nom : String
+    - Email : String
+    - Telephone : String
+    - Adresse : String
+    - InstallateurId : String
+    - DateCreation : Date
+    --
+}
+
+class Projet {
+    - id : Long
+    - Nom : String
+    - Description : String
+    - Localisation : String
+    - PuissanceCrete : Double
+    - SurfaceDispo : Double
+    - Inclinaison : Double
+    - Orientation : Double
+    - Budget : Double
+    - Statut : ProjectStatus
+    - DateCreation : Date
+    --
+    + ChangerStatut(s : ProjectStatus)
+}
+
+enum ProjectStatus {
+    CREATED
+    EN_PREPARATION
+    INSTALLATEUR_AFFECTE
+    IN_PROGRESS
+    COMPLETED
+    CANCELLED
+}
+
+class Installateur {
+    - id : String
+    - Email : String
+    - Nom : String
+    --
+    + ConsulterProjetsAffectes()
+}
+
+class TableauBord {
+    - totalClients : int
+    - projetsActifs : int
+    - projetsTermines : int
+    - ceMois : int
+}
+
+Admin "1" -- "0..*" Client       : gère >
+Admin "1" -- "0..*" Projet       : crée et affecte >
+Client "1" -- "0..*" Projet      : possède >
+Installateur "1" -- "0..*" Projet : est affecté à >
+Projet "*" --> "1" ProjectStatus : a un statut >
+Admin "1" -- "1" TableauBord     : consulte >
+
+@enduml

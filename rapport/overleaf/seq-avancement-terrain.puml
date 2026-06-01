@@ -1,0 +1,59 @@
+@startuml seq-avancement-terrain
+title Diagramme de séquence -- Soumettre un avancement terrain
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Installateur"    as User
+actor "Admin"           as AdminUser
+participant "Frontend\nMobile/Web"          as FE
+participant "API Gateway"                    as GW
+participant "FieldUpdateController"          as FUC
+participant "FieldUpdateService"             as FUS
+participant "NotificationWebSocketService"   as NWS
+participant "ProjectRepository"              as PR
+database  "PostgreSQL"                       as DB
+participant "STOMP Broker"                   as BROKER
+
+User -> FE : Choisir statut\n(SUR_SITE, EN_INSTALLATION...)
+User -> FE : Renseigner avancement %\n+ note
+FE   -> GW : POST /api/projects/{id}/field-updates\n(JWT, body)
+GW   -> FUC : Forward + headers
+FUC  -> FUS : submitFieldUpdate(req)
+FUS  -> PR  : findById(projectId)
+PR   -> DB  : SELECT * FROM projects
+DB  --> PR  : Project
+PR  --> FUS : Project
+
+FUS  -> FUS : Valider ownership\n(installerId == userId)
+FUS  -> DB  : INSERT INTO field_updates
+DB  --> FUS : FieldUpdate(id)
+FUS  -> PR  : update project.currentProgress\n+ currentFieldStatus
+PR   -> DB  : UPDATE projects SET ...
+DB  --> PR  : OK
+
+FUS  -> BROKER : send to /topic/field-updates/{id}
+FUS  -> NWS : notifyUser(adminId, "Avancement terrain")
+NWS  -> DB  : INSERT INTO notifications
+NWS  -> BROKER : send to /user/{adminId}/queue/notifications
+
+BROKER --> AdminUser : push notification
+
+FUS --> FUC : FieldUpdateDTO
+FUC --> GW  : 201 Created + JSON
+GW  --> FE  : 201 + DTO
+FE  --> User : Confirmation\n+ projet rafraîchi
+
+alt Blocage signalé
+    FUS -> NWS : notifyUser(adminId, "BLOCAGE")
+    NWS -> BROKER : push urgent
+end
+
+@enduml

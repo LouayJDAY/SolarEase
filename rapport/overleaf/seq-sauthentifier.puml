@@ -1,0 +1,85 @@
+@startuml seq-sauthentifier
+title Diagramme de séquence -- S'authentifier (Sprint 1)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor          #2C5282
+    LifeLineBackgroundColor #FAFAFA
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #E8F0FE
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #E8F0FE
+    ActorBorderColor          #2C5282
+}
+
+actor "Utilisateur\n(Admin / Installateur / Client)" as User
+participant "Frontend\n(React)"           as Front
+participant "API Gateway"                 as GW
+participant "AuthController"              as Ctrl
+participant "AuthService"                 as Svc
+participant "UserRepository"              as Repo
+participant "JwtTokenProvider"            as Jwt
+database    "Base de données\n(PostgreSQL)" as DB
+
+User  -> Front : Saisit e-mail + mot de passe
+activate Front
+
+Front -> GW    : POST /api/auth/login\n{email, password}
+activate GW
+
+GW    -> Ctrl  : Route publique (no JWT check)
+activate Ctrl
+
+Ctrl  -> Svc   : authenticate(loginRequest)
+activate Svc
+
+Svc   -> Repo  : findByEmail(email)
+activate Repo
+Repo  -> DB    : SELECT * FROM users WHERE email=?
+DB   --> Repo  : User
+Repo --> Svc   : User
+deactivate Repo
+
+alt Utilisateur inexistant ou inactif
+    Svc  --> Ctrl : throw BadCredentialsException
+    Ctrl --> GW   : HTTP 401 Unauthorized
+    GW   --> Front: 401 (message générique)
+    Front--> User : "E-mail ou mot de passe incorrect"
+else Utilisateur valide
+    Svc   -> Svc  : BCrypt.matches(password, hash)
+
+    alt Mot de passe incorrect
+        Svc  --> Ctrl : throw BadCredentialsException
+        Ctrl --> GW   : HTTP 401
+        GW   --> Front: 401
+        Front--> User : "E-mail ou mot de passe incorrect"
+    else Mot de passe valide
+        Svc -> Jwt  : generateAccessToken(user)
+        activate Jwt
+        Jwt --> Svc : accessToken (JWT, 1h)
+        deactivate Jwt
+
+        Svc -> Jwt  : generateRefreshToken(user)
+        activate Jwt
+        Jwt --> Svc : refreshToken (UUID, 7j)
+        deactivate Jwt
+
+        Svc -> Repo : save(refreshToken)
+        Repo -> DB  : INSERT INTO refresh_tokens
+        DB  --> Repo: OK
+        Repo--> Svc : OK
+
+        Svc  --> Ctrl : AuthResponse(tokens + UserDto)
+        Ctrl --> GW   : HTTP 200 + AuthResponse
+        GW   --> Front: 200 + tokens + UserDto
+        Front-> Front : Stocke JWT dans localStorage
+        Front--> User : Redirection vers dashboard\nselon le rôle
+    end
+end
+
+deactivate Svc
+deactivate Ctrl
+deactivate GW
+deactivate Front
+
+@enduml

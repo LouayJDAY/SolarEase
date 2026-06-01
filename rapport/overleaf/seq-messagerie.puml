@@ -1,0 +1,62 @@
+@startuml seq-messagerie
+title Diagramme de séquence -- Envoyer un message (temps réel)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor       #2C5282
+    LifeLineBorderColor #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor    #2C5282
+    ActorBackgroundColor      #FAFAFA
+    ActorBorderColor          #2C5282
+}
+
+actor "Expéditeur" as Sender
+actor "Destinataires" as Recipients
+participant "Frontend\nSender"      as FE1
+participant "API Gateway"            as GW
+participant "MessageController"      as MC
+participant "MessageService"         as MS
+participant "ConversationRepository" as CR
+participant "MessageRepository"      as MR
+database  "PostgreSQL"               as DB
+participant "STOMP Broker"           as BROKER
+participant "Frontend\nDestinataires" as FE2
+
+Sender -> FE1 : Saisir et envoyer\nun message
+FE1   -> GW : POST /api/projects/{id}/messages\n(JWT, body={content, recipientRoles})
+GW    -> MC : Forward + X-User-Id, X-User-Role
+MC    -> MS : sendMessage(projectId, req)
+
+MS    -> CR : findByProjectId(projectId)
+CR    -> DB : SELECT * FROM conversations
+DB   --> CR : Conversation (ou empty)
+alt Conversation inexistante
+    CR --> MS : empty
+    MS -> CR : save(new Conversation)
+    CR -> DB : INSERT INTO conversations
+    DB --> CR : Conversation persistée
+    CR --> MS : Conversation
+else Conversation existe
+    CR --> MS : Conversation
+end
+
+MS    -> MR : save(Message)
+MR    -> DB : INSERT INTO messages
+DB   --> MR : Message persisté
+MR   --> MS : Message
+
+MS    -> BROKER : send to /topic/project-messages/{id}
+BROKER --> FE2 : push MessageDto
+
+MS    -> MS : Pour chaque participant\nautre que l'expéditeur
+MS    -> BROKER : send to /user/{userId}/queue/notifications
+
+MS   --> MC : MessageDto
+MC   --> GW : 200 OK + JSON
+GW   --> FE1 : 200 + MessageDto
+FE1  --> Sender : Message affiché\ndans le fil
+
+Recipients <-- FE2 : Affichage du nouveau\nmessage en temps réel
+
+@enduml

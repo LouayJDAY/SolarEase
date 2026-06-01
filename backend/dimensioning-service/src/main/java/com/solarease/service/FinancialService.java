@@ -12,8 +12,8 @@ import java.util.List;
 @Slf4j
 public class FinancialService {
 
-    private static final double ELECTRICITY_PRICE_TND_KWH = 0.280; // Prix moyen du kWh (STEG - Palier supérieur)
-    private static final double ANNUAL_INFLATION_RATE = 0.05; // Hausse annuelle du prix de l'électricité (5%)
+    private static final double ELECTRICITY_PRICE_TND_KWH = 0.280; // Prix moyen du kWh (Tunisie: 0.25 - 0.30)
+    private static final double ANNUAL_INFLATION_RATE = 0.04; // Hausse annuelle du prix de l'électricité (~4%)
     private static final double PANEL_DEGRADATION_RATE = 0.005; // Perte de rendement annuelle (0.5%)
 
     public FinancialMetrics calculateMetrics(SolarInstallation installation) {
@@ -27,7 +27,7 @@ public class FinancialService {
         if (installation.getEstimatedCost() != null && installation.getEstimatedCost() > 0) {
             initialInvestment = installation.getEstimatedCost();
         } else {
-            initialInvestment = installation.getTotalCapacityKw() * 3500.0; // Fallback
+            initialInvestment = installation.getTotalCapacityKw() * 2500.0; // Tunisie: prix moyen / kWc installé
         }
         
         // 2. Cash Flow Simulation (25 Years)

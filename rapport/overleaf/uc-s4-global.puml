@@ -1,0 +1,42 @@
+@startuml uc-s4-global
+title Diagramme de cas d'utilisation global -- Sprint 4
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Installateur" as Installer
+actor "Admin"        as Admin
+actor "Client"       as Client
+
+rectangle "Module Collaboration" {
+    usecase "Suivi terrain"           as Field
+    usecase "Valider les avancements" as Validate
+    usecase "Messagerie projet"       as Msg
+    usecase "Notifications"           as Notif
+    usecase "Documents projet"        as Docs
+}
+
+Installer --> Field
+Installer --> Msg
+Installer --> Notif
+Installer --> Docs
+
+Admin --> Validate
+Admin --> Msg
+Admin --> Notif
+Admin --> Docs
+
+Client --> Msg
+Client --> Notif
+Client --> Docs
+
+@enduml

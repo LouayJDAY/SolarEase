@@ -1,0 +1,128 @@
+% ============================================================
+%  04-resume.tex  —  Résumé (FR) + Abstract (EN) — Version Premium
+% ============================================================
+\chapterstar{Résumé}
+\thispagestyle{fancy}
+
+\vspace{6pt}
+
+% ── Résumé français ────────────────────────────────────────
+\begin{tcolorbox}[
+  enhanced, breakable,
+  colback=sectionbg, colframe=isetblue,
+  arc=5pt, boxrule=0.8pt,
+  attach boxed title to top left={yshift=-2mm, xshift=8mm},
+  boxed title style={
+    colback=isetblue, colframe=isetblue,
+    arc=3pt, boxrule=0pt,
+    fontupper=\bfseries\color{white}
+  },
+  title={Résumé},
+  left=10pt, right=10pt, top=10pt, bottom=10pt
+]
+\setlength{\parskip}{4pt}
+Le secteur des énergies renouvelables, et particulièrement le photovoltaïque,
+connaît une croissance soutenue en Tunisie dans le cadre du Plan Solaire
+Tunisien. Pourtant, les sociétés d'installation de panneaux solaires peinent
+encore à industrialiser leurs processus commerciaux et techniques, faute d'un
+outil unifié et adapté à leurs besoins métiers.
+
+Le présent Projet de Fin de Parcours présente la conception et la réalisation
+de \textbf{SolarEase}, une plateforme web intelligente dédiée aux installateurs
+photovoltaïques. La solution centralise l'intégralité du cycle de vie d'un
+projet solaire~: authentification sécurisée par \textbf{JWT et OTP}, gestion
+des clients et des projets, calcul automatisé de dimensionnement intégrant
+l'API \textbf{PVGIS} pour des données d'irradiance réelles, comparaison de
+scénarios \textit{Classique versus Night~Panel} avec stockage batterie,
+analyse financière sur 25~ans, génération de rapports \textbf{PDF}
+professionnels et aide à la décision par \textbf{Intelligence Artificielle}
+(LLM Ollama / TinyLLaMA en mode local).
+
+L'architecture adoptée est de type \textbf{microservices} (Spring Boot~3.2 /
+Java~17), organisée en quatre services indépendants\,---\,\textit{Identity,
+Project, Dimensioning} et \textit{Gateway}\,---\,chacun disposant de sa propre
+base de données \textbf{PostgreSQL~16}. Le frontend est développé en
+\textbf{React~18 / TypeScript} avec Vite et TailwindCSS~; le déploiement est
+orchestré via \textbf{Docker Compose}.
+
+Les résultats valident la faisabilité technique et opérationnelle de la solution~:
+temps de traitement réduit, traçabilité accrue et propositions commerciales
+de qualité professionnelle.
+\end{tcolorbox}
+
+\vspace{4pt}
+\noindent\small\textbf{Mots-clés~:}
+\textcolor{isetblue}{photovoltaïque} $\cdot$
+\textcolor{isetblue}{microservices} $\cdot$
+\textcolor{isetblue}{Spring Boot} $\cdot$
+\textcolor{isetblue}{React} $\cdot$
+\textcolor{isetblue}{dimensionnement solaire} $\cdot$
+\textcolor{isetblue}{PVGIS} $\cdot$
+\textcolor{isetblue}{Night Panel} $\cdot$
+\textcolor{isetblue}{intelligence artificielle} $\cdot$
+\textcolor{isetblue}{Docker}
+
+\vspace{16pt}
+\begin{center}
+  \textcolor{isetgold}{\rule{0.15\textwidth}{0.6pt}}
+  \enspace\textcolor{isetblue!40}{\small$\blacklozenge$}\enspace
+  \textcolor{isetgold}{\rule{0.15\textwidth}{0.6pt}}
+\end{center}
+\vspace{12pt}
+
+% ── Abstract anglais ───────────────────────────────────────
+\begin{tcolorbox}[
+  enhanced, breakable,
+  colback=sectionbg, colframe=isetgold,
+  arc=5pt, boxrule=0.8pt,
+  attach boxed title to top left={yshift=-2mm, xshift=8mm},
+  boxed title style={
+    colback=isetgold, colframe=isetgold,
+    arc=3pt, boxrule=0pt,
+    fontupper=\bfseries\color{white}
+  },
+  title={Abstract},
+  left=10pt, right=10pt, top=10pt, bottom=10pt
+]
+\setlength{\parskip}{4pt}
+The renewable energy sector, particularly photovoltaics, is experiencing
+sustained growth in Tunisia as part of the national Solar Plan. However, solar
+panel installation companies still struggle to industrialize their commercial
+and technical processes due to the lack of an integrated tool tailored to their
+specific business needs.
+
+This final-year project presents the design and implementation of
+\textbf{SolarEase}, an intelligent web platform dedicated to photovoltaic
+installers. The solution centralizes the complete lifecycle of a solar
+project~: \textbf{JWT and OTP}-based secure authentication, customer and
+project management, automated sizing calculations integrating the \textbf{PVGIS}
+API for real irradiance data, Classic vs.~Night~Panel scenario comparison with
+battery storage, 25-year financial analysis, professional \textbf{PDF} report
+generation, and \textbf{AI}-assisted decision support (Ollama / TinyLLaMA LLM
+running locally).
+
+The adopted architecture is \textbf{microservices}-based (Spring Boot~3.2 /
+Java~17), structured into four independent services\,---\,\textit{Identity,
+Project, Dimensioning} and \textit{Gateway}\,---\,each with its own dedicated
+\textbf{PostgreSQL~16} database. The frontend is built with
+\textbf{React~18 / TypeScript}, Vite and TailwindCSS; deployment is
+orchestrated via \textbf{Docker Compose}.
+
+The results validate the technical and operational feasibility of the solution~:
+reduced processing time, enhanced traceability, and professional-quality
+commercial proposals.
+\end{tcolorbox}
+
+\vspace{4pt}
+\noindent\small\textbf{Keywords~:}
+\textcolor{isetblue}{photovoltaics} $\cdot$
+\textcolor{isetblue}{microservices} $\cdot$
+\textcolor{isetblue}{Spring Boot} $\cdot$
+\textcolor{isetblue}{React} $\cdot$
+\textcolor{isetblue}{solar sizing} $\cdot$
+\textcolor{isetblue}{PVGIS} $\cdot$
+\textcolor{isetblue}{Night Panel} $\cdot$
+\textcolor{isetblue}{artificial intelligence} $\cdot$
+\textcolor{isetblue}{Docker}
+
+\cleardoublepage

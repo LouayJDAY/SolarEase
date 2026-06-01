@@ -1,0 +1,116 @@
+@startuml class-sprint4
+title Diagramme de classes global -- Sprint 4
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+    FontSize        12
+}
+
+class Utilisateur {
+    - id : String
+    - role : String
+    - email : String
+    --
+}
+
+class Installateur {
+    --
+    + SoumettreAvancement()
+    + SignalerBlocage()
+}
+
+class Admin {
+    --
+    + ValiderAvancement()
+}
+
+class Client {
+    --
+    + EnvoyerMessage()
+}
+
+class FieldUpdate {
+    - id : Long
+    - projetId : Long
+    - statut : InstallerFieldStatus
+    - avancement : Integer
+    - note : String
+    - estBlocage : boolean
+    - raisonBlocage : String
+    - dateCreation : Date
+    --
+}
+
+enum InstallerFieldStatus {
+    EN_DEPLACEMENT
+    SUR_SITE
+    EN_INSTALLATION
+    EN_PAUSE
+    FIN_CHANTIER
+    BLOCAGE
+}
+
+class Conversation {
+    - id : Long
+    - projetId : Long
+    - clientId : Long
+    - participants : List
+    - dateCreation : Date
+    --
+}
+
+class Message {
+    - id : Long
+    - expediteurId : String
+    - expediteurNom : String
+    - expediteurRole : String
+    - destinataireRoles : List
+    - contenu : String
+    - dateEnvoi : Date
+    --
+    + Envoyer()
+}
+
+class Notification {
+    - id : Long
+    - utilisateurId : String
+    - titre : String
+    - message : String
+    - lue : boolean
+    - dateCreation : Date
+    --
+    + MarquerCommeLue()
+}
+
+class Document {
+    - id : Long
+    - nom : String
+    - type : String
+    - projetId : Long
+    - url : String
+    - taille : Long
+    - dateAjout : Date
+    --
+    + Telecharger()
+}
+
+Utilisateur <|-- Installateur
+Utilisateur <|-- Admin
+Utilisateur <|-- Client
+
+Installateur "1" -- "0..*" FieldUpdate : soumet >
+FieldUpdate "*" -- "1" InstallerFieldStatus : a un statut >
+
+Conversation "1" -- "0..*" Message       : contient >
+Utilisateur "*" -- "0..*" Conversation  : participe à >
+Utilisateur "1" -- "0..*" Message       : envoie >
+
+Utilisateur "1" -- "0..*" Notification  : reçoit >
+
+Utilisateur "1" -- "0..*" Document      : partage >
+
+@enduml
