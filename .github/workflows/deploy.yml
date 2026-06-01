@@ -39,5 +39,14 @@ jobs:
             git pull --ff-only origin main
             cd backend
             docker compose up -d --build
-            curl -sf http://localhost:8080/actuator/health | grep -q '"status":"UP"'
-            echo "Azure deploy OK"
+            echo "Waiting for gateway health..."
+            for i in $(seq 1 36); do
+              if curl -sf http://127.0.0.1:8080/actuator/health | grep -q '"status":"UP"'; then
+                echo "Azure deploy OK"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "Gateway health check timed out after 3 minutes"
+            curl -v http://127.0.0.1:8080/actuator/health || true
+            exit 1
