@@ -55,7 +55,7 @@ docker compose \
 - **Observability** -- Spring Actuator + Micrometer Prometheus + Grafana + Loki
 - **IaC** -- Kubernetes manifests with Kustomize (`k8s/base` + `k8s/overlays/{dev,prod}`) for the backend
 - **Quality** -- JaCoCo (backend), Trivy scans
-- **Deployment** -- backend on Railway (staging on `develop`, prod on `v*.*.*` tags) ; frontend on Vercel (`vercel.json`)
+- **Deployment** -- backend on **Azure VM** (Docker Compose, deploy via GitHub Actions SSH or manual) ; frontend on **Vercel** (`vercel.json`)
 
 See [RUNBOOK.md](RUNBOOK.md) for operations procedures.
 
@@ -64,7 +64,7 @@ See [RUNBOOK.md](RUNBOOK.md) for operations procedures.
 ## Branching strategy
 
 - `main` -- protected, production
-- `develop` -- integration, auto-deploys to staging
+- `develop` -- integration branch
 - `feature/SOLAR-<id>-<slug>` -- short-lived feature branches merged into `develop` via PR
 
 ---

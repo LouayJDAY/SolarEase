@@ -1,7 +1,7 @@
 # SolarEase -- Operations Runbook
 
 Operational procedures for running, deploying, and recovering the SolarEase
-platform across local, Docker Compose, Railway, and Kubernetes environments.
+platform across local, Docker Compose, Azure VM, and Kubernetes environments.
 
 > Audience: developers and ops on call. Keep this document up to date when
 > infrastructure changes.
@@ -13,17 +13,16 @@ platform across local, Docker Compose, Railway, and Kubernetes environments.
 | Environment | Purpose | URL | Source branch |
 |-------------|---------|-----|----------------|
 | Local | Developer laptop | http://localhost:5173 | any |
-| Staging | Pre-production validation | (Railway) | `develop` |
-| Production | Live customers | (Railway) | tags `v*.*.*` on `main` |
+| Production | Live demo (PFE) | Vercel + Azure VM gateway :8080 | `main` |
 
 ---
 
 ## 2. Branching strategy (GitFlow)
 
 ```
-main          o---o---o---o (tagged v1.0.0, v1.1.0, ...)   -> production
+main          o---o---o---o (production, Azure + Vercel)
                        \      /
-develop       --o---o---o---o---o ...                       -> staging
+develop       --o---o---o---o---o ...                       -> integration
                   \     /
 feature/X         o---o
 ```
@@ -31,9 +30,9 @@ feature/X         o---o
 Rules:
 
 - `main` is **protected**. Require: PR + green CI + 1 reviewer approval. No direct push, no force push.
-- `develop` is the integration branch. Auto-deploys to staging.
+- `develop` is the integration branch.
 - `feature/SOLAR-<id>-<slug>` branches are created from `develop` and merged via PR.
-- Tags `v*.*.*` on `main` trigger production deploy + GitHub Release.
+- Push to `main` (backend changes) triggers Azure deploy via GitHub Actions.
 
 GitHub branch protection: configure via repo settings -> Branches -> Protect matching branches.
 
@@ -71,51 +70,64 @@ docker compose \
 | `backend-ci.yml` | push / PR on `backend/**` | mvn verify on the 4 services (matrix) |
 | `docker-publish.yml` | push to `main`, tags `v*` | build + push images to GHCR |
 | `security-scan.yml` | push, PR, weekly cron | Trivy (fs + images) + Gitleaks |
-| `deploy.yml` | push to `develop` (staging), tag `v*` (prod) | Railway CLI deploy |
+| `deploy.yml` | push to `main` (`backend/**`), manual | SSH deploy to Azure VM |
 
 Required GitHub secrets:
 
-- `RAILWAY_TOKEN` -- staging account token
-- `RAILWAY_PROD_TOKEN` -- production account token
-- `CODECOV_TOKEN` -- optional, for coverage upload
+- `AZURE_VM_HOST` -- public IP of the Azure VM (e.g. `4.233.29.236`)
+- `AZURE_VM_USER` -- SSH user (e.g. `azureuser`)
+- `AZURE_VM_SSH_KEY` -- private ED25519 key for SSH deploy
 
 Required GitHub variables:
 
-- `STAGING_URL`, `PRODUCTION_URL` -- environment URLs for the Actions UI
+- `PRODUCTION_URL` -- public frontend URL (Vercel) for the Actions UI
 
 ---
 
 ## 5. Common operations
 
-### 5.1. Deploy to staging manually
+### 5.1. Deploy to Azure manually (SSH)
 
 ```bash
-gh workflow run deploy.yml -f environment=staging
+ssh azureuser@<AZURE_VM_IP>
+cd ~/SolarEase
+git pull origin main
+cd backend
+docker compose up -d --build
+curl http://localhost:8080/actuator/health
 ```
 
-### 5.2. Cut a production release
+### 5.2. Deploy via GitHub Actions
+
+```bash
+gh workflow run deploy.yml
+# Or push backend changes to main (auto-trigger).
+```
+
+### 5.3. Cut a production release
 
 ```bash
 git checkout main
 git pull --ff-only
 git merge --no-ff develop
-git tag -a v1.2.0 -m "Release 1.2.0"
-git push origin main --tags
-# Pipeline `deploy.yml` runs automatically on the tag.
+git push origin main
+# backend: deploy.yml runs if backend/** changed
+# frontend: Vercel redeploys automatically
 ```
 
-### 5.3. Rollback a Railway deployment
+### 5.4. Rollback an Azure deployment
 
 ```bash
-railway login
-railway link <project-id>
-railway environment production
-railway service <service-name>
-railway deployments    # find the previous deployment id
-railway redeploy <deployment-id>
+ssh azureuser@<AZURE_VM_IP>
+cd ~/SolarEase
+git log --oneline -5          # find the previous good commit
+git checkout <commit-sha>
+cd backend
+docker compose up -d --build
+curl http://localhost:8080/actuator/health
 ```
 
-### 5.4. Apply Kubernetes manifests
+### 5.5. Apply Kubernetes manifests
 
 ```bash
 # dev overlay
@@ -125,7 +137,7 @@ kubectl apply -k k8s/overlays/dev
 kubectl apply -k k8s/overlays/prod
 ```
 
-### 5.5. Create / rotate Kubernetes secrets
+### 5.6. Create / rotate Kubernetes secrets
 
 Do **not** commit real values. Use sealed-secrets or `kubectl create secret`:
 
@@ -148,7 +160,7 @@ kubectl -n solarease rollout restart deployment/identity-service deployment/gate
 
 > All active user sessions will be invalidated.
 
-### 5.6. Backup / restore PostgreSQL (Kubernetes)
+### 5.7. Backup / restore PostgreSQL (Kubernetes)
 
 ```bash
 # Backup
@@ -160,7 +172,7 @@ kubectl -n solarease exec -i postgres-project-0 -- \
   psql -U postgres -d solarease_projects < backup-project-2026-05-22.sql
 ```
 
-### 5.7. Restart Ollama (RAG sometimes hangs on first model load)
+### 5.8. Restart Ollama (RAG sometimes hangs on first model load)
 
 ```bash
 docker compose -f backend/docker-compose.yml restart ollama
@@ -168,7 +180,7 @@ docker compose -f backend/docker-compose.yml restart ollama
 kubectl -n solarease rollout restart deployment/ollama
 ```
 
-### 5.8. Watch service logs
+### 5.9. Watch service logs
 
 ```bash
 # Docker compose
@@ -199,7 +211,7 @@ kubectl -n solarease logs -f deployment/gateway-service --tail=200
 ### Secret leak
 
 1. Rotate the impacted secret immediately (section 5.5).
-2. Revoke any compromised tokens (Railway, GHCR, mail provider).
+2. Revoke any compromised tokens (Azure SSH key, GHCR, mail provider).
 3. Run `gitleaks detect --source .` locally to scan history.
 4. If secret was committed: rewrite history with `git filter-repo`, force-push,
    and notify all collaborators to re-clone.
