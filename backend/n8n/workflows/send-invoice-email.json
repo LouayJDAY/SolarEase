@@ -1,0 +1,187 @@
+{
+  "name": "SolarEase — Envoi facture client",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "solarease-invoice",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-webhook-0001",
+      "name": "Webhook Facture",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "solarease-invoice"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-email",
+              "leftValue": "={{ $json.body.clientEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-if-0002",
+      "name": "Email client present ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://project-service:8082/api/internal/invoices/{{ $json.body.invoiceId }}/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Secret",
+              "value": "327d34405c218ca03d7ce852f0c41948"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "invoicePdf"
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-http-0003",
+      "name": "Telecharger PDF facture",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "jdalouay@gmail.com",
+        "toEmail": "={{ $json.body.clientEmail }}",
+        "subject": "=SolarEase — Facture {{ $('Webhook Facture').item.json.body.invoiceNumber }} ({{ $('Webhook Facture').item.json.body.projectName }})",
+        "emailFormat": "text",
+        "text": "=Bonjour,\n\nVotre projet « {{ $('Webhook Facture').item.json.body.projectName }} » a été validé.\n\nVeuillez trouver ci-joint la facture {{ $('Webhook Facture').item.json.body.invoiceNumber }}.\nMontant : {{ $('Webhook Facture').item.json.body.amount }} TND\nÉchéance : {{ $('Webhook Facture').item.json.body.dueDate }}\n\nCordialement,\nL'équipe SolarEase",
+        "options": {
+          "attachments": "invoicePdf",
+          "attachmentPropertyName": "invoicePdf"
+        }
+      },
+      "id": "a1b2c3d4-email-0004",
+      "name": "Envoyer email SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [980, 220],
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURE_SMTP_IN_N8N",
+          "name": "SMTP SolarEase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"sent\",\"invoiceNumber\":\"{{ $('Webhook Facture').item.json.body.invoiceNumber }}\",\"clientEmail\":\"{{ $('Webhook Facture').item.json.body.clientEmail }}\"}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-respond-0005",
+      "name": "Reponse OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1220, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"skipped\",\"reason\":\"clientEmail missing\"}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "a1b2c3d4-respond-0006",
+      "name": "Reponse erreur email",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Facture": {
+      "main": [
+        [
+          {
+            "node": "Email client present ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email client present ?": {
+      "main": [
+        [
+          {
+            "node": "Telecharger PDF facture",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reponse erreur email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telecharger PDF facture": {
+      "main": [
+        [
+          {
+            "node": "Envoyer email SMTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer email SMTP": {
+      "main": [
+        [
+          {
+            "node": "Reponse OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

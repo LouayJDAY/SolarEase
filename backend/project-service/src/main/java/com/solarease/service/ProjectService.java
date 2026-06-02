@@ -3,8 +3,10 @@ package com.solarease.service;
 import com.solarease.dto.DashboardStatsResponse;
 import com.solarease.dto.ProjectRequest;
 import com.solarease.dto.ProjectResponse;
+import com.solarease.entity.InvoiceEntity;
 import com.solarease.entity.Project;
 import com.solarease.enums.ProjectStatus;
+import com.solarease.repository.InvoiceRepository;
 import com.solarease.exception.ResourceNotFoundException;
 import com.solarease.repository.ClientRepository;
 import com.solarease.repository.ProjectRepository;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +29,8 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ClientRepository clientRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final N8nInvoiceWebhookService n8nInvoiceWebhookService;
     private final com.solarease.repository.DemandRepository demandRepository;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
@@ -128,7 +133,13 @@ public class ProjectService {
 
         log.info("Updated project {} status to {}", id, status);
         Project saved = projectRepository.save(project);
-        // status change doesn't affect project count per client
+
+        if (ProjectStatus.COMPLETED.equals(saved.getStatus())) {
+            invoiceRepository.findByProject_Id(saved.getId()).stream()
+                    .max(Comparator.comparing(InvoiceEntity::getId))
+                    .ifPresent(inv -> n8nInvoiceWebhookService.notifyInvoiceReady(inv, "project.completed"));
+        }
+
         return mapToResponse(saved);
     }
 

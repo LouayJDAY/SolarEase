@@ -36,6 +36,7 @@ public class QuoteService {
     private final InvoiceRepository invoiceRepository;
     private final NotificationRepository notificationRepository;
     private final NotificationWebSocketService notificationWebSocketService;
+    private final N8nInvoiceWebhookService n8nInvoiceWebhookService;
     private final ClientRepository clientRepository;
 
     /**
@@ -159,6 +160,7 @@ public class QuoteService {
 
             InvoiceEntity regenerated = generateInvoiceFromQuote(quote);
             notificationWebSocketService.notifyInvoiceGenerated(regenerated.getClientId(), regenerated.getNumber());
+            n8nInvoiceWebhookService.notifyInvoiceReady(regenerated, "quote.accepted");
             log.warn("Quote {} was INVOICED without linked invoice record. Regenerated invoice {}", quoteId, regenerated.getNumber());
             return mapToDTO(quote);
         }
@@ -176,6 +178,7 @@ public class QuoteService {
             quote.setUpdatedAt(LocalDateTime.now());
             QuoteEntity updated = quoteRepository.save(quote);
             notificationWebSocketService.notifyInvoiceGenerated(regenerated.getClientId(), regenerated.getNumber());
+            n8nInvoiceWebhookService.notifyInvoiceReady(regenerated, "quote.accepted");
             log.info("Recovered missing invoice generation for accepted quote {}", quoteId);
             return mapToDTO(updated);
         }
@@ -206,6 +209,7 @@ public class QuoteService {
 
         notificationWebSocketService.notifyQuoteAccepted(updated.getInstallerId(), updated.getQuoteNumber());
         notificationWebSocketService.notifyInvoiceGenerated(invoice.getClientId(), invoice.getNumber());
+        n8nInvoiceWebhookService.notifyInvoiceReady(invoice, "quote.accepted");
         log.info("Quote accepted by client");
 
         return mapToDTO(updated);

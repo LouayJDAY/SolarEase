@@ -120,6 +120,9 @@ services:
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
+      N8N_ENABLED: ${N8N_ENABLED:-true}
+      N8N_INVOICE_WEBHOOK_URL: ${N8N_INVOICE_WEBHOOK_URL:-http://n8n:5678/webhook/solarease-invoice}
+      N8N_INTERNAL_SECRET: ${N8N_INTERNAL_SECRET:-change_me_n8n_secret}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
     depends_on:
       postgres-project:
