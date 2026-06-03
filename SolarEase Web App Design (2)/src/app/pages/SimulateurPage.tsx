@@ -41,6 +41,7 @@ export function SimulateurPage() {
     annualProduction: number;
   }>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [billInputMode, setBillInputMode] = useState<"manual" | "import">("manual");
 
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -307,14 +308,6 @@ export function SimulateurPage() {
             </div>
 
             <div className="mb-8">
-                <div className="flex justify-end mb-4">
-                  <button
-                    onClick={() => setShowInvoiceModal(true)}
-                    className="px-4 py-2 bg-primary text-white rounded-lg"
-                  >
-                    Importer une facture
-                  </button>
-                </div>
               <div className="flex justify-between mb-2">
                 {[1, 2, 3, 4].map((s) => (
                   <div
@@ -348,15 +341,12 @@ export function SimulateurPage() {
               {showInvoiceModal && (
                 <InvoiceUploadModal
                   onClose={() => setShowInvoiceModal(false)}
-                  onApply={(data: any) => {
-                    // prefer totalTTC if available
-                    if (data?.totalTTC) {
-                      handleInputChange("quarterlyBill", String(data.totalTTC));
-                      setStep(3);
-                    } else if (data?.total) {
-                      handleInputChange("quarterlyBill", String(data.total));
-                      setStep(3);
-                    }
+                  onApply={(data) => {
+                    handleInputChange(
+                      "quarterlyBill",
+                      String(data.quarterlyBill)
+                    );
+                    setBillInputMode("manual");
                     setShowInvoiceModal(false);
                   }}
                 />
@@ -414,31 +404,106 @@ export function SimulateurPage() {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <h2 className="text-2xl font-semibold text-secondary mb-6">
-                    Quelle est votre facture trimestrielle moyenne ?
+                  <h2 className="text-2xl font-semibold text-secondary mb-2">
+                    Quelle est votre facture trimestrielle ?
                   </h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Montant en TND/trimestre
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.quarterlyBill}
-                        onChange={(e) =>
-                          handleInputChange("quarterlyBill", e.target.value)
-                        }
-                        placeholder="Ex: 450"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                      />
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-gray-700">
-                        💡 Astuce : En Tunisie, la facture STEG est souvent
-                        trimestrielle. Utilisez le montant total du trimestre.
+                  <p className="text-gray-600 mb-6">
+                    Indiquez votre consommation STEG pour estimer la taille de
+                    l&apos;installation.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setBillInputMode("manual")}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        billInputMode === "manual"
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <p className="font-medium text-secondary">Saisir le montant</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Vous connaissez déjà le total trimestriel
                       </p>
-                    </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBillInputMode("import");
+                        setShowInvoiceModal(true);
+                      }}
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        billInputMode === "import"
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <p className="font-medium text-secondary">Importer facture STEG</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Photo ou PDF — extraction automatique
+                      </p>
+                    </button>
                   </div>
+
+                  {billInputMode === "manual" ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Montant en TND / trimestre
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.quarterlyBill}
+                          onChange={(e) =>
+                            handleInputChange("quarterlyBill", e.target.value)
+                          }
+                          placeholder="Ex: 450"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        />
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-gray-700">
+                          En Tunisie, la facture STEG est souvent{" "}
+                          <strong>trimestrielle</strong>. Utilisez le montant
+                          total à payer sur la période.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-6 text-center">
+                      {formData.quarterlyBill ? (
+                        <>
+                          <CheckCircle className="w-10 h-10 text-primary mx-auto mb-3" />
+                          <p className="font-medium text-secondary">
+                            Montant retenu : {formData.quarterlyBill} TND /
+                            trimestre
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowInvoiceModal(true)}
+                            className="mt-3 text-sm text-primary font-medium hover:underline"
+                          >
+                            Importer une autre facture
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-700 mb-4">
+                            Téléversez votre facture pour pré-remplir cette
+                            étape.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowInvoiceModal(true)}
+                            className="px-5 py-2.5 bg-primary text-white rounded-lg font-medium"
+                          >
+                            Ouvrir l&apos;import
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               )}
 
