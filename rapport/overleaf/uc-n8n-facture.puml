@@ -1,0 +1,35 @@
+@startuml uc-n8n-facture
+title Raffinement -- Envoi automatique de la facture par e-mail (n8n)
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+    ArrowColor      #2C5282
+}
+skinparam actor {
+    BackgroundColor #FAFAFA
+    BorderColor     #2C5282
+}
+
+actor "Client" as Client
+actor "Installateur" as Installer
+actor "n8n" as N8N <<system>>
+
+rectangle "Facturation automatisée" {
+    usecase "Accepter un devis" as AcceptQuote
+    usecase "Clôturer un projet" as CloseProject
+    usecase "Recevoir la facture\nPDF par e-mail" as ReceiveMail
+}
+
+Client    --> AcceptQuote
+Client    --> ReceiveMail
+Installer --> CloseProject
+
+AcceptQuote  ..> ReceiveMail : <<include>>
+CloseProject ..> ReceiveMail : <<include>>
+
+N8N --> ReceiveMail
+
+@enduml

@@ -16,4 +16,7 @@ public class VerifyOtpRequest {
 
     @NotBlank(message = "OTP code requis")
     private String otpCode;
+
+    /** Optional invitation token from public demand email link. */
+    private String invitationToken;
 }

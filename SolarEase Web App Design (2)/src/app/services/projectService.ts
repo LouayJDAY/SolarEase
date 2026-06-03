@@ -38,6 +38,8 @@ export interface ProjectResponse {
   currentPhase?: string;
   currentPhaseLabel?: string;
   client?: { id: number; firstName: string; lastName: string };
+  invitationSent?: boolean;
+  invitationMessage?: string;
   createdAt: string;
   updatedAt: string;
 }

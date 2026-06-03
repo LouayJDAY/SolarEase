@@ -28,6 +28,9 @@ export interface Demand {
   rejectionReason?: string;
   adminNote?: string;
   projectId?: number;
+  clientHasAccount?: boolean;
+  invitationSent?: boolean;
+  invitationSentAt?: string;
   createdAt: string;
   updatedAt: string;
   /** Alias kept for compatibility with older code paths. */

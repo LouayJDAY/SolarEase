@@ -1,12 +1,22 @@
 package com.solarease.service;
 
+import com.solarease.entity.Client;
+import com.solarease.entity.ClientInvitation;
+import com.solarease.entity.DemandEntity;
+import com.solarease.exception.ResourceNotFoundException;
+import com.solarease.repository.ClientInvitationRepository;
+import com.solarease.repository.ClientRepository;
+import com.solarease.repository.DemandRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,7 +24,12 @@ import java.util.UUID;
 @Slf4j
 public class InvitationService {
 
+    private static final int INVITATION_VALIDITY_DAYS = 14;
+
     private final Optional<JavaMailSender> mailSender;
+    private final ClientInvitationRepository invitationRepository;
+    private final ClientRepository clientRepository;
+    private final DemandRepository demandRepository;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -25,146 +40,176 @@ public class InvitationService {
     @Value("${app.twilio.account-sid:}")
     private String twilioAccountSid;
 
-    @Value("${app.twilio.auth-token:}")
-    private String twilioAuthToken;
-
-    @Value("${app.twilio.phone-number:}")
-    private String twilioPhoneNumber;
-
-    @Autowired(required = false)
-    public InvitationService(JavaMailSender mailSenderInput) {
+    @Autowired
+    public InvitationService(JavaMailSender mailSenderInput,
+                           ClientInvitationRepository invitationRepository,
+                           ClientRepository clientRepository,
+                           DemandRepository demandRepository) {
         this.mailSender = Optional.ofNullable(mailSenderInput);
-    }
-
-    public InvitationService() {
-        this.mailSender = Optional.empty();
-    }
-
-    /**
-     * Returns true only when both the mail bean and SMTP credentials are present.
-     * Spring Boot creates a JavaMailSender bean as soon as spring.mail.host is set,
-     * even with empty username/password — so isPresent() alone is not sufficient.
-     */
-    private boolean isMailConfigured() {
-        return mailSender.isPresent()
-                && mailFrom != null && !mailFrom.isBlank();
+        this.invitationRepository = invitationRepository;
+        this.clientRepository = clientRepository;
+        this.demandRepository = demandRepository;
     }
 
     /**
-     * Send client invitation by email with registration link and quote
+     * Send invitation after public demand conversion when the client has no portal account.
      */
-    public void sendInvitationEmail(String clientEmail, String clientName, 
-                                     Long demandId, Long projectId, String message) {
-        if (!isMailConfigured()) {
-            log.warn("Mail not configured (missing credentials). Skipping email to: {} for project: {}", clientEmail, projectId);
-            return;
+    @Transactional
+    public ClientInvitation sendInvitationForDemand(DemandEntity demand, Client client, Long projectId) {
+        if (client.getUserId() != null && !client.getUserId().isBlank()) {
+            log.info("Client {} already has userId — skipping invitation", client.getId());
+            return null;
         }
+        String clientName = buildClientName(client);
+        return sendInvitationEmail(
+                client.getEmail(),
+                clientName,
+                demand.getId(),
+                projectId,
+                client.getId(),
+                null
+        );
+    }
+
+    /**
+     * Resend invitation for an existing validated demand (admin action).
+     */
+    @Transactional
+    public ClientInvitation resendInvitationForDemand(DemandEntity demand, Long projectId, String message) {
+        if (demand.getClientEmail() == null || demand.getClientEmail().isBlank()) {
+            throw new IllegalArgumentException("Demand has no client email");
+        }
+        Client client = clientRepository.findByEmail(demand.getClientEmail().trim().toLowerCase(Locale.ROOT))
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found for demand email"));
+        if (client.getUserId() != null && !client.getUserId().isBlank()) {
+            throw new IllegalArgumentException("Client already has an active account");
+        }
+        String clientName = buildClientName(client);
+        return sendInvitationEmail(
+                client.getEmail(),
+                clientName,
+                demand.getId(),
+                projectId,
+                client.getId(),
+                message
+        );
+    }
+
+    @Transactional
+    public ClientInvitation sendInvitationEmail(String clientEmail,
+                                               String clientName,
+                                               Long demandId,
+                                               Long projectId,
+                                               Long clientId,
+                                               String adminMessage) {
+        if (!isMailConfigured()) {
+            throw new IllegalStateException(
+                    "SMTP non configuré sur le serveur. Configurez SPRING_MAIL_USERNAME et SPRING_MAIL_PASSWORD.");
+        }
+
+        String normalizedEmail = clientEmail.trim().toLowerCase(Locale.ROOT);
+        String token = UUID.randomUUID().toString();
+        LocalDateTime now = LocalDateTime.now();
+
+        ClientInvitation invitation = ClientInvitation.builder()
+                .token(token)
+                .email(normalizedEmail)
+                .clientId(clientId)
+                .projectId(projectId)
+                .demandId(demandId)
+                .expiresAt(now.plusDays(INVITATION_VALIDITY_DAYS))
+                .sentAt(now)
+                .build();
+        invitationRepository.save(invitation);
+
+        String registrationLink = generateRegistrationLink(token, normalizedEmail, projectId);
 
         try {
-            String registrationToken = generateRegistrationToken(clientEmail);
-            String registrationLink = generateRegistrationLink(registrationToken, projectId);
-
             SimpleMailMessage mailMessage = new SimpleMailMessage();
             mailMessage.setFrom(mailFrom);
-            mailMessage.setTo(clientEmail);
-            mailMessage.setSubject("SolarEase - Votre devis solaire est prêt ☀️");
-            
-            String emailBody = buildInvitationEmailBody(clientName, projectId, 
-                                                        registrationLink, message);
-            mailMessage.setText(emailBody);
-
+            mailMessage.setTo(normalizedEmail);
+            mailMessage.setSubject("SolarEase - Créez votre espace client ☀️");
+            mailMessage.setText(buildInvitationEmailBody(clientName, projectId, registrationLink, adminMessage));
             mailSender.get().send(mailMessage);
-            log.info("Invitation email sent to: {} for project: {}", clientEmail, projectId);
+            log.info("Invitation email sent to {} for project {}", normalizedEmail, projectId);
+            return invitation;
         } catch (Exception e) {
-            log.error("Failed to send invitation email to {}: {}", clientEmail, e.getMessage());
-            throw new RuntimeException("Impossible d'envoyer l'email d'invitation: " + e.getMessage());
+            log.error("Failed to send invitation email to {}: {}", normalizedEmail, e.getMessage());
+            throw new IllegalStateException("Impossible d'envoyer l'email d'invitation: " + e.getMessage());
         }
     }
 
-    /**
-     * Send quick notification SMS with registration link
-     */
+    public void sendInvitationOmniChannel(String clientEmail,
+                                          String phoneNumber,
+                                          String clientName,
+                                          Long demandId,
+                                          Long projectId,
+                                          String message,
+                                          boolean sendEmail,
+                                          boolean sendSms) {
+        if (sendEmail) {
+            Client client = clientRepository.findByEmail(clientEmail.trim().toLowerCase(Locale.ROOT))
+                    .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + clientEmail));
+            sendInvitationEmail(clientEmail, clientName, demandId, projectId, client.getId(), message);
+        }
+        if (sendSms && phoneNumber != null && !phoneNumber.isBlank()) {
+            sendInvitationSms(phoneNumber, clientName, projectId);
+        }
+    }
+
     public void sendInvitationSms(String phoneNumber, String clientName, Long projectId) {
         if (twilioAccountSid == null || twilioAccountSid.isEmpty()) {
             log.warn("Twilio not configured. Skipping SMS for: {}", phoneNumber);
             return;
         }
-
-        try {
-            String shortCode = generateShortCode(projectId);
-            String smsBody = buildInvitationSmsBody(clientName, shortCode);
-
-            log.info("SMS would be sent to: {} with content: {}", phoneNumber, smsBody);
-            
-        } catch (Exception e) {
-            log.error("Failed to send invitation SMS to {}: {}", phoneNumber, e.getMessage());
-        }
+        log.info("SMS would be sent to: {} for project {}", phoneNumber, projectId);
     }
 
-    /**
-     * Send both email and SMS invitations
-     */
-    public void sendInvitationOmniChannel(String clientEmail, String phoneNumber, 
-                                         String clientName, Long demandId, 
-                                         Long projectId, String message, 
-                                         boolean sendEmail, boolean sendSms) {
-        if (sendEmail) {
-            sendInvitationEmail(clientEmail, clientName, demandId, projectId, message);
-        }
-        
-        if (sendSms && phoneNumber != null && !phoneNumber.isEmpty()) {
-            sendInvitationSms(phoneNumber, clientName, projectId);
-        }
-
-        log.info("Omnichannel invitation sent to client: {} (email: {}, sms: {})", 
-                 clientName, sendEmail, sendSms);
+    public boolean hasActiveInvitation(Long demandId) {
+        return invitationRepository.findTopByDemandIdOrderBySentAtDesc(demandId)
+                .map(inv -> !inv.isUsed() && !inv.isExpired())
+                .orElse(false);
     }
 
-    // ── Private helpers ──────────────────────────────────────────────────────
-
-    private String generateRegistrationToken(String email) {
-        return UUID.randomUUID().toString();
+    public Optional<LocalDateTime> latestInvitationSentAt(Long demandId) {
+        return invitationRepository.findTopByDemandIdOrderBySentAtDesc(demandId)
+                .map(ClientInvitation::getSentAt);
     }
 
-    private String generateRegistrationLink(String token, Long projectId) {
-        String base = String.format("%s/register?token=%s", frontendUrl, token);
+    private boolean isMailConfigured() {
+        return mailSender.isPresent() && mailFrom != null && !mailFrom.isBlank();
+    }
+
+    private String generateRegistrationLink(String token, String email, Long projectId) {
+        String base = String.format("%s/register?token=%s&email=%s",
+                frontendUrl, token, email);
         return projectId != null ? base + "&projectId=" + projectId : base;
     }
 
-    private String generateShortCode(Long projectId) {
-        if (projectId == null) return "PRJ-NOUVEAU";
-        return "PRJ" + String.format("%06d", projectId % 1000000);
+    private String buildClientName(Client client) {
+        return (safe(client.getFirstName()) + " " + safe(client.getLastName())).trim();
     }
 
-    private String buildInvitationEmailBody(String clientName, Long projectId, 
-                                           String registrationLink, String adminMessage) {
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String buildInvitationEmailBody(String clientName,
+                                            Long projectId,
+                                            String registrationLink,
+                                            String adminMessage) {
         String projectRef = projectId != null ? "PRJ-" + projectId : "à définir";
-        return "Bonjour " + clientName + ",\n\n" +
-               "Votre demande pour un système solaire a été validée et votre devis est prêt! ☀️\n\n" +
-               "=== DÉTAILS DE VOTRE PROJET ===\n" +
-               "Référence du projet: " + projectRef + "\n\n" +
-               "=== ÉTAPE SUIVANTE ===\n" +
-               "Pour consulter votre devis et suivre votre projet en détail, veuillez créer un compte:\n\n" +
-               registrationLink + "\n\n" +
-               (adminMessage != null && !adminMessage.isEmpty() ? 
-                "=== MESSAGE DE L'ÉQUIPE SOLAREASE ===\n" + adminMessage + "\n\n" : "") +
-               "Une fois votre compte créé, vous pourrez:\n" +
-               "✓ Télécharger votre devis au format PDF\n" +
-               "✓ Suivre l'avancement de votre installation\n" +
-               "✓ Communiquer directement avec votre installateur\n" +
-               "✓ Accéder à tous les documents du projet\n\n" +
-               "Questions? Notre équipe est à votre écoute:\n" +
-               "📧 contact@solarease.tn\n" +
-               "📞 +216 71 123 456\n\n" +
-               "Cordialement,\n" +
-               "L'équipe SolarEase\n" +
-               "☀️ Ensemble pour l'énergie solaire!";
-    }
-
-    private String buildInvitationSmsBody(String clientName, String projectCode) {
-        return "Bonjour " + clientName + ", votre devis SolarEase est prêt! 🌞\n" +
-               "Projet: " + projectCode + "\n" +
-               "Créez votre compte: solarease.tn/register\n" +
-               "Questions? +216 71 123 456";
+        return "Bonjour " + clientName + ",\n\n"
+                + "Votre demande solaire a été validée et votre projet est prêt sur SolarEase.\n\n"
+                + "=== VOTRE PROJET ===\n"
+                + "Référence : " + projectRef + "\n\n"
+                + "=== CRÉER VOTRE COMPTE CLIENT ===\n"
+                + "Pour consulter votre projet, recevoir vos devis et suivre l'installation :\n\n"
+                + registrationLink + "\n\n"
+                + (adminMessage != null && !adminMessage.isBlank()
+                ? "=== MESSAGE DE L'ÉQUIPE ===\n" + adminMessage + "\n\n" : "")
+                + "Ce lien est valable " + INVITATION_VALIDITY_DAYS + " jours.\n\n"
+                + "Cordialement,\n"
+                + "L'équipe SolarEase";
     }
 }

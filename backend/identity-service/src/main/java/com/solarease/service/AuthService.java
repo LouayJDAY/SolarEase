@@ -24,17 +24,20 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final OtpService otpService;
     private final EmailService emailService;
+    private final ProjectServiceClient projectServiceClient;
 
     public AuthService(UserRepository userRepository, 
                       PasswordEncoder passwordEncoder,
                       JwtTokenProvider jwtTokenProvider,
                       OtpService otpService,
-                      EmailService emailService) {
+                      EmailService emailService,
+                      ProjectServiceClient projectServiceClient) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.otpService = otpService;
         this.emailService = emailService;
+        this.projectServiceClient = projectServiceClient;
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -136,6 +139,14 @@ public class AuthService {
 
         user.setIsEmailVerified(true);
         userRepository.save(user);
+
+        if (user.getRole() == User.UserRole.CLIENT) {
+            projectServiceClient.linkClientAccount(
+                    user.getUuid(),
+                    user.getEmail(),
+                    request.getInvitationToken()
+            );
+        }
 
         // Send welcome email
         emailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());

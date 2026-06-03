@@ -61,7 +61,10 @@ public class DemandEntity {
 
     // Solar project fields (same as Project)
     private String name;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
+
     private String location;
     private Double latitude;
     private Double longitude;

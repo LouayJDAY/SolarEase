@@ -4,12 +4,14 @@ import com.solarease.dto.QuoteDTO;
 import com.solarease.entity.InvoiceEntity;
 import com.solarease.entity.Project;
 import com.solarease.entity.QuoteEntity;
+import com.solarease.entity.QuoteSequence;
 import com.solarease.exception.ResourceNotFoundException;
 import com.solarease.repository.ClientRepository;
 import com.solarease.repository.InvoiceRepository;
 import com.solarease.repository.NotificationRepository;
 import com.solarease.repository.ProjectRepository;
 import com.solarease.repository.QuoteRepository;
+import com.solarease.repository.QuoteSequenceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +40,8 @@ public class QuoteService {
     private final NotificationWebSocketService notificationWebSocketService;
     private final N8nInvoiceWebhookService n8nInvoiceWebhookService;
     private final ClientRepository clientRepository;
+    private final QuoteSequenceRepository quoteSequenceRepository;
+    private final AccessControlService accessControlService;
 
     /**
      * Create a new quote (DRAFT status)
@@ -124,12 +128,19 @@ public class QuoteService {
             throw new IllegalStateException("Cannot send quote that is not in DRAFT status");
         }
 
+        if (LocalDateTime.now().isAfter(quote.getValidUntil())) {
+            throw new IllegalStateException("Cannot send quote: validity date is in the past");
+        }
+
         quote.setStatus(QuoteEntity.QuoteStatus.SENT);
         quote.setSentAt(LocalDateTime.now());
         QuoteEntity updated = quoteRepository.save(quote);
 
-        String clientIdStr = String.valueOf(updated.getClientId());
-        notificationWebSocketService.notifyQuoteSent(clientIdStr, updated.getQuoteNumber(), updated.getProject().getId());
+        String notifyUserId = resolveClientNotifyUserId(updated.getClientId());
+        if (notifyUserId != null) {
+            notificationWebSocketService.notifyQuoteSent(
+                    notifyUserId, updated.getQuoteNumber(), updated.getProject().getId());
+        }
         log.info("Quote sent to client");
 
         return mapToDTO(updated);
@@ -190,6 +201,9 @@ public class QuoteService {
 
         // Check if still valid
         if (LocalDateTime.now().isAfter(quote.getValidUntil())) {
+            quote.setStatus(QuoteEntity.QuoteStatus.EXPIRED);
+            quote.setUpdatedAt(LocalDateTime.now());
+            quoteRepository.save(quote);
             throw new IllegalStateException("Quote has expired");
         }
 
@@ -245,22 +259,53 @@ public class QuoteService {
     }
 
     /**
-     * Get quote by ID
+     * Mark a sent quote as expired (manual or scheduled cleanup).
      */
-    public QuoteDTO getQuoteById(Long quoteId) {
+    public QuoteDTO expireQuote(Long quoteId, String callerId, String userRole) {
         QuoteEntity quote = quoteRepository.findById(quoteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Quote not found with id: " + quoteId));
+
+        if (!"ADMIN".equalsIgnoreCase(userRole) && !quote.getInstallerId().equals(callerId)) {
+            throw new IllegalArgumentException("Installer does not own this quote");
+        }
+
+        if (!quote.getStatus().equals(QuoteEntity.QuoteStatus.SENT)) {
+            throw new IllegalStateException("Only SENT quotes can be marked as expired");
+        }
+
+        quote.setStatus(QuoteEntity.QuoteStatus.EXPIRED);
+        quote.setUpdatedAt(LocalDateTime.now());
+        return mapToDTO(quoteRepository.save(quote));
+    }
+
+    /**
+     * Get quote by ID
+     */
+    public QuoteDTO getQuoteById(Long quoteId, String userRole, String userId, String userEmail) {
+        QuoteEntity quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Quote not found with id: " + quoteId));
+        requireQuoteAccess(quote, userRole, userId, userEmail);
         return mapToDTO(quote);
+    }
+
+    /** @deprecated use {@link #getQuoteById(Long, String, String, String)} */
+    public QuoteDTO getQuoteById(Long quoteId) {
+        return getQuoteById(quoteId, "ADMIN", null, null);
     }
 
     /**
      * Get all quotes for a project
      */
-    public List<QuoteDTO> getQuotesByProjectId(Long projectId) {
+    public List<QuoteDTO> getQuotesByProjectId(Long projectId, String userRole, String userId, String userEmail) {
+        accessControlService.requireProjectAccess(userRole, userId, userEmail, projectId);
         return quoteRepository.findByProject_Id(projectId)
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    public List<QuoteDTO> getQuotesByProjectId(Long projectId) {
+        return getQuotesByProjectId(projectId, "ADMIN", null, null);
     }
 
     /**
@@ -295,11 +340,16 @@ public class QuoteService {
     /**
      * Get active quotes for a project (SENT or ACCEPTED)
      */
-    public List<QuoteDTO> getActiveQuotesByProjectId(Long projectId) {
+    public List<QuoteDTO> getActiveQuotesByProjectId(Long projectId, String userRole, String userId, String userEmail) {
+        accessControlService.requireProjectAccess(userRole, userId, userEmail, projectId);
         return quoteRepository.findActiveQuotesByProjectId(projectId)
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    public List<QuoteDTO> getActiveQuotesByProjectId(Long projectId) {
+        return getActiveQuotesByProjectId(projectId, "ADMIN", null, null);
     }
 
     /**
@@ -334,6 +384,9 @@ public class QuoteService {
         }
         if (quoteDTO.getNotes() != null) {
             quote.setNotes(quoteDTO.getNotes());
+        }
+        if (quoteDTO.getValidUntil() != null) {
+            quote.setValidUntil(quoteDTO.getValidUntil());
         }
 
         // Recalculate total
@@ -421,11 +474,32 @@ public class QuoteService {
     }
 
     private String generateQuoteNumber() {
-        // Format: QUOTE-YYYY-XXXXX
         int year = LocalDateTime.now().getYear();
-        // In a real system, this would be auto-incremented per year from DB
-        long randomSuffix = (long) (Math.random() * 100000);
-        return String.format("QUOTE-%d-%05d", year, randomSuffix);
+        QuoteSequence sequence = quoteSequenceRepository.findByYearForUpdate(year)
+                .orElseGet(() -> quoteSequenceRepository.save(
+                        QuoteSequence.builder().year(year).lastNumber(0).build()));
+        int next = sequence.getLastNumber() + 1;
+        sequence.setLastNumber(next);
+        quoteSequenceRepository.save(sequence);
+        return String.format("DEV-%d-%05d", year, next);
+    }
+
+    private void requireQuoteAccess(QuoteEntity quote, String userRole, String userId, String userEmail) {
+        if (quote.getProject() == null) {
+            return;
+        }
+        accessControlService.requireProjectAccess(userRole, userId, userEmail, quote.getProject().getId());
+    }
+
+    private String resolveClientNotifyUserId(Long clientId) {
+        if (clientId == null) {
+            return null;
+        }
+        return clientRepository.findById(clientId)
+                .map(c -> c.getUserId() != null && !c.getUserId().isBlank()
+                        ? c.getUserId()
+                        : String.valueOf(c.getId()))
+                .orElse(String.valueOf(clientId));
     }
 
     private InvoiceEntity generateInvoiceFromQuote(QuoteEntity quote) {

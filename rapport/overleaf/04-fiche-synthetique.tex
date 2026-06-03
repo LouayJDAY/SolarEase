@@ -1,0 +1,102 @@
+% ============================================================
+%  04-fiche-synthetique.tex  —  Fiche Synthétique du Stage PFE
+% ============================================================
+
+\chapterstar{Fiche Synthétique}
+\thispagestyle{fancy}
+
+\vspace*{-0.8cm}
+
+\definecolor{ficheblue}{RGB}{31,78,121}
+\definecolor{fichebluebg}{RGB}{232,241,250}
+\definecolor{fichebluelight}{RGB}{247,250,253}
+\definecolor{fichesection}{RGB}{213,229,245}
+
+{\footnotesize
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabularx}{\textwidth}{@{}>{\bfseries\color{ficheblue}}L{4.2cm}X@{}}
+\arrayrulecolor{ficheblue!45}
+\toprule[1.1pt]
+\rowcolor{ficheblue}
+\textcolor{white}{\thead{INFORMATIONS}} & \textcolor{white}{\thead{DÉTAILS}} \\
+\midrule
+\rowcolor{fichebluelight}
+Nom de l'entreprise & \organisme{} (X\&V Electronics) \\
+\rowcolor{fichebluelight}
+Ville & Tunis, Tunisie \\
+\rowcolor{fichebluelight}
+Encadrant industriel & \encadreurProf{} \\
+\rowcolor{fichebluelight}
+Encadrant académique & \encadreurAcad{} \\
+\rowcolor{fichebluelight}
+Période du stage & 10 février --- 31 mai 2026 (16 semaines calendaires) \\
+\rowcolor{fichebluelight}
+Jours effectifs & 12 semaines (\textasciitilde{} 60 jours ouvrés) \\
+\rowcolor{fichebluelight}
+Intitulé du projet & Plateforme SolarEase --- dimensionnement et pilotage commercial solaire \\
+\midrule
+\rowcolor{fichesection}
+\multicolumn{2}{l}{\textcolor{ficheblue}{\textbf{TÂCHES ET PHASES}}} \\
+\midrule
+\rowcolor{fichebluelight}
+Principales tâches &
+\begin{itemize}[leftmargin=1.2em, nosep, topsep=2pt]
+\setlength{\itemsep}{1pt}
+\item Analyse des besoins, modélisation UML et architecture microservices
+\item Développement full-stack (React~/~TypeScript, Spring Boot~3.2)
+\item Dimensionnement PVGIS, recommandation IA (Ollama, RAG, pgvector)
+\item Collaboration temps réel (WebSocket), devis, factures et espace client
+\item DevOps et mise en production (Docker, GitHub Actions, Azure, Vercel)
+\item Observabilité (Prometheus, Grafana, Loki) et rédaction du rapport PFE
+\end{itemize} \\
+\rowcolor{fichebluelight}
+Période d'observation & Non \\
+\rowcolor{fichebluelight}
+Phase conception & Oui (2 semaines) --- Maquettes Figma, architecture, UML, backlog Jira \\
+\rowcolor{fichebluelight}
+Phase développement & Oui (9 semaines) --- Implémentation, intégration, tests, CI/CD \\
+\rowcolor{fichebluelight}
+Phase finalisation & Oui (1 semaine) --- Déploiement démo, captures, rapport et soutenance \\
+\midrule
+\rowcolor{fichesection}
+\multicolumn{2}{l}{\textcolor{ficheblue}{\textbf{COMPÉTENCES ET MOYENS}}} \\
+\midrule
+\rowcolor{fichebluelight}
+Prérequis techniques & Java~17, Spring Boot, React, TypeScript, REST API, SQL, Docker, Git \\
+\rowcolor{fichebluelight}
+Outils et logiciels &
+\begin{itemize}[leftmargin=1.2em, nosep, topsep=2pt]
+\setlength{\itemsep}{1pt}
+\item \textbf{Frontend :} VS Code, Vite, React DevTools, TailwindCSS, Figma
+\item \textbf{Backend :} IntelliJ IDEA, Spring Boot, Postman, Maven
+\item \textbf{DevOps :} Docker, Docker Compose, GitHub Actions, Azure VM, Vercel
+\item \textbf{Qualité :} JaCoCo, Trivy, Gitleaks, Spring Actuator
+\item \textbf{Design / modélisation :} PlantUML, Draw.io, Jira (Kanban)
+\item \textbf{Observabilité :} Prometheus, Grafana, Loki, Promtail
+\end{itemize} \\
+\rowcolor{fichebluelight}
+Équipement matériel & PC portable de développement (aucun matériel spécifique fourni) \\
+\rowcolor{fichebluelight}
+Méthodologie & Kanban + sprints Agile (5 itérations, revues avec encadrant académique) \\
+\midrule
+\rowcolor{fichesection}
+\multicolumn{2}{l}{\textcolor{ficheblue}{\textbf{COMPÉTENCES ACQUISES}}} \\
+\midrule
+\rowcolor{fichebluelight}
+Comportementales & Autonomie, rigueur technique, communication avec l'encadrant, gestion du backlog et respect des délais \\
+\rowcolor{fichebluelight}
+Techniques &
+\begin{itemize}[leftmargin=1.2em, nosep, topsep=2pt]
+\setlength{\itemsep}{1pt}
+\item Stack complet : React~18 + TypeScript, Spring Boot~3.2, PostgreSQL~16
+\item Architecture : microservices, API Gateway, JWT + OTP, WebSocket / STOMP
+\item Métier solaire : PVGIS, Night Panel, PDF, devis et facturation
+\item IA : Ollama, RAG hybride, embeddings pgvector
+\item DevOps : Docker multi-stage, GitHub Actions, déploiement Azure + Vercel
+\item Observabilité : métriques Prometheus, dashboards Grafana, logs Loki
+\end{itemize} \\
+\bottomrule
+\end{tabularx}
+}

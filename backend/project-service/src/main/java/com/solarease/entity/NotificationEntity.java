@@ -18,6 +18,8 @@ public class NotificationEntity {
 
     private String clientId;
     private String title;
+
+    @Column(columnDefinition = "TEXT")
     private String message;
     private boolean readFlag;
     private LocalDateTime createdAt;

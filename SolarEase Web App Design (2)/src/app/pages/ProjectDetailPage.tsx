@@ -27,9 +27,11 @@ import {
   Flag,
   Activity,
   Send,
+  FileText,
 } from "lucide-react";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
+import { ProjectQuotesPanel } from "../components/ProjectQuotesPanel";
 import {
   AreaChart,
   Area,
@@ -78,7 +80,7 @@ export function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showDimensioningModal, setShowDimensioningModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"apercu" | "terrain">("apercu");
+  const [activeTab, setActiveTab] = useState<"apercu" | "terrain" | "devis">("apercu");
 
   // Field updates state
   const [fieldUpdates, setFieldUpdates] = useState<FieldUpdate[]>([]);
@@ -565,6 +567,17 @@ export function ProjectDetailPage() {
               Aperçu
             </button>
             <button
+              onClick={() => setActiveTab("devis")}
+              className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                activeTab === "devis"
+                  ? "bg-white border border-b-white border-slate-200 text-primary -mb-px"
+                  : "text-slate-500 hover:text-secondary"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Devis
+            </button>
+            <button
               onClick={() => setActiveTab("terrain")}
               className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                 activeTab === "terrain"
@@ -581,6 +594,10 @@ export function ProjectDetailPage() {
               )}
             </button>
           </div>
+
+          {activeTab === "devis" && project && (
+            <ProjectQuotesPanel projectId={project.id} projectName={project.name} />
+          )}
 
           {activeTab === "terrain" && (
             <div className="space-y-6">

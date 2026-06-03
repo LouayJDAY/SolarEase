@@ -34,6 +34,8 @@ interface Props {
   onReject: () => void;
   onAssignToMe: () => void;
   onChangePriority: (priority: DemandPriority) => void;
+  onResendInvitation?: () => void;
+  resendBusy?: boolean;
 }
 
 const PRIORITY_OPTIONS: DemandPriority[] = ["HAUTE", "NORMALE", "BASSE"];
@@ -47,6 +49,8 @@ export function RequestDetailPanel({
   onReject,
   onAssignToMe,
   onChangePriority,
+  onResendInvitation,
+  resendBusy,
 }: Props) {
   if (!demand) {
     return (
@@ -92,6 +96,11 @@ export function RequestDetailPanel({
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={demand.status} />
             <SourceBadge source={demand.source} />
+            {demand.status === "VALIDEE" && demand.invitationSent && demand.clientHasAccount === false && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                Invitation envoyée
+              </span>
+            )}
           </div>
         </div>
 
@@ -278,9 +287,25 @@ export function RequestDetailPanel({
             Lecture seule — vous devez être administrateur pour agir sur les demandes.
           </p>
         ) : isLocked ? (
-          <p className="text-xs text-muted-foreground text-center">
-            Cette demande est {demand.status === "VALIDEE" ? "validée" : "rejetée"} — aucune action supplémentaire requise.
-          </p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-xs text-muted-foreground text-center">
+              Cette demande est {demand.status === "VALIDEE" ? "validée" : "rejetée"} — aucune action supplémentaire requise.
+            </p>
+            {demand.status === "VALIDEE" &&
+              demand.projectId &&
+              demand.clientHasAccount === false &&
+              onResendInvitation && (
+                <button
+                  type="button"
+                  onClick={onResendInvitation}
+                  disabled={resendBusy}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 text-primary text-sm font-medium hover:bg-primary/5 disabled:opacity-60"
+                >
+                  <Mail className="w-4 h-4" />
+                  {resendBusy ? "Envoi…" : "Renvoyer l'invitation"}
+                </button>
+              )}
+          </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <button

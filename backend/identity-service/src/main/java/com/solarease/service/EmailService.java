@@ -2,6 +2,7 @@ package com.solarease.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -13,10 +14,13 @@ public class EmailService {
 
 	private final JavaMailSender mailSender;
 
+	@Value("${spring.mail.username:}")
+	private String mailFrom;
+
 	public void sendOtpEmail(String toEmail, String otpCode) {
 		try {
 			SimpleMailMessage message = new SimpleMailMessage();
-			message.setFrom("noreply@solarease.com");
+			message.setFrom(mailFrom != null && !mailFrom.isBlank() ? mailFrom : "noreply@solarease.com");
 			message.setTo(toEmail);
 			message.setSubject("SolarEase - Vérification de votre email");
 			message.setText(buildEmailBody(otpCode));
@@ -41,7 +45,7 @@ public class EmailService {
 	public void sendWelcomeEmail(String toEmail, String firstName) {
 		try {
 			SimpleMailMessage message = new SimpleMailMessage();
-			message.setFrom("noreply@solarease.com");
+			message.setFrom(mailFrom != null && !mailFrom.isBlank() ? mailFrom : "noreply@solarease.com");
 			message.setTo(toEmail);
 			message.setSubject("Bienvenue sur SolarEase!");
 			message.setText("Bonjour " + firstName + ",\n\n" +

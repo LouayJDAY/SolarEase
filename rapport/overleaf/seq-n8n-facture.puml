@@ -1,0 +1,34 @@
+@startuml seq-n8n-facture
+title Diagramme de séquence -- Envoi automatique facture via n8n (Sprint 5)
+
+skinparam shadowing false
+skinparam sequence {
+    ArrowColor              #2C5282
+    LifeLineBorderColor     #2C5282
+    ParticipantBackgroundColor #FFFFFF
+    ParticipantBorderColor  #2C5282
+    ActorBackgroundColor    #FAFAFA
+    ActorBorderColor        #2C5282
+}
+
+actor "Client" as Client
+participant "Frontend" as FE
+participant "project-service" as PS
+participant "n8n" as N8N
+participant "SMTP\n(Gmail)" as SMTP
+
+Client -> FE  : Accepter le devis
+FE    -> PS   : PUT /api/quotes/{id}/accept
+PS    -> PS   : Générer facture + résoudre clientEmail
+PS    -> N8N  : POST /webhook/solarease-invoice
+N8N   -> PS   : GET /api/internal/invoices/{id}/pdf
+PS   --> N8N  : PDF facture
+N8N   -> SMTP : E-mail + pièce jointe
+SMTP --> Client : Facture reçue
+
+note over PS, N8N
+  Déclencheur alternatif~: projet COMPLETED
+  (même flux, trigger project.completed)
+end note
+
+@enduml

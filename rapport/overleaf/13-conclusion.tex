@@ -23,23 +23,21 @@ accompli couvre~:
     projets (CRUD, cycle de vie 6 statuts, tableau de bord KPI)~;
   \item \textbf{Chapitre~4 (Sprints 3, 4 et 5)~:} cœur métier et
     collaboration~: moteur de dimensionnement photovoltaïque (données PVGIS
-    réelles, modèle Night Panel, analyse financière sur 25 ans), approche
+    réelles, modèle Night Panel (production nocturne complémentaire),
+    analyse financière sur 25 ans), approche
     RAG \textbf{hybride} pour les recommandations IA (sélection
     déterministe sur le catalogue société + base vectorielle
     \texttt{pgvector} + Ollama), génération automatique de rapports PDF
     professionnels, suivi terrain avec mises à jour de progression,
     messagerie temps réel (WebSocket), centre de notifications, espace
     client dédié avec stepper de suivi, gestion des demandes solaires,
-    devis avec acceptation client et facturation automatique~;
-  \item \textbf{DevOps (Chapitre~5)~:} industrialisation complète de la
-    chaîne logicielle backend~: containerisation multi-stage des 4
-    microservices, pipeline CI/CD GitHub Actions (build, tests, scans
-    Trivy/Gitleaks, publication d'images sur GHCR), stack d'observabilité
-    (Spring Actuator + Prometheus + Grafana + Loki), qualité (JaCoCo),
-    Infrastructure as Code (Kubernetes + Kustomize, overlays dev/prod),
-    déploiement automatique Railway sur les branches \texttt{develop} et
-    les tags \texttt{v*.*.*}. Le frontend React/Vite reste un projet
-    léger livré en continu sur Vercel.
+    devis avec acceptation client, facturation automatique et envoi de la
+    facture PDF par e-mail via workflow \textbf{n8n}~;
+  \item \textbf{DevOps (Chapitre~5)~:} industrialisation backend
+    (Docker multi-stage, CI/CD GitHub Actions, GHCR, Trivy/Gitleaks,
+    observabilité Prometheus/Grafana/Loki), déploiement de démonstration
+    \textbf{Vercel + VM Azure}, et base IaC Kubernetes pour évolution
+    future~; développement local conservé via Docker Compose et proxy Vite.
 \end{itemize}
 
 \section*{Bilan des objectifs atteints}
@@ -77,7 +75,7 @@ accompli couvre~:
     \hline
     Infrastructure as Code & \textcolor{green!70!black}{\checkmark} Oui & Kustomize (base + overlays) \\
     \hline
-    Déploiement multi-environnement & \textcolor{green!70!black}{\checkmark} Oui & Railway staging + prod \\
+    Déploiement multi-environnement & \textcolor{green!70!black}{\checkmark} Oui & Vercel + VM Azure \\
     \hline
   \end{tabularx}
 \end{table}

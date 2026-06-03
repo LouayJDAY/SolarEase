@@ -201,17 +201,14 @@ public class DemandController {
 
         accessControlService.requireAnyRole(userRole, "ADMIN");
 
+        DemandDTO demand = demandService.getDemandById(id);
+        Long projectId = request.getProjectId() != null ? request.getProjectId() : demand.getProjectId();
+        if (projectId == null) {
+            return Map.of("success", "false", "message", "Aucun projet associé à cette demande");
+        }
+
         try {
-            invitationService.sendInvitationOmniChannel(
-                request.getClientEmail(),
-                request.getPhoneNumber(),
-                request.getClientName(),
-                id,
-                request.getProjectId(),
-                request.getMessage(),
-                request.getSendEmail(),
-                request.getSendSms()
-            );
+            demandService.resendInvitation(id, projectId, request.getMessage());
 
             log.info("Invitation sent for demand {} via email: {}, sms: {}",
                      id, request.getSendEmail(), request.getSendSms());

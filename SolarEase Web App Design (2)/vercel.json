@@ -9,6 +9,10 @@
     {
       "source": "/ws",
       "destination": "http://4.233.29.236:8080/ws"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

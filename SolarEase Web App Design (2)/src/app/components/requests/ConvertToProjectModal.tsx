@@ -74,11 +74,18 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
     setSubmitting(true);
     try {
       const project = await demandService.promotePublicAndConvert(demand.id, coordinates);
-      toast.success(`Client créé et projet #${project.id} ouvert`);
+      if (project.invitationSent) {
+        toast.success(`Projet #${project.id} créé — invitation envoyée par email`);
+      } else if (project.invitationMessage) {
+        toast.success(`Projet #${project.id} créé — ${project.invitationMessage}`);
+      } else {
+        toast.success(`Client créé et projet #${project.id} ouvert`);
+      }
       onConverted(project.id);
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Promotion impossible");
+      const msg = err?.response?.data?.message ?? "Promotion impossible";
+      toast.error(msg.includes("SMTP") ? `Email non envoyé : ${msg}` : msg);
     } finally {
       setSubmitting(false);
     }

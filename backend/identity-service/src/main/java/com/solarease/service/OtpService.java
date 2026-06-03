@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -24,8 +25,10 @@ public class OtpService {
     @Value("${app.otp.expiration:300}")
     private long otpExpirationSeconds;
 
+    @Transactional
     public String generateAndSendOtp(User user) {
-        // Générer code OTP aléatoire (6 chiffres)
+        otpTokenRepository.invalidateUnusedOtpsForUser(user);
+
         String otpCode = generateOtpCode();
 
         // Créer OtpToken
@@ -46,7 +49,7 @@ public class OtpService {
     }
 
     public Optional<String> findLatestOtpCode(User user) {
-        return otpTokenRepository.findByUserAndIsUsedFalse(user)
+        return otpTokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user)
                 .map(OtpToken::getOtpCode);
     }
 

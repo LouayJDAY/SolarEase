@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
@@ -7,16 +7,30 @@ import authService from "../services/authService";
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("token") ?? "";
+  const inviteEmail = searchParams.get("email") ?? "";
+  const inviteProjectId = searchParams.get("projectId") ?? "";
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
+    email: inviteEmail,
     phone: "",
     password: "",
     confirmPassword: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (inviteToken) {
+      sessionStorage.setItem("invitationToken", inviteToken);
+    }
+    if (inviteProjectId) {
+      sessionStorage.setItem("invitationProjectId", inviteProjectId);
+    }
+  }, [inviteToken, inviteProjectId]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -92,6 +106,12 @@ export function RegisterPage() {
           <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-secondary">
             Après l’inscription, un code OTP est envoyé par email pour activer votre compte.
           </div>
+          {inviteToken && (
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Vous avez été invité à créer votre espace client SolarEase
+              {inviteProjectId ? ` pour le projet #${inviteProjectId}` : ""}.
+            </div>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {errors.general && (

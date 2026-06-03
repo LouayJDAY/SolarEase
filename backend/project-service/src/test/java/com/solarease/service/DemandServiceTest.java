@@ -20,6 +20,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Optional;
 
@@ -37,12 +39,14 @@ import static org.mockito.Mockito.*;
  * callbacks are invoked.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class DemandServiceTest {
 
     @Mock private DemandRepository demandRepository;
     @Mock private ProjectService projectService;
     @Mock private ClientRepository clientRepository;
     @Mock private NotificationWebSocketService notificationService;
+    @Mock private InvitationService invitationService;
 
     @InjectMocks private DemandService demandService;
 
@@ -50,6 +54,7 @@ class DemandServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(invitationService.latestInvitationSentAt(any())).thenReturn(java.util.Optional.empty());
         sample = DemandEntity.builder()
                 .id(42L)
                 .clientUserId("user-uuid")
@@ -121,6 +126,38 @@ class DemandServiceTest {
                 "phone must be appended to the description for the admin reader");
 
         verify(notificationService).notifyAdminsOnNewDemand(any(DemandDTO.class));
+    }
+
+    @Test
+    void createPublicDemand_acceptsLongSimulatorMessage() {
+        when(demandRepository.save(any(DemandEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String longMessage = """
+                Bonjour,
+                Je souhaite un devis personnalisé basé sur ma simulation SolarEase.
+
+                Type de bien: Maison
+                Facture trimestrielle: 451 TND
+                Surface toiture: 50 m²
+                Région: Tunis
+                Puissance estimée: 4.5 kWc
+                Investissement estimé: 12000 TND
+                Économies annuelles estimées: 1800 TND
+
+                Merci de me recontacter pour une étude précise.""";
+
+        PublicDemandCreateRequest req = new PublicDemandCreateRequest();
+        req.setFullName("Test User");
+        req.setEmail("long-msg@example.com");
+        req.setPhone("+216 55 12 34 56");
+        req.setSubject("devis");
+        req.setMessage(longMessage);
+
+        DemandDTO dto = demandService.createPublicDemand(req);
+
+        assertTrue(dto.getDescription().length() > 255,
+                "simulator payload must survive without truncation at service layer");
+        assertTrue(dto.getDescription().contains("simulation SolarEase"));
     }
 
     // ── updateStatus ─────────────────────────────────────────────────────────
@@ -231,6 +268,7 @@ class DemandServiceTest {
         when(clientRepository.findByEmail("public@x.tn")).thenReturn(Optional.empty());
         Client created = Client.builder().id(55L).email("public@x.tn").firstName("Ali").lastName("Ben Salah").build();
         when(clientRepository.save(any(Client.class))).thenReturn(created);
+        when(clientRepository.findById(55L)).thenReturn(Optional.of(created));
         when(demandRepository.save(any(DemandEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         ProjectResponse newProject = ProjectResponse.builder().id(200L).build();
         when(projectService.createProject(anyString(), anyString(), anyString(), anyString(), any(ProjectRequest.class)))
@@ -253,6 +291,7 @@ class DemandServiceTest {
         when(demandRepository.findById(42L)).thenReturn(Optional.of(sample));
         Client existing = Client.builder().id(7L).email("known@x.tn").build();
         when(clientRepository.findByEmail("known@x.tn")).thenReturn(Optional.of(existing));
+        when(clientRepository.findById(7L)).thenReturn(Optional.of(existing));
         when(demandRepository.save(any(DemandEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         ProjectResponse newProject = ProjectResponse.builder().id(201L).build();
         when(projectService.createProject(anyString(), anyString(), anyString(), anyString(), any(ProjectRequest.class)))

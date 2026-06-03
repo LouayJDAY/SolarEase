@@ -38,6 +38,10 @@ public class DemandDTO {
     private String rejectionReason;
     private String adminNote;
     private Long projectId;
+    /** True when client has no portal account yet. */
+    private Boolean clientHasAccount;
+    private Boolean invitationSent;
+    private LocalDateTime invitationSentAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

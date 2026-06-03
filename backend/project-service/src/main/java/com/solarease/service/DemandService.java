@@ -31,6 +31,7 @@ public class DemandService {
     private final ProjectService projectService;
     private final ClientRepository clientRepository;
     private final NotificationWebSocketService notificationService;
+    private final InvitationService invitationService;
 
     // ── CLIENT: submit a new demand ──────────────────────────────────────────
 
@@ -267,12 +268,48 @@ public class DemandService {
                     return saved.getId();
                 });
 
-        return convertToProject(demandId, clientId, adminId, adminEmail, latitude, longitude);
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found: " + clientId));
+
+        ProjectResponse project = convertToProject(demandId, clientId, adminId, adminEmail, latitude, longitude);
+
+        if (client.getUserId() == null || client.getUserId().isBlank()) {
+            DemandEntity refreshed = demandRepository.findById(demandId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Demand not found: " + demandId));
+            invitationService.sendInvitationForDemand(refreshed, client, project.getId());
+            project.setInvitationSent(true);
+            project.setInvitationMessage("Invitation envoyée à " + client.getEmail());
+        } else {
+            project.setInvitationSent(false);
+            project.setInvitationMessage("Le client possède déjà un compte portail");
+        }
+
+        return project;
+    }
+
+    @Transactional
+    public void resendInvitation(Long demandId, Long projectId, String message) {
+        DemandEntity demand = demandRepository.findById(demandId)
+                .orElseThrow(() -> new ResourceNotFoundException("Demand not found: " + demandId));
+        Long effectiveProjectId = projectId != null ? projectId : demand.getProjectId();
+        if (effectiveProjectId == null) {
+            throw new IllegalStateException("Aucun projet associé à cette demande");
+        }
+        invitationService.resendInvitationForDemand(demand, effectiveProjectId, message);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private DemandDTO toDto(DemandEntity e) {
+        Boolean clientHasAccount = null;
+        if (e.getClientEmail() != null && !e.getClientEmail().isBlank()) {
+            clientHasAccount = clientRepository.findByEmail(e.getClientEmail().trim().toLowerCase(Locale.ROOT))
+                    .map(c -> c.getUserId() != null && !c.getUserId().isBlank())
+                    .orElse(false);
+        }
+
+        java.util.Optional<java.time.LocalDateTime> sentAt = invitationService.latestInvitationSentAt(e.getId());
+
         return DemandDTO.builder()
                 .id(e.getId())
                 .clientUserId(e.getClientUserId())
@@ -297,6 +334,9 @@ public class DemandService {
                 .rejectionReason(e.getRejectionReason())
                 .adminNote(e.getAdminNote())
                 .projectId(e.getProjectId())
+                .clientHasAccount(clientHasAccount)
+                .invitationSent(sentAt.isPresent())
+                .invitationSentAt(sentAt.orElse(null))
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
                 .build();

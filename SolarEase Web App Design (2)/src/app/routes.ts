@@ -15,6 +15,7 @@ import { CatalogPage } from "./pages/CatalogPage";
 import { EquipmentDetailPage } from "./pages/EquipmentDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { QuotesPage } from "./pages/QuotesPage";
+import { QuoteDetailPage } from "./pages/QuoteDetailPage";
 import { InstallerInvoicesPage } from "./pages/InstallerInvoicesPage";
 import AdminRequestsPage from "./pages/AdminRequestsPage";
 import { ClientLayout } from "./components/client/ClientLayout";
@@ -116,6 +117,10 @@ export const router = createBrowserRouter([
   {
     path: "/quotes",
     Component: QuotesPage,
+  },
+  {
+    path: "/quotes/:id",
+    Component: QuoteDetailPage,
   },
   {
     path: "/requests",

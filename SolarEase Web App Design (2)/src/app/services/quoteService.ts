@@ -81,6 +81,11 @@ const quoteService = {
     return res.data;
   },
 
+  updateQuote: async (quoteId: number, payload: Partial<QuoteCreateRequest>) => {
+    const res = await api.patch<Quote>(`/quotes/${quoteId}`, payload);
+    return res.data;
+  },
+
   sendQuote: async (quoteId: number) => {
     const res = await api.put<Quote>(`/quotes/${quoteId}/send`);
     return res.data;
@@ -98,6 +103,11 @@ const quoteService = {
 
   deleteQuote: async (quoteId: number) => {
     await api.delete(`/quotes/${quoteId}`);
+  },
+
+  expireQuote: async (quoteId: number) => {
+    const res = await api.put<Quote>(`/quotes/${quoteId}/expire`);
+    return res.data;
   },
 
   getActiveProjectQuotes: async (projectId: number) => {

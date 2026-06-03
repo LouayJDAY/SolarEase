@@ -35,6 +35,15 @@ export function QuoteDetailContent({ variant }: Props) {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAcceptConfirm, setShowAcceptConfirm] = useState(false);
   const [acting, setActing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftForm, setDraftForm] = useState({
+    description: "",
+    laborCost: "",
+    materialsCost: "",
+    tax: "",
+    notes: "",
+    validUntil: "",
+  });
 
   const backTarget = variant === "client" ? "/client/quotes" : "/quotes";
 
@@ -50,6 +59,14 @@ export function QuoteDetailContent({ variant }: Props) {
       const found = await quoteService.getQuoteById(quoteId);
       if (found) {
         setQuote(found);
+        setDraftForm({
+          description: found.description ?? "",
+          laborCost: String(found.laborCost),
+          materialsCost: String(found.materialsCost),
+          tax: String(found.tax ?? 0),
+          notes: found.notes ?? "",
+          validUntil: found.validUntil?.slice(0, 10) ?? "",
+        });
       } else {
         toast.error("Devis non trouve");
         navigate(backTarget);
@@ -125,6 +142,48 @@ export function QuoteDetailContent({ variant }: Props) {
     }
   };
 
+  const handleSaveDraft = async () => {
+    if (!quote) return;
+    setActing(true);
+    try {
+      const labor = parseFloat(draftForm.laborCost) || 0;
+      const materials = parseFloat(draftForm.materialsCost) || 0;
+      const tax = parseFloat(draftForm.tax) || 0;
+      await quoteService.updateQuote(quote.id, {
+        projectId: quote.projectId,
+        description: draftForm.description,
+        laborCost: labor,
+        materialsCost: materials,
+        tax,
+        notes: draftForm.notes,
+        validUntil: draftForm.validUntil
+          ? new Date(draftForm.validUntil).toISOString()
+          : undefined,
+      });
+      toast.success("Brouillon enregistré");
+      setEditing(false);
+      await loadQuote();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Enregistrement impossible");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const handleExpire = async () => {
+    if (!quote) return;
+    setActing(true);
+    try {
+      await quoteService.expireQuote(quote.id);
+      toast.success("Devis marqué comme expiré");
+      await loadQuote();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Action impossible");
+    } finally {
+      setActing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-16">
@@ -177,6 +236,14 @@ export function QuoteDetailContent({ variant }: Props) {
             {isInstaller && quote.status === "DRAFT" && (
               <>
                 <button
+                  type="button"
+                  onClick={() => setEditing((v) => !v)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  {editing ? "Annuler" : "Modifier"}
+                </button>
+                <button
                   onClick={handleSend}
                   disabled={acting}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -196,13 +263,23 @@ export function QuoteDetailContent({ variant }: Props) {
             )}
 
             {isInstaller && quote.status === "SENT" && (
-              <button
-                onClick={() => setShowRejectModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Marquer comme refuse
-              </button>
+              <>
+                <button
+                  onClick={handleExpire}
+                  disabled={acting}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Marquer expiré
+                </button>
+                <button
+                  onClick={() => setShowRejectModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Marquer comme refuse
+                </button>
+              </>
             )}
 
             {isClient && quote.status === "SENT" && (
@@ -266,6 +343,63 @@ export function QuoteDetailContent({ variant }: Props) {
             </div>
           </div>
         </div>
+
+        {editing && isInstaller && quote.status === "DRAFT" && (
+          <div className="mb-6 p-4 border border-primary/20 rounded-xl bg-primary/5 space-y-3">
+            <h3 className="text-sm font-semibold text-secondary">Modifier le brouillon</h3>
+            <textarea
+              value={draftForm.description}
+              onChange={(e) => setDraftForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              placeholder="Description des travaux"
+            />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <input
+                type="number"
+                value={draftForm.laborCost}
+                onChange={(e) => setDraftForm((f) => ({ ...f, laborCost: e.target.value }))}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="Main d'œuvre"
+              />
+              <input
+                type="number"
+                value={draftForm.materialsCost}
+                onChange={(e) => setDraftForm((f) => ({ ...f, materialsCost: e.target.value }))}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="Matériaux"
+              />
+              <input
+                type="number"
+                value={draftForm.tax}
+                onChange={(e) => setDraftForm((f) => ({ ...f, tax: e.target.value }))}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                placeholder="TVA"
+              />
+              <input
+                type="date"
+                value={draftForm.validUntil}
+                onChange={(e) => setDraftForm((f) => ({ ...f, validUntil: e.target.value }))}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              />
+            </div>
+            <input
+              type="text"
+              value={draftForm.notes}
+              onChange={(e) => setDraftForm((f) => ({ ...f, notes: e.target.value }))}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              placeholder="Notes internes"
+            />
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={acting}
+              className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+            >
+              Enregistrer
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">

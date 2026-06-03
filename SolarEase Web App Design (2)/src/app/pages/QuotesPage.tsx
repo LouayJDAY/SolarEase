@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   Plus,
   BookOpen,
@@ -56,6 +56,8 @@ const emptyForm: QuoteCreateRequest = {
 
 export function QuotesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const createForProjectId = Number(searchParams.get("createFor") || 0);
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
 
@@ -122,6 +124,13 @@ export function QuotesPage() {
       mounted = false;
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin || !createForProjectId) return;
+    setForm((prev) => ({ ...prev, projectId: createForProjectId }));
+    setShowForm(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
+  }, [isAdmin, createForProjectId]);
 
   const fetchCatalog = async () => {
     setLoadingCatalog(true);

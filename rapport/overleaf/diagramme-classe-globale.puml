@@ -1,188 +1,200 @@
 @startuml diagramme-classe-globale
 title Diagramme de classes globale -- SolarEase
 
-' ────────────────────────────────────────────────────────────
-'  Corrections (annotations rouges de l'encadrant) :
-'    • Technicien    -> Installateur
-'    • Cycle Installateur-Client-Projet brisé
-'        (suppression de Installateur gère Client)
-'    • Suppression de Admin gère Client (non envisageable)
-'  Tout le reste du diagramme est conservé à l'identique.
-' ────────────────────────────────────────────────────────────
+' Corrections encadrant :
+'   • Technicien -> Installateur
+'   • Pas de relation Installateur -- Client
+'   • Pas de relation Admin -- Client
 
 skinparam classAttributeIconSize 0
 skinparam shadowing false
 skinparam class {
-    BackgroundColor   #FAFAFA
-    BorderColor       #2C5282
-    ArrowColor        #2C5282
-    ArrowFontSize     11
+  BackgroundColor   #FAFAFA
+  BorderColor       #2C5282
+  ArrowColor        #2C5282
+  ArrowFontSize     11
 }
 
 ' =========================
-'   IDENTITÉ
+'   IDENTITÉ & ACTEURS
 ' =========================
-class Utilisateur {
-    -id : int
-    -nom : String
-    -email : String
-    -motDePasse : String
-    -role : Role
-    +seConnecter()
-    +seDeconnecter()
+class Utilisateur <<abstract>> {
+  -id : int
+  -nom : String
+  -email : String
+  -motDePasse : String
+  -role : Role
+  --
+  +seConnecter()
+  +seDeconnecter()
 }
 
 class OtpToken {
-    -id : int
-    -token : String
-    -expiresAt : Date
-    -used : boolean
-    +isValid()
+  -id : int
+  -token : String
+  -expiresAt : Date
+  -used : boolean
+  --
+  +isValid()
 }
 
 class RefreshToken {
-    -id : int
-    -token : String
-    -expiresAt : Date
-    -revoked : boolean
-    +isExpired()
-    +revoke()
+  -id : int
+  -token : String
+  -expiresAt : Date
+  -revoked : boolean
+  --
+  +isExpired()
+  +revoke()
 }
 
 class Installateur {
-    -telephone : String
-    -adresse : String
-    +gererClients()
-    +gererProjets()
-    +consulterStatistiques()
+  -telephone : String
+  -adresse : String
+  --
+  +gererProjets()
+  +consulterStatistiques()
 }
 
 class Admin {
-    +gererUtilisateurs()
-    +consulterStatistiques()
+  --
+  +gererUtilisateurs()
+  +gererInstallateurs()
+  +consulterStatistiques()
 }
 
 class Client {
-    -telephone : String
-    -adresse : String
-    +consulterProjets()
-    +recevoirDevis()
-    +onCreate()
-    +onUpdate()
+  -telephone : String
+  -adresse : String
+  --
+  +consulterProjets()
+  +recevoirDevis()
+  +onCreate()
+  +onUpdate()
 }
 
 ' =========================
 '   PROJET
 ' =========================
 class Projet {
-    -id : int
-    -nom : String
-    -dateDebut : Date
-    -dateFin : Date
-    -statut : String
-    +ajouterEquipement()
-    +genererDevis()
-    +onCreate()
-    +onUpdate()
+  -id : int
+  -nom : String
+  -dateDebut : Date
+  -dateFin : Date
+  -statut : String
+  --
+  +ajouterEquipement()
+  +genererDevis()
+  +onCreate()
+  +onUpdate()
 }
 
 ' =========================
 '   COMMERCIAL / DOCUMENTS
 ' =========================
 class Notification {
-    -id : int
-    -message : String
-    -dateEnvoi : Date
-    -lu : boolean
-    +marquerCommeLue()
+  -id : int
+  -message : String
+  -dateEnvoi : Date
+  -lu : boolean
+  --
+  +marquerCommeLue()
 }
 
 class Facture {
-    -id : int
-    -montant : float
-    -dateEmission : Date
-    -statut : String
-    +envoyerAuClient()
-    +enregistrerPaiement()
+  -id : int
+  -montant : float
+  -dateEmission : Date
+  -statut : String
+  --
+  +envoyerAuClient()
+  +enregistrerPaiement()
 }
 
 class Document {
-    -id : int
-    -nom : String
-    -type : String
-    -url : String
-    -dateUpload : Date
-    +telecharger()
-    +supprimer()
+  -id : int
+  -nom : String
+  -type : String
+  -url : String
+  -dateUpload : Date
+  --
+  +telecharger()
+  +supprimer()
 }
 
 class Devis {
-    -id : int
-    -montant : float
-    -dateEmission : Date
-    -statut : String
-    +envoyerAuClient()
-    +valider()
-    +rejeter()
+  -id : int
+  -montant : float
+  -dateEmission : Date
+  -statut : String
+  --
+  +envoyerAuClient()
+  +valider()
+  +rejeter()
 }
 
 class Rapport {
-    -id : int
-    -type : String
-    -contenu : String
-    -dateCreation : Date
-    +genererPDF()
+  -id : int
+  -type : String
+  -contenu : String
+  -dateCreation : Date
+  --
+  +genererPDF()
 }
 
 ' =========================
 '   DIMENSIONNEMENT
 ' =========================
 class Dimensioning {
-    -id : Long
-    -projectId : Long
-    -status : DimensioningStatus
-    -aiRecommendation : String
-    -panelType : String
-    +calculerDimensionning()
-    +compareDimensionings()
+  -id : Long
+  -projectId : Long
+  -status : DimensioningStatus
+  -aiRecommendation : String
+  -panelType : String
+  --
+  +calculerDimensionning()
+  +compareDimensionings()
 }
 
 class RoofCharacteristic {
-    -id : int
-    -surface : float
-    -inclinaison : float
-    -orientation : String
-    -materiau : String
-    +calculerSurface()
+  -id : int
+  -surface : float
+  -inclinaison : float
+  -orientation : String
+  -materiau : String
+  --
+  +calculerSurface()
 }
 
 class SolarInstallation {
-    -id : int
-    -puissanceTotale : float
-    -nombrePanneaux : int
-    -rendement : float
-    -dateInstallation : Date
-    +calculerRendement()
-    +genererRapport()
+  -id : int
+  -puissanceTotale : float
+  -nombrePanneaux : int
+  -rendement : float
+  -dateInstallation : Date
+  --
+  +calculerRendement()
+  +genererRapport()
 }
 
 class Equipment {
-    -id : int
-    -type : String
-    -marque : String
-    -modele : String
-    -quantite : int
-    -puissance : float
-    +getAllEquipements()
-    +getEquipementByType()
-    +getEquipementById()
+  -id : int
+  -type : String
+  -marque : String
+  -modele : String
+  -quantite : int
+  -puissance : float
+  --
+  +getAllEquipements()
+  +getEquipementByType()
+  +getEquipementById()
 }
 
 ' ────────────────────────────────────────────
 '   RELATIONS
 ' ────────────────────────────────────────────
 
-' Héritage
+' Héritage acteurs
 Utilisateur <|-- Installateur
 Utilisateur <|-- Admin
 Utilisateur <|-- Client
@@ -191,13 +203,16 @@ Utilisateur <|-- Client
 Utilisateur "1" -- "0..*" OtpToken     : génère
 Utilisateur "1" -- "0..*" RefreshToken : possède
 
-' Gestion (cycle supprimé : Installateur ne gère plus directement Client)
-Installateur "1" -- "0..*" Projet  : gère
+' Admin supervise les installateurs (pas de lien Admin -- Client)
+Admin "1" -- "0..*" Installateur : supervise
 
-' Projet ↔ Client
-Client "1" -- "*" Projet : concerne
+' Installateur gère les projets (pas de lien direct Installateur -- Client)
+Installateur "1" -- "0..*" Projet : gère
 
-' Client reçoit des artefacts (pas de retour, pas de cycle)
+' Projet et client
+Client "1" -- "0..*" Projet : concerne
+
+' Artefacts reçus par le client
 Client "1" -- "0..*" Notification : reçoit
 Client "1" -- "0..*" Facture      : reçoit
 Client "1" -- "0..*" Document     : possède
@@ -207,9 +222,9 @@ Projet "1" -- "1..*" Rapport      : produit
 Projet "1" -- "1..*" Dimensioning : contient
 Projet "1" -- "1..*" Devis        : génère
 
-' Dimensionnement
-Dimensioning "1" -- "1"   RoofCharacteristic : décrit
-Dimensioning "1" -- "1"   SolarInstallation  : définit
+' Dimensionnement technique
+Dimensioning "1" *-- "1" RoofCharacteristic : décrit
+Dimensioning "1" *-- "1" SolarInstallation  : définit
 Dimensioning "*" -- "1..*" Equipment         : utilise
 
 @enduml

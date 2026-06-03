@@ -112,11 +112,13 @@ consommation). L'engagement écologique se traduit par le choix des
 meilleures marques et de solutions à fort rendement énergétique.
 
 \paragraph{c)~R\&D et innovation.}
-Prototypage de panneaux intelligents à \textbf{production nocturne},
-innovations domotiques et tests de nouvelles technologies énergétiques.
-C'est précisément dans ce département qu'est née la fonctionnalité
-\textbf{Night Panel} intégrée à SolarEase, qui simule la production
-résiduelle d'un panneau associé à un stockage par batterie.
+Prototypage de panneaux intelligents à \textbf{production nocturne}, innovations
+domotiques et tests de nouvelles technologies énergétiques. C'est dans ce
+département qu'est conçu le projet \textbf{Night Panel}~: une technologie visant
+à produire de l'électricité la nuit en exploitant le rayonnement thermique
+nocturne, complétant les panneaux photovoltaïques classiques. La plateforme
+\textbf{SolarEase} intègre ce concept via un module de simulation et de
+comparaison (\textit{Classique versus Night Panel}) au service des installateurs.
 
 \paragraph{d)~Marketing \& branding.}
 Gestion des réseaux sociaux, identité visuelle, publicité digitale et
@@ -269,6 +271,37 @@ Les principaux défis auxquels font face les installateurs sont~:
   \end{tabularx}
 \end{table}
 
+\subsection{Présentation générale du projet Night Panel}
+
+Face à l'augmentation de la demande énergétique et aux limites des systèmes
+photovoltaïques traditionnels, le projet \textbf{Night Panel} propose une
+solution innovante permettant de produire de l'électricité durant la nuit afin
+de compléter la production des panneaux solaires classiques. En effet, alors
+que les panneaux photovoltaïques ne génèrent de l'énergie qu'en présence du
+rayonnement solaire, Night Panel vise à exploiter les différences de température
+et le rayonnement thermique nocturne pour assurer une production énergétique
+continue.
+
+Le concept repose sur l'utilisation de technologies capables de convertir
+l'énergie thermique émise par la Terre vers le ciel nocturne en énergie
+électrique. Associé à un système photovoltaïque conventionnel, Night Panel
+permet d'améliorer le rendement global de l'installation et de tendre vers
+une \textbf{disponibilité énergétique de 24~heures sur 24}.
+
+Ce projet s'inscrit dans une démarche de transition énergétique durable en
+cherchant à optimiser l'exploitation des ressources naturelles disponibles
+aussi bien le jour que la nuit. L'objectif est de réduire la dépendance aux
+systèmes de stockage coûteux, d'améliorer l'autonomie énergétique et de
+contribuer au développement de solutions innovantes dans le domaine des
+énergies renouvelables.
+
+Dans le cadre du présent PFE, SolarEase ne reproduit pas le prototype matériel
+Night Panel~; elle en \textbf{intègre la vision métier} en offrant aux
+installateurs un outil de dimensionnement et de comparaison permettant
+d'évaluer l'apport d'une solution hybride (production diurne PV + complément
+nocturne) et d'en mesurer l'impact sur l'autoconsommation et la rentabilité
+du projet client.
+
 % ──────────────────────────────────────────────────────────
 \section{Problématique et Objectifs}
 
@@ -305,7 +338,8 @@ Pour répondre à cette problématique, le projet SolarEase fixe les objectifs s
   \item Centraliser la gestion des clients et des projets solaires dans un seul outil~;
   \item Automatiser le calcul de dimensionnement photovoltaïque à partir des données
     d'irradiation PVGIS~;
-  \item Proposer un mode \textit{Night Panel} simulant le stockage par batterie~;
+  \item Proposer un mode \textit{Night Panel} simulant et comparant une
+    installation complétée par une production nocturne (concept R\&D)~;
   \item Fournir une analyse financière complète (ROI, payback, cash-flow sur 25 ans)~;
   \item Générer automatiquement un rapport PDF professionnel et exploitable~;
   \item Intégrer une recommandation IA contextuelle via un LLM local (Ollama)~;
@@ -391,8 +425,9 @@ SolarEase se distingue des solutions existantes par~:
     rapport PDF final, en passant par le dimensionnement et l'analyse financière~;
   \item \textbf{Le calcul basé sur des données réelles}~: connexion à l'API
     PVGIS de la Commission Européenne pour des données d'irradiance précises~;
-  \item \textbf{L'innovation Night Panel}~: simulation et comparaison des
-    panneaux avec stockage par batterie intégré~;
+  \item \textbf{L'innovation Night Panel}~: intégration du concept R\&D de
+    production nocturne (rayonnement thermique) et comparaison avec le
+    dimensionnement photovoltaïque classique~;
   \item \textbf{L'intelligence artificielle}~: recommandations contextualisées
     générées par un LLM local (Ollama / TinyLLaMA)~;
   \item \textbf{L'architecture moderne}~: microservices Spring Boot, frontend

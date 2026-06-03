@@ -36,6 +36,9 @@ public class ProjectResponse {
     private String currentPhase;
     private String currentPhaseLabel;
     private ClientInfo client;
+    /** Set when a public prospect was invited to create a client account. */
+    private Boolean invitationSent;
+    private String invitationMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

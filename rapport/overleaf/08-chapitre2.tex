@@ -61,130 +61,118 @@ sera utilisée par quatre types d'acteurs.
 \subsection{Besoins fonctionnels}
 
 Les besoins fonctionnels décrivent les actions spécifiques que le système
-doit permettre aux utilisateurs d'accomplir. Voici la liste détaillée des
-fonctionnalités attendues pour la plateforme SolarEase, regroupées par
-domaine métier.
+doit permettre aux utilisateurs d'accomplir. Conformément à
+l'identification des acteurs (section~2.1.2), la liste ci-dessous regroupe
+les fonctionnalités attendues \textbf{par acteur}, afin de relier chaque
+besoin au profil qui l'exerce. Les fonctions d'authentification communes
+(JWT, profil, mot de passe) sont rappelées pour les acteurs authentifiés
+concernés.
 
 \begin{itemize}[leftmargin=1.6em, label={$\bullet$}]
-  \item \textbf{Gestion des comptes utilisateurs et authentification}
+
+  \item \textbf{Visiteur (utilisateur non authentifié)}
   \begin{itemize}[leftmargin=2em, label={--}]
-    \item Inscription d'un client avec vérification par code OTP envoyé par e-mail.
-    \item Création des comptes installateurs par l'administrateur (compte vérifié d'office).
-    \item Authentification par JWT (\textit{access~token}~+~\textit{refresh~token}).
-    \item Consultation et mise à jour du profil utilisateur.
-    \item Changement de mot de passe.
-    \item Renvoi d'un code OTP en cas d'expiration.
-    \item Gestion des rôles utilisateurs (\texttt{CLIENT}, \texttt{INSTALLER}, \texttt{ADMIN}).
+    \item Consulter les informations publiques de la plateforme (présentation,
+      simulateur, tarifs, contact).
+    \item Soumettre une demande solaire via le formulaire de contact public
+      (étude, devis, renseignement).
   \end{itemize}
 
-  \item \textbf{Gestion des clients}
+  \item \textbf{Client final (\texttt{CLIENT})}
   \begin{itemize}[leftmargin=2em, label={--}]
-    \item Consulter la liste des clients (avec pagination).
-    \item Ajouter un nouveau client.
-    \item Modifier les informations d'un client.
-    \item Supprimer un client.
-    \item Rechercher un client par nom ou par adresse e-mail.
+    \item S'inscrire avec vérification par code OTP envoyé par e-mail.
+    \item S'authentifier par JWT (\textit{access~token}~+~\textit{refresh~token}).
+    \item Renvoyer un code OTP en cas d'expiration.
+    \item Consulter et mettre à jour son profil utilisateur.
+    \item Changer son mot de passe.
+    \item Consulter son tableau de bord (projets, devis, factures, demandes).
+    \item Visualiser le détail d'un projet (avancement, documents).
+    \item Télécharger les rapports PDF de dimensionnement et les factures.
+    \item Accepter ou refuser un devis reçu de l'installateur (génération
+      automatique d'une facture en cas d'acceptation).
+    \item Recevoir automatiquement la facture PDF par e-mail (workflow n8n
+      déclenché à l'acceptation du devis ou à la clôture du projet).
+    \item Soumettre une nouvelle demande depuis l'espace client authentifié.
+    \item Échanger avec l'installateur via la messagerie projet.
+    \item Recevoir des notifications temps réel (WebSocket / STOMP) et les
+      consulter dans un centre de notifications (marquage lu / non lu).
   \end{itemize}
 
-  \item \textbf{Gestion des projets solaires}
+  \item \textbf{Installateur (\texttt{INSTALLER})}
   \begin{itemize}[leftmargin=2em, label={--}]
-    \item Consulter la liste des projets et le tableau de bord avec KPI.
-    \item Créer un nouveau projet (client, localisation, type, puissance, budget).
-    \item Modifier les informations d'un projet.
-    \item Suivre l'évolution du projet à travers six statuts
+    \item S'authentifier par JWT et gérer son profil (consultation, mise à jour,
+      changement de mot de passe).
+    \item Consulter la liste de ses clients (pagination, recherche par nom
+      ou e-mail).
+    \item Ajouter, modifier et supprimer un client.
+    \item Consulter la liste de ses projets et le tableau de bord associé.
+    \item Créer un projet (client, localisation, type, puissance, budget).
+    \item Modifier les informations d'un projet qui lui est affecté.
+    \item Suivre l'évolution d'un projet à travers six statuts
       (\texttt{CREATED}, \texttt{EN\_PREPARATION},
       \texttt{INSTALLATEUR\_AFFECTE}, \texttt{IN\_PROGRESS},
       \texttt{COMPLETED}, \texttt{CANCELLED}).
-    \item Affecter un installateur à un projet (réservé à l'administrateur).
-    \item Mettre à jour le pourcentage d'avancement (suivi terrain).
+    \item Mettre à jour le pourcentage d'avancement terrain (commentaire
+      inclus).
+    \item Lancer un dimensionnement standard (données PVGIS, Commission
+      Européenne).
+    \item Lancer un dimensionnement Night~Panel (production nocturne complémentaire,
+      concept R\&D)~;
+    \item Comparer les scénarios Classique vs Night~Panel (courbes sur
+      24~heures).
+    \item Consulter l'analyse financière (ROI, \textit{payback}, flux cumulés
+      sur 25~ans).
+    \item Obtenir une recommandation IA contextualisée (Ollama / TinyLLaMA,
+      enrichie par RAG hybride~: catalogue société + recherche sémantique
+      \texttt{pgvector} sur normes STEG/ANME).
+    \item Générer et télécharger un rapport PDF (synthèse technique, schémas,
+      courbes, recommandation IA).
+    \item Consulter le catalogue d'équipements (panneaux, onduleurs,
+      Night~Panels).
+    \item Créer un devis associé à un projet et l'envoyer au client par
+      notification.
+    \item Consulter la liste de ses devis et factures.
+    \item Échanger avec le client via la messagerie projet et recevoir des
+      notifications temps réel.
   \end{itemize}
 
-  \item \textbf{Dimensionnement photovoltaïque}
+  \item \textbf{Administrateur (\texttt{ADMIN})}
   \begin{itemize}[leftmargin=2em, label={--}]
-    \item Lancer un dimensionnement standard à partir des données
-      d'irradiation PVGIS (Commission Européenne).
-    \item Lancer un dimensionnement Night~Panel intégrant le stockage
-      par batterie et le calcul de couverture nocturne.
-    \item Comparer les deux scénarios (Classique vs Night~Panel) avec
-      courbes de production sur 24~heures.
-    \item Consulter l'analyse financière complète~: ROI, période de
-      retour sur investissement (\textit{payback}) et flux de trésorerie
-      cumulés sur 25~ans.
-  \end{itemize}
-
-  \item \textbf{Génération de rapports PDF}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Générer un rapport PDF professionnel à partir des résultats
-      du dimensionnement.
-    \item Inclure la synthèse technique, les schémas, les courbes et la
-      recommandation IA.
-    \item Télécharger le rapport directement depuis l'interface.
-  \end{itemize}
-
-  \item \textbf{Recommandation par intelligence artificielle}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Obtenir une recommandation contextualisée pour chaque
-      dimensionnement.
-    \item Génération via un \textit{Large Language Model} local
-      (Ollama).
-    \item Enrichissement par approche RAG \textbf{hybride}
-      (\textit{Retrieval-Augmented Generation})~: sélection déterministe
-      sur le catalogue société (onduleurs, câbles, disjoncteurs) et
-      recherche sémantique \texttt{pgvector} sur la documentation
-      produit et les normes STEG/ANME.
-  \end{itemize}
-
-  \item \textbf{Catalogue d'équipements}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Consulter le catalogue d'équipements (panneaux, onduleurs, Night~Panels).
-    \item Ajouter un nouvel équipement.
-    \item Modifier et supprimer un équipement.
-    \item Activer ou désactiver un équipement.
-  \end{itemize}
-
-  \item \textbf{Suivi terrain et collaboration temps réel}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Saisir l'avancement terrain d'un projet (pourcentage et commentaire).
-    \item Diffuser des notifications temps réel via WebSocket / STOMP.
-    \item Échanger via une messagerie projet entre installateur et client.
-    \item Disposer d'un centre de notifications avec marquage lu / non lu.
-  \end{itemize}
-
-  \item \textbf{Gestion des demandes solaires}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Soumettre une demande publique via le formulaire de contact (visiteur).
-    \item Soumettre une demande depuis l'espace client (client authentifié).
-    \item Consulter, filtrer et trier les demandes (administrateur).
-    \item Convertir une demande en projet.
-    \item Promouvoir un prospect (visiteur) en client.
+    \item S'authentifier par JWT et gérer son profil (consultation, mise à jour,
+      changement de mot de passe).
+    \item Créer les comptes installateurs (compte vérifié d'office, rôle
+      \texttt{INSTALLER}).
+    \item Gérer les rôles utilisateurs (\texttt{CLIENT}, \texttt{INSTALLER},
+      \texttt{ADMIN}).
+    \item Consulter le tableau de bord global avec indicateurs KPI (vue
+      transverse sur projets, clients, demandes).
+    \item Consulter, filtrer et trier l'ensemble des demandes solaires.
     \item Assigner une demande à un administrateur.
+    \item Promouvoir un prospect (visiteur) au rang de client.
+    \item Convertir une demande en projet.
+    \item Affecter un installateur à un projet.
+    \item Superviser l'ensemble des clients, projets, devis et factures
+      (CRUD et recherche, sans restriction d'affectation).
+    \item Administrer le catalogue d'équipements~: ajouter, modifier,
+      supprimer, activer ou désactiver un équipement.
+    \item Accéder à l'ensemble des fonctionnalités installateur (dimensionnement,
+      PDF, suivi terrain, messagerie) sur l'ensemble des projets.
   \end{itemize}
 
-  \item \textbf{Cycle commercial~: devis et facturation}
+  \item \textbf{Besoins transverses (plateforme et déploiement)}
   \begin{itemize}[leftmargin=2em, label={--}]
-    \item Créer un devis associé à un projet.
-    \item Envoyer le devis au client par notification.
-    \item Accepter ou refuser le devis (côté client).
-    \item Générer automatiquement une facture à l'acceptation du devis.
-    \item Consulter la liste des devis et factures.
-  \end{itemize}
-
-  \item \textbf{Espace client}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Consulter un tableau de bord (projets, devis, factures, demandes).
-    \item Visualiser le détail d'un projet (avancement, documents).
-    \item Télécharger les rapports PDF et les factures.
-    \item Accéder à la messagerie projet.
-    \item Soumettre une nouvelle demande.
-  \end{itemize}
-
-  \item \textbf{Containerisation et déploiement de l'application}
-  \begin{itemize}[leftmargin=2em, label={--}]
-    \item Conteneurisation de l'ensemble des microservices avec \textbf{Docker}
+    \item Contrôle d'accès centralisé au niveau de l'API~Gateway selon le
+      rôle porté par le JWT.
+    \item Conteneurisation des microservices avec \textbf{Docker}
       (Dockerfile multi-stage).
     \item Orchestration locale via \textbf{Docker~Compose}.
-    \item Déploiement continu via \textbf{GitHub~Actions} et \textbf{Railway}.
+    \item Déploiement continu via \textbf{GitHub~Actions} et
+      \textbf{Microsoft Azure} (VM + Docker Compose)~; frontend sur
+      \textbf{Vercel}.
+    \item Automatisation des notifications métier via \textbf{n8n}
+      (webhook interne, envoi SMTP des factures PDF au client).
   \end{itemize}
+
 \end{itemize}
 
 \subsection{Besoins non fonctionnels}
@@ -377,7 +365,7 @@ par priorité et rattachées à un sprint de livraison.
     US-08 & Installateur & Lancer un dimensionnement automatique (PVGIS) & Sprint 4 & \textcolor{red}{\textbf{Haute}} & 13 \\
     \hline
     \rowcolor{gray!5}
-    US-09 & Installateur & Simuler l'ajout de Night Panels (stockage nocturne) & Sprint 4 & \textcolor{red}{\textbf{Haute}} & 8 \\
+    US-09 & Installateur & Simuler un scénario Night Panel (production nocturne) & Sprint 4 & \textcolor{red}{\textbf{Haute}} & 8 \\
     \hline
     US-10 & Installateur & Comparer les scénarios (Classique vs Night Panel) & Sprint 4 & \textcolor{red}{\textbf{Haute}} & 5 \\
     \hline

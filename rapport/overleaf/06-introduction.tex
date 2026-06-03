@@ -82,10 +82,11 @@ SolarEase se distingue par trois innovations majeures~:
   \item \textbf{Données réelles PVGIS}~: les calculs de production solaire
     s'appuient sur l'API officielle de la Commission Européenne (données
     d'irradiance géolocalisées), garantissant une précision scientifique~;
-  \item \textbf{Mode Night~Panel}~: une fonctionnalité inédite permettant
-    de simuler et comparer des installations avec stockage batterie intégré,
-    incluant le calcul de la couverture nocturne et du taux
-    d'autoconsommation~;
+  \item \textbf{Mode Night~Panel}~: intégration du concept R\&D \organisme{}
+    visant une production électrique nocturne par conversion de l'énergie
+    thermique, avec module de simulation permettant de comparer une installation
+    classique à un scénario Night Panel (couverture étendue, autoconsommation,
+    disponibilité 24~h/24)~;
   \item \textbf{Intelligence Artificielle locale}~: des recommandations
     personnalisées générées par un LLM (Ollama / TinyLLaMA) déployé
     localement, sans dépendance à des services cloud externes.
@@ -127,14 +128,15 @@ Le présent rapport est structuré comme suit~:
     (catalogue société + \texttt{pgvector}) pour les recommandations IA,
     génération PDF, suivi terrain, messagerie
     temps réel, notifications, espace client, demandes, devis,
-    factures et workflow commercial complet \\
+    factures, workflow commercial complet et envoi automatique des factures
+    PDF par e-mail via \textbf{n8n} \\
     \addlinespace
     Chapitre 5 --- DevOps \& mise en production &
     Containerisation des microservices backend, pipeline CI/CD GitHub
     Actions, observabilité (Prometheus, Grafana, Loki), qualité et
     sécurité (JaCoCo, Trivy, Gitleaks), Infrastructure as Code
     (Kubernetes + Kustomize) et stratégie de déploiement
-    multi-environnements (Railway pour le backend, Vercel pour le frontend) \\
+    multi-environnements (Vercel + VM Microsoft Azure) \\
     \addlinespace[8pt]
     Conclusion générale &
     Bilan des réalisations, limites et perspectives d'évolution \\

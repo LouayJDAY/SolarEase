@@ -82,7 +82,10 @@ export function OTPVerificationPage() {
     }
 
     try {
-      await authService.verifyOtp({ email, otpCode: code });
+      const invitationToken = sessionStorage.getItem("invitationToken") ?? undefined;
+      await authService.verifyOtp({ email, otpCode: code, invitationToken });
+      sessionStorage.removeItem("invitationToken");
+      sessionStorage.removeItem("invitationProjectId");
       navigate("/login");
     } catch (err: any) {
       setError(err.response?.data?.message || "Code OTP invalide ou expiré.");

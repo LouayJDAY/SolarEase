@@ -582,7 +582,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   \hline
   SOLAR-21 & Cycle de vie des devis & DRAFT$\to$SENT$\to$ACCEPTED/REJECTED, notification & Haute & \ok~Fait \\
   \hline
-  SOLAR-22 & Facturation automatique & Génération facture à l'acceptation, PDF OpenPDF & Haute & \ok~Fait \\
+  SOLAR-22 & Facturation automatique & Génération facture, PDF OpenPDF, webhook n8n & Haute & \ok~Fait \\
   \hline
   SOLAR-23 & Administration installateurs & CRUD installateurs, invitations client, diffusion & Moyenne & \ok~Fait \\
   \hline
@@ -853,7 +853,8 @@ de mieux illustrer les interactions entre les acteurs et le système.
     4. Le frontend envoie \texttt{PUT /api/quotes/\{id\}/accept}.\newline
     5. Le service vérifie que la date \texttt{validUntil} n'est pas dépassée.\newline
     6. Le statut passe à \texttt{ACCEPTED} puis automatiquement à \texttt{INVOICED} après génération de la facture.\newline
-    7. L'installateur et le client reçoivent une notification.\\
+    7. L'installateur et le client reçoivent une notification.\newline
+    8. Le \texttt{project-service} appelle le webhook n8n qui envoie la facture PDF par e-mail à l'adresse du client (\texttt{clientEmail}).\\
     \hline
     \textbf{Scénarios alternatifs} &
     \textit{Scénario alternatif 1 -- Refus avec motif :}\newline
@@ -889,7 +890,9 @@ de mieux illustrer les interactions entre les acteurs et le système.
     3. La facture est créée avec \texttt{status=SENT}, \texttt{amount=quote.totalAmount} et \texttt{dueDate = today + 30j}.\newline
     4. Le statut du devis bascule en \texttt{INVOICED}.\newline
     5. Le client reçoit la facture dans son espace.\newline
-    6. Une notification est envoyée au client et à l'installateur.\\
+    6. Une notification est envoyée au client et à l'installateur.\newline
+    7. \texttt{N8nInvoiceWebhookService} appelle n8n pour envoyer le PDF par
+    e-mail à l'adresse du client (\texttt{clientEmail}).\\
     \hline
     \textbf{Scénarios alternatifs} &
     \textit{Scénario alternatif 1 -- Erreur de génération :}\newline
@@ -898,6 +901,110 @@ de mieux illustrer les interactions entre les acteurs et le système.
     \hline
   \end{tabularx}
 \end{table}
+
+\subsubsection{Approche n8n~: envoi automatique de la facture par e-mail}
+\label{sec:n8n}
+
+La génération de la facture dans le \texttt{project-service} (OpenPDF) ne
+suffit pas à garantir sa réception par le client final. Pour compléter le
+workflow commercial du sprint~5 sans alourdir le code Java, SolarEase
+s'appuie sur \textbf{n8n}, moteur de workflows \textit{low-code} conteneurisé
+sur le réseau Docker \texttt{solarease-net}. Le microservice reste responsable
+de la logique métier (devis, factures, PDF)~; n8n orchestre l'envoi SMTP avec
+pièce jointe.
+
+\paragraph{Déclencheurs.}
+Deux événements métier activent le workflow
+\texttt{SolarEase --- Envoi facture client}~:
+
+\begin{table}[H]
+  \caption{Déclencheurs du workflow n8n (Sprint~5)}
+  \label{tab:n8n-triggers}
+  \centering\small
+  \begin{tabularx}{\textwidth}{|L{4.5cm}|L{3.2cm}|X|}
+    \hline
+    \rowcolor{figblue!20}
+    \textbf{Événement} & \textbf{Trigger backend} & \textbf{Résultat} \\
+    \hline
+    Client accepte un devis &
+    \texttt{quote.accepted} &
+    E-mail + PDF à \texttt{clientEmail} \\
+    \hline
+    Projet clôturé (\texttt{COMPLETED}) &
+    \texttt{project.completed} &
+    Idem si facture associée \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+L'adresse destinataire est l'e-mail enregistré sur la fiche client
+(\texttt{items\_client.email}), résolu par \texttt{N8nInvoiceWebhookService}
+à partir du projet lié à la facture.
+
+\paragraph{Diagramme de cas d'utilisation.}
+La figure~\ref{fig:uc-n8n-facture} modélise le raffinement du cas d'utilisation
+«~Recevoir la facture par e-mail~»~: l'acceptation du devis ou la clôture du
+projet inclut la génération PDF, le déclenchement du webhook n8n, le
+téléchargement sécurisé du document et l'envoi SMTP vers l'adresse du client.
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{uc-n8n-facture.png}{%
+    \includegraphics[width=0.92\textwidth]{uc-n8n-facture.png}%
+  }{%
+    \fbox{\parbox[c][7cm][c]{0.92\textwidth}{\centering
+      Compiler \texttt{uc-n8n-facture.puml} $\rightarrow$ \texttt{uc-n8n-facture.png}%
+    }}%
+  }
+  \caption{Diagramme de cas d'utilisation --- envoi automatique facture via n8n}
+  \label{fig:uc-n8n-facture}
+\end{figure}
+
+\paragraph{Diagramme de séquence.}
+La figure~\ref{fig:seq-n8n-facture} détaille les interactions entre le
+\texttt{project-service}, n8n, l'endpoint interne PDF et le serveur SMTP
+lors de l'acceptation d'un devis (déclencheur principal du sprint~5).
+
+\begin{figure}[H]
+  \centering
+  \IfFileExists{seq-n8n-facture.png}{%
+    \includegraphics[width=0.95\textwidth]{seq-n8n-facture.png}%
+  }{%
+    \fbox{\parbox[c][8cm][c]{0.95\textwidth}{\centering
+      Compiler \texttt{seq-n8n-facture.puml} $\rightarrow$ \texttt{seq-n8n-facture.png}%
+    }}%
+  }
+  \caption{Diagramme de séquence --- workflow n8n d'envoi de facture PDF}
+  \label{fig:seq-n8n-facture}
+\end{figure}
+
+\paragraph{Chaîne technique.}
+Le flux comporte quatre étapes principales~:
+(1)~après \texttt{generateInvoiceFromQuote()} ou passage en
+\texttt{COMPLETED}, le \texttt{project-service} envoie un POST JSON au webhook
+\texttt{/webhook/solarease-invoice}~;
+(2)~n8n vérifie que \texttt{clientEmail} est renseigné~;
+(3)~n8n récupère le PDF via
+\texttt{GET /api/internal/invoices/\{id\}/pdf} (endpoint interne protégé par
+\texttt{X-Internal-Secret}, sans JWT, accessible uniquement sur le réseau
+Docker)~;
+(4)~n8n envoie l'e-mail via SMTP (Gmail, port~587, STARTTLS) avec la facture
+en pièce jointe.
+
+\paragraph{Implémentation.}
+Les composants principaux sont~:
+\begin{itemize}[leftmargin=*, nosep]
+  \item \texttt{N8nInvoiceWebhookService.java}~: construction du payload et
+        appel HTTP vers n8n~;
+  \item \texttt{InternalInvoiceController.java}~: téléchargement sécurisé du
+        PDF pour n8n~;
+  \item \texttt{backend/n8n/workflows/send-invoice-email.json}~: workflow
+        versionné (webhook, condition e-mail, HTTP Request, envoi SMTP).
+\end{itemize}
+
+Le couplage reste faible~: le contrat JSON entre backend et n8n permet
+d'ajouter ultérieurement d'autres automatisations (relance impayée,
+notification Slack) sans modifier le cœur métier Java.
 
 % ──────────────────────────────────────────────
 \paragraph{Raffinement de cas d'utilisation «~Tableau de bord client~»}
@@ -1274,6 +1381,8 @@ public class AccessControlService {
     \hline
     T-41 & Facture PDF & PDF valide généré, téléchargement OK & \ok~OK \\
     \hline
+    T-47 & Envoi n8n facture & Webhook OK, e-mail reçu à \texttt{clientEmail} & \ok~OK \\
+    \hline
     T-42 & Dashboard client & KPI affichés, projet actif en avant & \ok~OK \\
     \hline
     T-43 & Stepper client & Progression synchronisée avec statut & \ok~OK \\
@@ -1295,7 +1404,8 @@ depuis le chantier. La messagerie et les notifications assurent une
 collaboration fluide entre les trois rôles (admin, installateur, client).
 L'espace client offre une expérience dédiée avec un suivi visuel du projet
 à travers un stepper intuitif. Enfin, le workflow commercial complet ---
-de la demande solaire à la facturation automatique en passant par le devis ---
+de la demande solaire à la facturation automatique en passant par le devis,
+puis l'envoi de la facture PDF par e-mail via n8n (section~\ref{sec:n8n}) ---
 transforme SolarEase en une solution professionnelle de gestion de projets
 solaires, prête pour le marché tunisien.
 \end{conclusionbox}

@@ -1,0 +1,76 @@
+@startuml devops-archi
+title Chaîne DevOps et déploiement de démonstration -- SolarEase
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #2C5282
+skinparam RectangleBorderColor #2C5282
+skinparam RectangleBackgroundColor #F7FAFC
+skinparam componentStyle rectangle
+
+skinparam package {
+  BorderColor #2C5282
+  BackgroundColor #EDF2F7
+  FontColor #1A365D
+}
+
+' ── CI/CD ──────────────────────────────────────────────────────────
+package "Intégration continue (GitHub)" {
+  actor "Développeur" as Dev
+  component "GitHub\n(repo SolarEase)" as GH
+  component "GitHub Actions\n(CI/CD)" as GHA #E2E8F0
+  component "GHCR\n(images Docker)" as GHCR #E2E8F0
+  database "JaCoCo / SARIF\n(artefacts)" as Artifacts
+
+  Dev --> GH : git push / PR
+  GH --> GHA : déclenche workflows
+  GHA --> Artifacts : tests + scans\n(Trivy, Gitleaks)
+  GHA --> GHCR : docker publish
+}
+
+' ── Production PFE ─────────────────────────────────────────────────
+package "Production (démo PFE)" #EBF8FF {
+  component "Vercel\n(React / Vite)" as Vercel #BEE3F8
+  component "VM Azure\nUbuntu + Docker Compose" as Azure #BEE3F8
+  component "Gateway :8080\n+ 4 microservices" as Backend
+  component "PostgreSQL x3\n+ Ollama + n8n" as Data
+
+  Vercel -down-> Backend : rewrites\n/api, /ws
+  Backend --> Data
+}
+
+GHA ..> Azure : deploy.yml\n(SSH + compose up)
+GHCR ..> Azure : images (optionnel)
+
+' ── Local ───────────────────────────────────────────────────────────
+package "Développement local" #F0FFF4 {
+  component "npm run dev\n(Vite :5173)" as Vite #C6F6D5
+  component "Docker Compose\nlocalhost:8080" as Local
+
+  Vite --> Local : proxy /api
+}
+
+' ── Observabilité ───────────────────────────────────────────────────
+package "Observabilité (optionnelle)" #FFFAF0 {
+  component "Prometheus :9090" as Prom #FEEBC8
+  component "Grafana :3000" as Graf #FEEBC8
+  component "Loki + Promtail" as Loki #FEEBC8
+
+  Prom --> Graf : métriques
+  Loki --> Graf : logs
+  Backend ..> Prom : /actuator/prometheus
+  Backend ..> Loki : logs Docker
+}
+
+note bottom of Azure
+  **IP publique** :8080 (NSG)
+  Comptes démo : admin / client / installateur
+end note
+
+note bottom of Vercel
+  **vercel.json** : rewrites vers Azure
+  Pas de VITE_API_URL en prod
+end note
+
+@enduml

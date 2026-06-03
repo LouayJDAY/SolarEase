@@ -24,7 +24,7 @@ import RejectModal from "../components/RejectModal";
 import { useAdminDemandsLive } from "../hooks/useAdminDemandsLive";
 import { useRequestHotkeys } from "../components/requests/useRequestHotkeys";
 
-type BusyAction = "validate" | "complete" | "reject" | "assign" | null;
+type BusyAction = "validate" | "complete" | "reject" | "assign" | "resend" | null;
 
 export default function AdminRequestsPage() {
   const { user } = useAuth();
@@ -265,13 +265,34 @@ export default function AdminRequestsPage() {
       setConvertOpen(false);
       fetchDemands({ silent: true });
       fetchCounts();
-      // Soft navigation to keep the admin in the Inbox; jump to the new project via button
-      toast.success(`Projet #${projectId} ouvert dans Projets`, {
-        duration: 4000,
-      });
+      toast.success(`Projet #${projectId} ouvert dans Projets`, { duration: 4000 });
     },
     [fetchDemands, fetchCounts]
   );
+
+  const handleResendInvitation = useCallback(async () => {
+    if (!selected) return;
+    setBusyAction("resend");
+    try {
+      const name = `${selected.clientFirstName ?? ""} ${selected.clientLastName ?? ""}`.trim();
+      await demandService.sendInvitation(
+        selected.id,
+        selected.clientEmail,
+        name || selected.clientEmail,
+        selected.projectId ?? null,
+        selected.clientPhone,
+        undefined,
+        true,
+        false
+      );
+      toast.success("Invitation renvoyée par email");
+      await fetchDemands();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Impossible de renvoyer l'invitation");
+    } finally {
+      setBusyAction(null);
+    }
+  }, [selected, fetchDemands]);
 
   // ── Hotkeys ───────────────────────────────────────────────────────────
   const hotkeyHandlersRef = useRef({
@@ -422,6 +443,8 @@ export default function AdminRequestsPage() {
                 onReject={() => setRejectOpen(true)}
                 onAssignToMe={handleAssignToMe}
                 onChangePriority={handlePriority}
+                onResendInvitation={handleResendInvitation}
+                resendBusy={busyAction === "resend"}
               />
             </div>
           </div>

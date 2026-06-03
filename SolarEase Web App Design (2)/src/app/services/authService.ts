@@ -68,6 +68,7 @@ export interface RegisterRequest {
 export interface VerifyOtpRequest {
   email: string;
   otpCode: string;
+  invitationToken?: string;
 }
 
 export interface ResendOtpRequest {

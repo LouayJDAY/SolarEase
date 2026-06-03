@@ -51,11 +51,13 @@ public class QuoteController {
     @GetMapping("/{id}")
     public ResponseEntity<QuoteDTO> getQuoteById(
             @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestHeader("X-User-Role") String userRole) {
         log.info("GET /api/quotes/{} - Fetching quote", id);
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN", "CLIENT");
 
-        QuoteDTO quote = quoteService.getQuoteById(id);
+        QuoteDTO quote = quoteService.getQuoteById(id, userRole, userId, userEmail);
         return ResponseEntity.ok(quote);
     }
 
@@ -66,11 +68,13 @@ public class QuoteController {
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<QuoteDTO>> getQuotesByProjectId(
             @PathVariable Long projectId,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestHeader("X-User-Role") String userRole) {
         log.info("GET /api/quotes/project/{} - Fetching quotes", projectId);
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN", "CLIENT");
 
-        List<QuoteDTO> quotes = quoteService.getQuotesByProjectId(projectId);
+        List<QuoteDTO> quotes = quoteService.getQuotesByProjectId(projectId, userRole, userId, userEmail);
         return ResponseEntity.ok(quotes);
     }
 
@@ -130,11 +134,13 @@ public class QuoteController {
     @GetMapping("/project/{projectId}/active")
     public ResponseEntity<List<QuoteDTO>> getActiveQuotesByProjectId(
             @PathVariable Long projectId,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail,
             @RequestHeader("X-User-Role") String userRole) {
         log.info("GET /api/quotes/project/{}/active - Fetching active quotes", projectId);
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN", "CLIENT");
 
-        List<QuoteDTO> quotes = quoteService.getActiveQuotesByProjectId(projectId);
+        List<QuoteDTO> quotes = quoteService.getActiveQuotesByProjectId(projectId, userRole, userId, userEmail);
         return ResponseEntity.ok(quotes);
     }
 
@@ -152,6 +158,22 @@ public class QuoteController {
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
 
         QuoteDTO updated = quoteService.sendQuote(id, installerId, userRole);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Mark quote as expired (SENT → EXPIRED)
+     * PUT /api/quotes/{id}/expire
+     */
+    @PutMapping("/{id}/expire")
+    public ResponseEntity<QuoteDTO> expireQuote(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String callerId,
+            @RequestHeader("X-User-Role") String userRole) {
+        log.info("PUT /api/quotes/{}/expire - Expiring quote", id);
+        accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
+
+        QuoteDTO updated = quoteService.expireQuote(id, callerId, userRole);
         return ResponseEntity.ok(updated);
     }
 
