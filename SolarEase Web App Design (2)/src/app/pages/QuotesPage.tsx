@@ -106,7 +106,6 @@ export function QuotesPage() {
   }, [isAdmin]);
 
   useEffect(() => {
-    if (isAdmin) return;
     let mounted = true;
     setLoadingProjects(true);
     projectService
@@ -123,14 +122,14 @@ export function QuotesPage() {
     return () => {
       mounted = false;
     };
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
-    if (isAdmin || !createForProjectId) return;
+    if (!createForProjectId) return;
     setForm((prev) => ({ ...prev, projectId: createForProjectId }));
     setShowForm(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
-  }, [isAdmin, createForProjectId]);
+  }, [createForProjectId]);
 
   const fetchCatalog = async () => {
     setLoadingCatalog(true);
@@ -328,11 +327,11 @@ export function QuotesPage() {
             </h1>
             <p className="text-sm text-slate-500">
               {isAdmin
-                ? "Supervision globale des devis emis par les installateurs."
+                ? "Supervision globale et creation de devis pour tous les projets."
                 : "Creez, envoyez et suivez vos devis installateur."}
             </p>
           </div>
-          {!isAdmin && !showForm && (
+          {!showForm && (
             <button
               type="button"
               onClick={handleOpenForm}
@@ -358,7 +357,7 @@ export function QuotesPage() {
           showCounts={statusCounts}
         />
 
-        {!isAdmin && showForm && (
+        {showForm && (
           <section
             ref={formRef}
             className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm scroll-mt-24"
@@ -727,15 +726,13 @@ export function QuotesPage() {
             <QuoteList
               quotes={filteredQuotes}
               role={isAdmin ? "ADMIN" : "INSTALLER"}
-              onSend={!isAdmin ? handleSend : undefined}
-              onDelete={!isAdmin ? handleDelete : undefined}
+              onSend={handleSend}
+              onDelete={handleDelete}
               onPreviewPdf={(q) => quoteService.printQuotePdf(q)}
               onOpenDetail={(q) => navigate(`/quotes/${q.id}`)}
               emptyMessage={
                 quotes.length === 0
-                  ? isAdmin
-                    ? "Aucun devis enregistre sur la plateforme."
-                    : "Aucun devis pour le moment. Cliquez sur 'Nouveau devis' pour commencer."
+                  ? "Aucun devis pour le moment. Cliquez sur « Nouveau devis » pour commencer."
                   : "Aucun devis ne correspond aux filtres."
               }
             />

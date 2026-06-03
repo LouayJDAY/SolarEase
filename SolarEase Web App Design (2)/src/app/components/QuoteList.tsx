@@ -130,7 +130,7 @@ export function QuoteList({
               </div>
 
               <div className="flex flex-wrap md:flex-col gap-2 md:w-44 md:shrink-0">
-                {role === "INSTALLER" && quote.status === "DRAFT" && onSend && (
+                {role !== "CLIENT" && quote.status === "DRAFT" && onSend && (
                   <button
                     type="button"
                     onClick={() => onSend(quote.id)}
@@ -183,7 +183,7 @@ export function QuoteList({
                   </button>
                 )}
 
-                {role === "INSTALLER" && quote.status === "DRAFT" && onDelete && (
+                {role !== "CLIENT" && quote.status === "DRAFT" && onDelete && (
                   <button
                     type="button"
                     onClick={() => onDelete(quote.id)}
