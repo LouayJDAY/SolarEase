@@ -20,10 +20,10 @@ public interface ProductCatalogRepository extends JpaRepository<ProductCatalog, 
 
     @Query("SELECT p FROM ProductCatalog p WHERE " +
            "(:category IS NULL OR p.category = :category) AND " +
-           "(:q IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
-           "LOWER(p.reference) LIKE LOWER(CONCAT('%', :q, '%')))")
+           "(LOWER(p.name) LIKE :pattern OR " +
+           "(p.reference IS NOT NULL AND LOWER(p.reference) LIKE :pattern))")
     List<ProductCatalog> searchFiltered(
         @Param("category") ProductCatalog.Category category,
-        @Param("q") String query
+        @Param("pattern") String pattern
     );
 }

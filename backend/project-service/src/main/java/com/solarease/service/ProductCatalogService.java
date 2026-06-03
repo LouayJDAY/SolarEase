@@ -29,7 +29,16 @@ public class ProductCatalogService {
             } catch (IllegalArgumentException ignored) {}
         }
         String query = (q != null && !q.isBlank()) ? q.trim() : null;
-        return repository.searchFiltered(cat, query).stream().map(this::toDTO).collect(Collectors.toList());
+
+        if (cat == null && query == null) {
+            return getAll();
+        }
+        if (query == null) {
+            return repository.findByCategory(cat).stream().map(this::toDTO).collect(Collectors.toList());
+        }
+
+        String pattern = "%" + query.toLowerCase() + "%";
+        return repository.searchFiltered(cat, pattern).stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     @Transactional
