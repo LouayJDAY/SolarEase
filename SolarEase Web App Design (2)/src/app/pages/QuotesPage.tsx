@@ -141,6 +141,7 @@ export function QuotesPage() {
       setCatalogItems(results);
     } catch {
       setCatalogItems([]);
+      toast.error("Impossible de charger le catalogue produits");
     } finally {
       setLoadingCatalog(false);
     }
