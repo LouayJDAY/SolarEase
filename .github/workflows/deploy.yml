@@ -36,7 +36,9 @@ jobs:
             cd ~/SolarEase
             git fetch origin main
             git checkout main
-            git pull --ff-only origin main
+            # VM must mirror origin exactly (.env stays untracked via .gitignore)
+            git reset --hard origin/main
+            git clean -fd
             cd backend
             docker compose up -d --build
             echo "Waiting for gateway health..."
