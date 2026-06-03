@@ -23,7 +23,8 @@ const catalogService = {
     const params = new URLSearchParams();
     if (q) params.append("q", q);
     if (category) params.append("category", category);
-    const res = await api.get<CatalogProduct[]>(`/catalog?${params.toString()}`);
+    const qs = params.toString();
+    const res = await api.get<CatalogProduct[]>(qs ? `/catalog?${qs}` : "/catalog");
     return res.data;
   },
 
