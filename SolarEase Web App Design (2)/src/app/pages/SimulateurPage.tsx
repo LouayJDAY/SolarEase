@@ -11,16 +11,23 @@ import {
   ArrowRight,
   CheckCircle,
   Info,
+  MapPin,
+  Sun,
 } from "lucide-react";
 import { motion } from "motion/react";
 import InvoiceUploadModal from "../components/InvoiceUploadModal";
+import {
+  getSolarRegion,
+  IRRADIANCE_LABELS,
+  SOLAR_REGIONS,
+} from "../constants/solarRegions";
 
 export function SimulateurPage() {
   // Paramètres validés entreprise (Tunisie)
   const USABLE_SURFACE_COEFFICIENT = 0.7;
   const PANEL_AREA_M2 = 1.9;
   const PANEL_POWER_KW = 0.4;
-  const PRODUCTIVITY_KWH_PER_KWP = 1600;
+  const DEFAULT_PRODUCTIVITY_KWH_PER_KWP = 1600;
   const ELECTRICITY_PRICE_TND_KWH = 0.28;
   const INSTALLED_COST_TND_PER_KW = 2500;
   const CO2_FACTOR_KG_PER_KWH = 0.6;
@@ -47,18 +54,26 @@ export function SimulateurPage() {
     setFormData({ ...formData, [field]: value });
   };
 
+  const selectedRegion = getSolarRegion(formData.region);
+  const productivityKwhPerKwp =
+    selectedRegion?.productivityKwhPerKwp ?? DEFAULT_PRODUCTIVITY_KWH_PER_KWP;
+
   const calculateResults = () => {
     const quarterlyBill = parseFloat(formData.quarterlyBill);
     const roofArea = parseFloat(formData.roofArea);
+    const regionProductivity =
+      getSolarRegion(formData.region)?.productivityKwhPerKwp ??
+      DEFAULT_PRODUCTIVITY_KWH_PER_KWP;
 
     const roofLimitedSystemSize =
       (roofArea * USABLE_SURFACE_COEFFICIENT * PANEL_POWER_KW) / PANEL_AREA_M2;
     const billLimitedSystemSize =
-      (quarterlyBill * 4) / (PRODUCTIVITY_KWH_PER_KWP * ELECTRICITY_PRICE_TND_KWH);
+      (quarterlyBill * 4) /
+      (regionProductivity * ELECTRICITY_PRICE_TND_KWH);
 
     const systemSize = Math.min(roofLimitedSystemSize, billLimitedSystemSize);
     const estimatedCost = systemSize * INSTALLED_COST_TND_PER_KW;
-    const annualProduction = systemSize * PRODUCTIVITY_KWH_PER_KWP;
+    const annualProduction = systemSize * regionProductivity;
     const annualSavings = annualProduction * ELECTRICITY_PRICE_TND_KWH;
     const roi = estimatedCost / annualSavings;
     const co2Reduction = annualProduction * CO2_FACTOR_KG_PER_KWH;
@@ -217,12 +232,20 @@ export function SimulateurPage() {
                     </h3>
                     <p className="text-sm text-gray-700 mb-2">
                       Cette estimation est basée sur une consommation moyenne et
-                      un ensoleillement typique de la région{" "}
-                      <strong>{formData.region}</strong>. Le calcul prend en
-                      compte :
+                      l&apos;ensoleillement de{" "}
+                      <strong>
+                        {selectedRegion?.label ?? formData.region}
+                      </strong>
+                      {selectedRegion
+                        ? ` (~${selectedRegion.productivityKwhPerKwp} kWh/kWc/an)`
+                        : ""}
+                      . Le calcul prend en compte :
                     </p>
                     <ul className="text-sm text-gray-700 space-y-1 ml-4">
-                      <li>• Production solaire moyenne de 1600 kWh/kWc/an</li>
+                      <li>
+                        • Productivité régionale de {productivityKwhPerKwp}{" "}
+                        kWh/kWc/an
+                      </li>
                       <li>
                         • Tarif STEG moyen de 0.18 TND/kWh (progressif selon
                         tranches)
@@ -549,30 +572,93 @@ export function SimulateurPage() {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <h2 className="text-2xl font-semibold text-secondary mb-6">
+                  <h2 className="text-2xl font-semibold text-secondary mb-2">
                     Dans quelle région habitez-vous ?
                   </h2>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Région
-                    </label>
-                    <select
-                      value={formData.region}
-                      onChange={(e) =>
-                        handleInputChange("region", e.target.value)
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="">Sélectionner une région</option>
-                      <option value="Tunis">Grand Tunis</option>
-                      <option value="Nord">Nord (Bizerte, Béja, Jendouba)</option>
-                      <option value="Centre">
-                        Centre (Sousse, Monastir, Mahdia)
-                      </option>
-                      <option value="Sud">Sud (Sfax, Gabès, Médenine)</option>
-                      <option value="Sahel">Sahel</option>
-                    </select>
+                  <p className="text-gray-600 mb-6">
+                    L&apos;ensoleillement varie selon la zone — cela influence
+                    directement la production estimée.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                    {SOLAR_REGIONS.map((region) => {
+                      const selected = formData.region === region.id;
+                      const irr = IRRADIANCE_LABELS[region.irradiance];
+                      const barWidth =
+                        (region.productivityKwhPerKwp / 1780) * 100;
+
+                      return (
+                        <button
+                          key={region.id}
+                          type="button"
+                          onClick={() =>
+                            handleInputChange("region", region.id)
+                          }
+                          className={`p-4 rounded-xl border-2 text-left transition-all ${
+                            selected
+                              ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                              : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-primary shrink-0" />
+                              <span className="font-medium text-secondary">
+                                {region.label}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${irr.bg} ${irr.color}`}
+                            >
+                              {irr.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mb-3 line-clamp-1">
+                            {region.governorates}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-amber-400 to-primary rounded-full transition-all"
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700 whitespace-nowrap">
+                              {region.productivityKwhPerKwp} kWh/kWc
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {selectedRegion ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shrink-0">
+                          <Sun className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-secondary">
+                            {selectedRegion.label} —{" "}
+                            {selectedRegion.productivityKwhPerKwp} kWh/kWc/an
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {selectedRegion.hint}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            ~{selectedRegion.sunHoursPerDay} h d&apos;ensoleillement
+                            moyen / jour
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                      Sélectionnez votre zone pour affiner la simulation
+                    </div>
+                  )}
                 </motion.div>
               )}
 
