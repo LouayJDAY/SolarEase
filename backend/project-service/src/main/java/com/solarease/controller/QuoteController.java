@@ -1,8 +1,10 @@
 package com.solarease.controller;
 
+import com.solarease.dto.QuoteCreateRequest;
 import com.solarease.dto.QuoteDTO;
 import com.solarease.service.AccessControlService;
 import com.solarease.service.QuoteService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,11 +38,20 @@ public class QuoteController {
     public ResponseEntity<QuoteDTO> createQuote(
             @RequestHeader("X-User-Id") String installerId,
             @RequestHeader("X-User-Role") String userRole,
-            @RequestBody QuoteDTO quoteDTO) {
+            @RequestBody @Valid QuoteCreateRequest request) {
         log.info("POST /api/quotes - Creating quote");
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
 
-        QuoteDTO created = quoteService.createQuote(quoteDTO.getProjectId(), installerId, userRole, quoteDTO);
+        QuoteDTO quoteDTO = QuoteDTO.builder()
+                .projectId(request.getProjectId())
+                .description(request.getDescription())
+                .laborCost(request.getLaborCost())
+                .materialsCost(request.getMaterialsCost())
+                .tax(request.getTax())
+                .notes(request.getNotes())
+                .build();
+
+        QuoteDTO created = quoteService.createQuote(request.getProjectId(), installerId, userRole, quoteDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

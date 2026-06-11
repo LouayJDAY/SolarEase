@@ -48,6 +48,12 @@ public class SolarInstallation {
 
     private Double nightlyConsumptionKwh; // Consommation nocturne couverte (kWh/jour)
 
+    /** ROOF, CONSUMPTION or BOTH_EQUAL — which constraint limited panel count. */
+    private String sizingConstraint;
+
+    /** Daily consumption (kWh) used for sizing, if any. */
+    private Double dailyConsumptionUsed;
+
     @JsonIgnore
     @OneToOne(mappedBy = "solarInstallation")
     private Dimensioning dimensioning;

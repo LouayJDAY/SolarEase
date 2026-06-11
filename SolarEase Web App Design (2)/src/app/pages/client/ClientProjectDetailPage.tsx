@@ -1,5 +1,18 @@
 import { Link, useParams } from "react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import {
+  connectWebSocket,
+  releaseWebSocketConnection,
+  subscribeToFieldUpdates,
+  subscribeToNotifications,
+  subscribeToProjectUpdates,
+  unsubscribeFromFieldUpdates,
+  unsubscribeFromNotifications,
+  unsubscribeFromProjectUpdates,
+  FieldUpdatePayload,
+  ProjectLiveUpdateEvent,
+} from "../../services/websocketService";
 import { StatusBadge } from "../../components/client/StatusBadge";
 import { ProjectStepper, ProjectStep } from "../../components/client/ProjectStepper";
 import {
@@ -17,6 +30,16 @@ import projectService, { ProjectResponse } from "../../services/projectService";
 import quoteService, { Quote } from "../../services/quoteService";
 import documentService from "../../services/documentService";
 import fieldUpdateService, { FieldUpdate } from "../../services/fieldUpdateService";
+import dimensioningService from "../../services/dimensioningService";
+import { ProductionChart } from "../../components/client/ProductionChart";
+import {
+  buildEstimatedMonthlyProduction,
+  getLatestDimensioningAnnualKwh,
+} from "../../utils/estimatedProduction";
+import {
+  getProjectCompletedSteps,
+  getProjectCurrentStep,
+} from "../../utils/projectProgress";
 import { QuoteCard } from "../../components/client/QuoteCard";
 import { QuoteAcceptModal } from "../../components/client/QuoteAcceptModal";
 import { QuoteRejectModal } from "../../components/client/QuoteRejectModal";
@@ -24,6 +47,7 @@ import { MonInstallationCard } from "../../components/client/MonInstallationCard
 
 export function ClientProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -33,19 +57,26 @@ export function ClientProjectDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [latestFieldUpdate, setLatestFieldUpdate] = useState<FieldUpdate | null>(null);
   const [recentPhotos, setRecentPhotos] = useState<{ url: string; date: string; caption?: string | null }[]>([]);
+  const [productionData, setProductionData] = useState<
+    { month: string; production: number; target: number }[]
+  >([]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
-      const [proj, projQuotes, projDocs] = await Promise.all([
+      const [proj, projQuotes, projDocs, dimensionings] = await Promise.all([
         projectService.getProject(Number(id)),
         quoteService.getProjectQuotes(Number(id)).catch(() => [] as Quote[]),
         documentService.getDocumentsByProject(Number(id)).catch(() => []),
+        dimensioningService.getByProject(Number(id)).catch(() => []),
       ]);
       setProject(proj);
       setQuotes(projQuotes);
       setDocuments(projDocs);
+
+      const annualKwh = getLatestDimensioningAnnualKwh(dimensionings);
+      setProductionData(annualKwh ? buildEstimatedMonthlyProduction(annualKwh) : []);
 
       const updates = await fieldUpdateService
         .getFieldUpdates(Number(id))
@@ -60,13 +91,72 @@ export function ClientProjectDetailPage() {
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchData();
-  }, [id]);
+    void fetchData();
+  }, [fetchData]);
+
+  // Real-time sync: stepper, progress, quotes, field photos
+  useEffect(() => {
+    if (!id || !user?.userId) return;
+    const projectId = Number(id);
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    const refresh = () => {
+      void fetchData(true);
+    };
+    const onNotif = () => {
+      refresh();
+    };
+    const onFieldUpdate = (update: FieldUpdatePayload) => {
+      setProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentProgress: update.progressPercent ?? prev.currentProgress,
+              currentPhase: update.currentPhase ?? prev.currentPhase,
+              currentPhaseLabel: update.currentPhaseLabel ?? prev.currentPhaseLabel,
+              currentFieldStatus: update.fieldStatus ?? prev.currentFieldStatus,
+              status:
+                (update.progressPercent ?? 0) > 0 && prev.status === "CREATED"
+                  ? "IN_PROGRESS"
+                  : prev.status,
+            }
+          : prev
+      );
+      refresh();
+    };
+    const onProjectUpdate = (event: ProjectLiveUpdateEvent) => {
+      setProject((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: (event.status as ProjectResponse["status"]) ?? prev.status,
+              currentProgress: event.currentProgress ?? prev.currentProgress,
+              currentPhase: event.currentPhase ?? prev.currentPhase,
+              currentFieldStatus: event.currentFieldStatus ?? prev.currentFieldStatus,
+            }
+          : prev
+      );
+      refresh();
+    };
+
+    connectWebSocket(user.userId, token);
+    subscribeToNotifications(user.userId, onNotif);
+    subscribeToProjectUpdates(projectId, onProjectUpdate);
+    subscribeToFieldUpdates(projectId, onFieldUpdate);
+
+    return () => {
+      unsubscribeFromNotifications(onNotif);
+      unsubscribeFromProjectUpdates(projectId);
+      unsubscribeFromFieldUpdates(projectId);
+      releaseWebSocketConnection();
+    };
+  }, [id, user?.userId, fetchData]);
 
   const handleAccept = async () => {
     if (!acceptModal) return;
@@ -97,33 +187,6 @@ export function ClientProjectDetailPage() {
       setActionLoading(false);
     }
   };
-
-  const stepMap: Record<string, ProjectStep> = {
-    CREATED: "STUDY",
-    EN_PREPARATION: "STUDY",
-    INSTALLATEUR_AFFECTE: "VALIDATION",
-    IN_PROGRESS: "INSTALLATION",
-    COMPLETED: "COMPLETED",
-    CANCELLED: "STUDY",
-  };
-
-  const completedStepsMap: Record<string, ProjectStep[]> = {
-    CREATED: [],
-    EN_PREPARATION: [],
-    INSTALLATEUR_AFFECTE: ["STUDY"],
-    IN_PROGRESS: ["STUDY", "VALIDATION"],
-    COMPLETED: ["STUDY", "VALIDATION", "INSTALLATION", "COMMISSIONING", "COMPLETED"],
-    CANCELLED: [],
-  };
-
-  const productionData = [
-    { month: "Oct", production: 680, target: 700 },
-    { month: "Nov", production: 720, target: 700 },
-    { month: "Déc", production: 650, target: 700 },
-    { month: "Jan", production: 780, target: 700 },
-    { month: "Fév", production: 810, target: 700 },
-    { month: "Mar", production: 850, target: 700 },
-  ];
 
   if (loading) {
     return (
@@ -190,8 +253,8 @@ export function ClientProjectDetailPage() {
         </div>
 
         <ProjectStepper
-          currentStep={stepMap[status] ?? "STUDY"}
-          completedSteps={completedStepsMap[status] ?? []}
+          currentStep={getProjectCurrentStep(project)}
+          completedSteps={getProjectCompletedSteps(project)}
         />
       </motion.div>
 
@@ -243,20 +306,49 @@ export function ClientProjectDetailPage() {
                     </p>
                   </div>
                 </div>
-                {doc.url && (
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await documentService.openDocument(doc.id);
+                      } catch {
+                        toast.error("Impossible d'ouvrir le document");
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                  >
+                    Voir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await documentService.downloadDocument(doc.id, doc.name);
+                        toast.success("Téléchargement démarré");
+                      } catch {
+                        toast.error("Impossible de télécharger le document");
+                      }
+                    }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors text-sm"
                   >
                     <Download className="w-4 h-4" />
                     Télécharger
-                  </a>
-                )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {productionData.length > 0 && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <h2 className="text-xl font-bold text-secondary mb-2">Production estimée (kWh/mois)</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Estimation basée sur le dimensionnement PVGIS de ce projet
+          </p>
+          <ProductionChart data={productionData} type="bar" />
         </div>
       )}
 

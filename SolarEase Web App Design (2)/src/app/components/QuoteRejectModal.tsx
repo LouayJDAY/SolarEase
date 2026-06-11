@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
+import { quoteRejectSchema } from "../validation/commerceSchemas";
 
 interface Props {
   open: boolean;
@@ -39,9 +40,13 @@ export function QuoteRejectModal({ open, quoteNumber, totalAmount, onClose, onCo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const parsed = quoteRejectSchema.safeParse({ rejectionReason: reason.trim() });
+    if (!parsed.success) {
+      return;
+    }
     setSubmitting(true);
     try {
-      await onConfirm(reason.trim());
+      await onConfirm(parsed.data.rejectionReason ?? "");
     } finally {
       setSubmitting(false);
     }

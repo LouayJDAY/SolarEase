@@ -11,6 +11,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -49,9 +51,24 @@ public class N8nInvoiceWebhookService {
             return;
         }
 
-        log.info("n8n invoice webhook → clientEmail={} invoice={} project={}",
-                clientEmail.get(), invoice.getNumber(), project.getName());
+        Map<String, Object> payload = buildPayload(invoice, project, clientEmail.get(), trigger);
+        Runnable send = () -> dispatchWebhook(payload, invoice.getId(), invoice.getNumber(), trigger);
 
+        // Defer until DB commit so n8n can fetch the PDF (invoice row must be visible).
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    send.run();
+                }
+            });
+            log.debug("n8n invoice webhook scheduled after commit for invoice {} ({})", invoice.getNumber(), trigger);
+        } else {
+            send.run();
+        }
+    }
+
+    private Map<String, Object> buildPayload(InvoiceEntity invoice, Project project, String clientEmail, String trigger) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("event", "invoice.ready");
         payload.put("trigger", trigger);
@@ -59,18 +76,25 @@ public class N8nInvoiceWebhookService {
         payload.put("invoiceNumber", invoice.getNumber());
         payload.put("projectId", project.getId());
         payload.put("projectName", project.getName());
-        payload.put("clientEmail", clientEmail.get());
+        payload.put("clientEmail", clientEmail);
         payload.put("amount", invoice.getAmount());
         payload.put("dueDate", invoice.getDueDate() != null ? invoice.getDueDate().toString() : null);
         payload.put("pdfUrl", "http://project-service:8082/api/internal/invoices/" + invoice.getId() + "/pdf");
+        return payload;
+    }
+
+    private void dispatchWebhook(Map<String, Object> payload, Long invoiceId, String invoiceNumber, String trigger) {
+        String clientEmail = (String) payload.get("clientEmail");
+        log.info("n8n invoice webhook → clientEmail={} invoice={} trigger={}", clientEmail, invoiceNumber, trigger);
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            restTemplate.postForEntity(invoiceWebhookUrl, new HttpEntity<>(payload, headers), String.class);
-            log.info("n8n invoice webhook sent for invoice {} ({})", invoice.getNumber(), trigger);
+            var response = restTemplate.postForEntity(invoiceWebhookUrl, new HttpEntity<>(payload, headers), String.class);
+            log.info("n8n invoice webhook sent for invoice {} ({}) status={}",
+                    invoiceNumber, trigger, response.getStatusCode().value());
         } catch (Exception e) {
-            log.error("Failed to call n8n invoice webhook for invoice {}: {}", invoice.getId(), e.getMessage());
+            log.error("Failed to call n8n invoice webhook for invoice {}: {}", invoiceId, e.getMessage());
         }
     }
 

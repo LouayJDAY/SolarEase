@@ -28,6 +28,9 @@ public class NotificationWebSocketService {
     /** STOMP topic broadcasting demand events to every subscribed admin. */
     public static final String ADMIN_DEMANDS_TOPIC = "/topic/admin/demands";
 
+    /** STOMP topic telling every subscribed admin dashboard to reload its KPIs. */
+    public static final String ADMIN_DASHBOARD_TOPIC = "/topic/admin/dashboard";
+
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationRepository notificationRepository;
 
@@ -102,6 +105,19 @@ public class NotificationWebSocketService {
                 String.format("%s vous a envoyé un message concernant le projet « %s ».", senderName, projectName));
     }
 
+    public void notifySupportTicketCreated(String installerId, String clientName, String subject, Long ticketId) {
+        notifyUser(installerId,
+                "Nouveau ticket support",
+                String.format("%s a ouvert le ticket « %s » (#%d).", clientName, subject, ticketId));
+    }
+
+    /** Bell notification visible to every admin (virtual broadcast user). */
+    public void notifySupportTicketCreatedForAdmin(String clientName, String subject, Long ticketId) {
+        notifyUser(ADMIN_BROADCAST_USER_ID,
+                "Nouveau ticket support",
+                String.format("%s a ouvert le ticket « %s » (#%d). Consultez l'espace Support.", clientName, subject, ticketId));
+    }
+
     // ── Demand inbox notifications ────────────────────────────────────────────
 
     /**
@@ -110,6 +126,44 @@ public class NotificationWebSocketService {
      * recipient. The frontend admin Inbox plays a sound and prepends the new
      * demand to the list without reloading.
      */
+    /**
+     * Push a lightweight refresh signal so connected admin dashboards reload stats
+     * without waiting for the HTTP polling interval.
+     */
+    public void notifyAdminDashboardRefresh(String event) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", event);
+        payload.put("timestamp", LocalDateTime.now().toString());
+        try {
+            messagingTemplate.convertAndSend(ADMIN_DASHBOARD_TOPIC, payload);
+            log.debug("Admin dashboard refresh broadcast: {}", event);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast admin dashboard refresh ({}): {}", event, e.getMessage());
+        }
+    }
+
+    /**
+     * Notify a specific installer dashboard (scoped stats) and the global admin view.
+     */
+    public void notifyDashboardRefresh(String event, String installerId) {
+        notifyAdminDashboardRefresh(event);
+        if (installerId == null || installerId.isBlank()) {
+            return;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", event);
+        payload.put("installerId", installerId);
+        payload.put("timestamp", LocalDateTime.now().toString());
+        try {
+            messagingTemplate.convertAndSend(
+                    "/topic/installer/" + installerId + "/dashboard", payload);
+            log.debug("Installer dashboard refresh broadcast: {} -> {}", event, installerId);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast installer dashboard refresh for {}: {}",
+                    installerId, e.getMessage());
+        }
+    }
+
     public void notifyAdminsOnNewDemand(DemandDTO demand) {
         if (demand == null) {
             return;
@@ -156,6 +210,7 @@ public class NotificationWebSocketService {
         } catch (Exception e) {
             log.warn("Failed to broadcast new-demand event for demand {}: {}", demand.getId(), e.getMessage());
         }
+        notifyAdminDashboardRefresh("DEMAND_CREATED");
     }
 
     /**

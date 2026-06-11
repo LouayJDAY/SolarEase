@@ -1,0 +1,41 @@
+@startuml uc-s1-global
+title Diagramme de cas d'utilisation global -- Sprint 1
+
+left to right direction
+skinparam shadowing false
+skinparam usecase {
+    BackgroundColor #FFFFFF
+    BorderColor     #2C5282
+}
+skinparam actor {
+    BorderColor #2C5282
+}
+
+actor Admin
+actor Client
+
+rectangle "Identity Service" {
+    usecase "S'inscrire"           as UC_Register
+    usecase "Renvoyer OTP"         as UC_ResendOtp
+    usecase "S'authentifier"       as UC_Auth
+    usecase "Gérer les installateurs" as UC_Installers
+    usecase "Consulter son profil"    as UC_View
+    usecase "Modifier son profil"     as UC_Edit
+}
+
+Client --> UC_Register
+Client --> UC_Auth
+Client --> UC_View
+Client --> UC_Edit
+
+Admin --> UC_Auth
+Admin --> UC_Installers
+Admin --> UC_View
+
+UC_Register ..> UC_ResendOtp : <<extend>>
+
+UC_Installers ..> UC_Auth : <<include>>a
+UC_View       ..> UC_Auth : <<include>>
+UC_Edit       ..> UC_Auth : <<include>>
+
+@enduml

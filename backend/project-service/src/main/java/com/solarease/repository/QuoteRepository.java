@@ -70,6 +70,12 @@ public interface QuoteRepository extends JpaRepository<QuoteEntity, Long> {
     );
 
     /**
+     * Find quotes visible to a client (excludes installer-only DRAFT status).
+     */
+    @Query("SELECT q FROM QuoteEntity q WHERE q.clientId = :clientId AND q.status <> 'DRAFT' ORDER BY q.createdAt DESC")
+    Page<QuoteEntity> findVisibleByClientId(@Param("clientId") Long clientId, Pageable pageable);
+
+    /**
      * Find all active quotes (SENT or ACCEPTED) for a project
      */
     @Query("SELECT q FROM QuoteEntity q WHERE q.project.id = :projectId AND q.status IN ('SENT', 'ACCEPTED') ORDER BY q.createdAt DESC")

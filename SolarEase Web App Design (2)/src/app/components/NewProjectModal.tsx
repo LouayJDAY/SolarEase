@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { X, MapPin, DollarSign, User } from "lucide-react";
+import { X, DollarSign, User, MapPin } from "lucide-react";
 import clientService, { ClientResponse } from "../services/clientService";
+import { LocationPicker, LocationValue } from "./LocationPicker";
+import { isValidProjectCoordinates } from "../utils/geo";
+import { projectCreateSchema } from "../validation/projectSchemas";
+import { zodFieldErrors } from "../validation/common";
 
 interface NewProjectModalProps {
   isOpen: boolean;
@@ -36,14 +40,19 @@ export function NewProjectModal({
     name: "",
     client: "",
     location: "",
-    peakPower: "",
+  });
+  const [locationGeo, setLocationGeo] = useState<LocationValue>({
+    location: "",
+    latitude: null,
+    longitude: null,
   });
 
   useEffect(() => {
     if (isOpen) {
       setSubmitError("");
       setClientsError("");
-      setFieldErrors({ name: "", client: "", location: "", peakPower: "" });
+      setFieldErrors({ name: "", client: "", location: "" });
+      setLocationGeo({ location: "", latitude: null, longitude: null });
       setIsLoadingClients(true);
 
       clientService
@@ -58,22 +67,42 @@ export function NewProjectModal({
   }, [isOpen]);
 
   const validate = () => {
-    const nextErrors = {
-      name: formData.name.trim() ? "" : "Le nom du projet est requis.",
-      client: formData.client ? "" : "Veuillez sélectionner un client.",
-      location: formData.location.trim() ? "" : "La localisation est requise.",
-      peakPower: "",
-    };
+    const locationOk =
+      locationGeo.location.trim().length > 0 &&
+      isValidProjectCoordinates(locationGeo.latitude, locationGeo.longitude);
 
-    const peakPower = parseFloat(formData.peakPower);
-    if (!formData.peakPower.trim()) {
-      nextErrors.peakPower = "La puissance crête est requise.";
-    } else if (Number.isNaN(peakPower) || peakPower <= 0) {
-      nextErrors.peakPower = "La puissance doit être supérieure à 0.";
+    if (!locationOk) {
+      setFieldErrors({
+        name: formData.name.trim() ? "" : "Le nom du projet est requis.",
+        client: formData.client ? "" : "Veuillez sélectionner un client.",
+        location: "Sélectionnez l'emplacement du site sur la carte (requis pour PVGIS).",
+      });
+      return false;
     }
 
-    setFieldErrors(nextErrors);
-    return !nextErrors.name && !nextErrors.client && !nextErrors.location && !nextErrors.peakPower;
+    const parsed = projectCreateSchema.safeParse({
+      name: formData.name.trim(),
+      clientId: formData.client,
+      latitude: locationGeo.latitude,
+      longitude: locationGeo.longitude,
+      availableArea: formData.availableArea.trim() || undefined,
+      inclination: formData.inclination.trim() || undefined,
+      orientation: formData.orientation.trim() || undefined,
+      budget: formData.budget.trim() || undefined,
+    });
+
+    if (!parsed.success) {
+      const zErr = zodFieldErrors(parsed.error);
+      setFieldErrors({
+        name: zErr.name || (formData.name.trim() ? "" : "Le nom du projet est requis."),
+        client: zErr.clientId || (formData.client ? "" : "Veuillez sélectionner un client."),
+        location: zErr.latitude || zErr.longitude || "",
+      });
+      return false;
+    }
+
+    setFieldErrors({ name: "", client: "", location: "" });
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,10 +115,10 @@ export function NewProjectModal({
       ...formData,
       name: formData.name.trim(),
       description: formData.description.trim(),
-      location: formData.location.trim(),
-      latitude: formData.latitude.trim(),
-      longitude: formData.longitude.trim(),
-      peakPower: formData.peakPower.trim(),
+      location: locationGeo.location.trim(),
+      latitude: String(locationGeo.latitude ?? ""),
+      longitude: String(locationGeo.longitude ?? ""),
+      peakPower: formData.peakPower.trim() || "0",
       availableArea: formData.availableArea.trim(),
       budget: formData.budget.trim(),
     };
@@ -104,6 +133,7 @@ export function NewProjectModal({
       }
 
       onClose();
+      setLocationGeo({ location: "", latitude: null, longitude: null });
       setFormData({
         name: "",
         description: "",
@@ -135,7 +165,7 @@ export function NewProjectModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <h2 className="text-xl font-semibold text-secondary">
@@ -195,151 +225,83 @@ export function NewProjectModal({
             />
           </div>
 
-          {/* Client & Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Client <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <select
-                  required
-                  value={formData.client}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client: e.target.value })
-                  }
-                  disabled={isLoadingClients}
-                  className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none bg-white disabled:bg-slate-100 ${
-                    fieldErrors.client ? "border-red-400" : "border-gray-300"
-                  }`}
-                >
-                  <option value="">
-                    {isLoadingClients ? "Chargement des clients..." : "Sélectionner un client"}
+          {/* Client */}
+          <div>
+            <label className="block text-sm font-medium text-secondary mb-2">
+              Client <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <select
+                required
+                value={formData.client}
+                onChange={(e) =>
+                  setFormData({ ...formData, client: e.target.value })
+                }
+                disabled={isLoadingClients}
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors appearance-none bg-white disabled:bg-slate-100 ${
+                  fieldErrors.client ? "border-red-400" : "border-gray-300"
+                }`}
+              >
+                <option value="">
+                  {isLoadingClients ? "Chargement des clients..." : "Sélectionner un client"}
+                </option>
+                {clients.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.firstName} {c.lastName}
                   </option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.firstName} {c.lastName}
-                    </option>
-                  ))}
-                </select>
+                ))}
+              </select>
+            </div>
+            {fieldErrors.client && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.client}</p>
+            )}
+            {clientsError && (
+              <p className="mt-1 text-xs text-red-600">{clientsError}</p>
+            )}
+          </div>
+
+          <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <MapPin className="h-4 w-4 text-primary" />
               </div>
-              {fieldErrors.client && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.client}</p>
-              )}
-              {clientsError && (
-                <p className="mt-1 text-xs text-red-600">{clientsError}</p>
-              )}
+              <div>
+                <h3 className="text-sm font-semibold text-secondary">Site & dimensionnement</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Emplacement météo PVGIS et paramètres du toit.
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Localisation <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <LocationPicker
+              value={locationGeo}
+              onChange={setLocationGeo}
+              error={fieldErrors.location || undefined}
+              compact
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-secondary mb-2">
+                  Surface disponible (m²)
+                </label>
                 <input
-                  type="text"
-                  required
-                  value={formData.location}
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={formData.availableArea}
                   onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
+                    setFormData({ ...formData, availableArea: e.target.value })
                   }
-                  className={`w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
-                    fieldErrors.location ? "border-red-400" : "border-gray-300"
-                  }`}
-                  placeholder="Ex: Tunis, Tunisie"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white"
+                  placeholder="Ex: 25"
                 />
               </div>
-              {fieldErrors.location && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.location}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Latitude & Longitude */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Latitude
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, latitude: e.target.value })
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                placeholder="Ex: 36.8065"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Longitude
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, longitude: e.target.value })
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                placeholder="Ex: 10.1815"
-              />
-            </div>
-          </div>
-
-          {/* Peak Power & Available Area */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Puissance crête (kWc) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                required
-                value={formData.peakPower}
-                onChange={(e) =>
-                  setFormData({ ...formData, peakPower: e.target.value })
-                }
-                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
-                  fieldErrors.peakPower ? "border-red-400" : "border-gray-300"
-                }`}
-                placeholder="Ex: 3.5"
-              />
-              {fieldErrors.peakPower && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.peakPower}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Surface disponible (m²)
-              </label>
-              <input
-                type="number"
-                step="1"
-                value={formData.availableArea}
-                onChange={(e) =>
-                  setFormData({ ...formData, availableArea: e.target.value })
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                placeholder="Ex: 25"
-              />
-            </div>
-          </div>
-
-          {/* Inclination & Orientation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary mb-2">
-                Inclinaison (°)
-              </label>
-              <div className="space-y-2">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
+                  Inclinaison ({formData.inclination}°)
+                </label>
                 <input
                   type="range"
                   min="0"
@@ -349,16 +311,6 @@ export function NewProjectModal({
                     setFormData({ ...formData, inclination: e.target.value })
                   }
                   className="w-full accent-primary"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="90"
-                  value={formData.inclination}
-                  onChange={(e) =>
-                    setFormData({ ...formData, inclination: e.target.value })
-                  }
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                 />
               </div>
             </div>
@@ -375,34 +327,47 @@ export function NewProjectModal({
                 onChange={(e) =>
                   setFormData({ ...formData, orientation: e.target.value })
                 }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full max-w-xs px-4 py-2.5 border border-gray-300 rounded-lg bg-white"
                 placeholder="0 = Sud"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 0° = Sud, 90° = Ouest, -90° = Est
               </p>
             </div>
-          </div>
+          </section>
 
-          {/* Budget */}
-          <div>
-            <label className="block text-sm font-medium text-secondary mb-2">
-              Budget estimé (TND)
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="number"
-                step="100"
-                value={formData.budget}
-                onChange={(e) =>
-                  setFormData({ ...formData, budget: e.target.value })
-                }
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                placeholder="Ex: 12500"
-              />
+          <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <DollarSign className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-secondary">Informations commerciales</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Budget client — la puissance sera calculée au dimensionnement.
+                </p>
+              </div>
             </div>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-secondary mb-2">
+                Budget estimé (TND)
+              </label>
+              <div className="relative max-w-sm">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="number"
+                  step="100"
+                  min="0"
+                  value={formData.budget}
+                  onChange={(e) =>
+                    setFormData({ ...formData, budget: e.target.value })
+                  }
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white"
+                  placeholder="Ex: 12500"
+                />
+              </div>
+            </div>
+          </section>
 
           {/* Form Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">

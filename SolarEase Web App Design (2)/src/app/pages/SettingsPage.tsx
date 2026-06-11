@@ -4,6 +4,8 @@ import { TopBar } from "../components/TopBar";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/authService";
 import settingsService from "../services/settingsService";
+import { changePasswordSchema, updateProfileSchema } from "../validation/authSchemas";
+import { getApiErrorMessage } from "../utils/apiError";
 import {
   User,
   Shield,
@@ -128,6 +130,11 @@ function ProfilTab({ onSave }: { onSave: () => void }) {
     : "SE";
 
   const handleSave = async () => {
+    const parsed = updateProfileSchema.safeParse({ firstName, lastName, phone });
+    if (!parsed.success) {
+      console.error(parsed.error.issues[0]?.message);
+      return;
+    }
     try {
       setSaving(true);
       const updated = await authService.updateProfile({ firstName, lastName, phone });
@@ -251,12 +258,13 @@ function SecuriteTab({ onSave }: { onSave: () => void }) {
 
   const handleChangePassword = async () => {
     setError("");
-    if (newPw !== confirmPw) {
-      setError("Les mots de passe ne correspondent pas");
-      return;
-    }
-    if (newPw.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères");
+    const parsed = changePasswordSchema.safeParse({
+      currentPassword: currentPw,
+      newPassword: newPw,
+      confirmPassword: confirmPw,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Données invalides.");
       return;
     }
     try {
@@ -266,8 +274,8 @@ function SecuriteTab({ onSave }: { onSave: () => void }) {
       setNewPw("");
       setConfirmPw("");
       onSave();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Erreur lors du changement de mot de passe");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setSaving(false);
     }

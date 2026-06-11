@@ -26,7 +26,21 @@ public class ClientRequest {
     @Email(message = "Invalid email format")
     private String email;
     
+    @Size(max = 20, message = "Phone number must be at most 20 characters")
     private String phoneNumber;
 
+    @Size(max = 500, message = "Address must be at most 500 characters")
     private String address;
+
+    @Size(max = 100, message = "City must be at most 100 characters")
+    private String city;
+
+    @Size(max = 20, message = "Postal code must be at most 20 characters")
+    private String postalCode;
+
+    @Size(max = 50, message = "Client type must be at most 50 characters")
+    private String clientType;
+
+    @Size(max = 1000, message = "Notes must be at most 1000 characters")
+    private String notes;
 }

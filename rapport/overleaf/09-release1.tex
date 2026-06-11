@@ -105,10 +105,14 @@ sont provisionnés par l'administrateur.
 
 \begin{figure}[H]
   \centering
+  \IfFileExists{uc-s1-global.png}{%
+    \includegraphics[width=0.88\textwidth]{uc-s1-global.png}%
+  }{%
   \IfFileExists{101.png}{%
     \includegraphics[width=0.88\textwidth]{101.png}%
   }{%
     \fbox{\parbox[c][8cm][c]{0.92\textwidth}{\centering Diagramme de cas d'utilisation global de Sprint 1}}%
+  }}%
   }
   \caption{Diagramme de cas d'utilisation global de Sprint~1}
   \label{fig:uc-s1}

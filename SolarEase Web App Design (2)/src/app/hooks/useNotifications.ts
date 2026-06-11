@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   connectWebSocket,
-  disconnectWebSocket,
+  releaseWebSocketConnection,
   subscribeToNotifications,
+  unsubscribeFromNotifications,
   NotificationPayload,
 } from "../services/websocketService";
 import notificationService from "../services/notificationService";
@@ -52,20 +53,23 @@ export function useNotifications({
   useEffect(() => {
     if (!userId || !token) return;
 
-    subscribeToNotifications(userId, (payload) => {
+    const handler = (payload: NotificationPayload) => {
       setNotifications((prev) => {
         const exists = prev.some((n) => String(n.id) === String(payload.id));
         if (exists) return prev;
         return [payload, ...prev];
       });
-    });
+    };
+
+    subscribeToNotifications(userId, handler);
 
     connectWebSocket(userId, token, {
       onConnected: () => setWsConnected(true),
     });
 
     return () => {
-      disconnectWebSocket();
+      unsubscribeFromNotifications(handler);
+      releaseWebSocketConnection();
       setWsConnected(false);
     };
   }, [userId, token]);

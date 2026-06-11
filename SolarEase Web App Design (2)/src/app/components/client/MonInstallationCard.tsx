@@ -5,6 +5,7 @@ import {
   type FieldUpdate,
   type InstallerFieldStatus,
 } from "../../services/fieldUpdateService";
+import { AuthenticatedImage } from "../AuthenticatedImage";
 
 interface MonInstallationCardProps {
   progressPercent?: number | null;
@@ -86,11 +87,8 @@ export function MonInstallationCard({
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {recentPhotos.map((p, i) => (
-              <a
+              <div
                 key={i}
-                href={p.url}
-                target="_blank"
-                rel="noreferrer"
                 className="flex-shrink-0"
                 title={
                   p.caption ??
@@ -100,12 +98,13 @@ export function MonInstallationCard({
                   })
                 }
               >
-                <img
+                <AuthenticatedImage
                   src={p.url}
                   alt="Photo terrain"
-                  className="w-24 h-24 object-cover rounded-lg border border-slate-200 hover:opacity-90 transition"
+                  enlargeOnClick
+                  className="w-24 h-24 object-cover rounded-lg border border-slate-200 hover:opacity-90 transition cursor-zoom-in"
                 />
-              </a>
+              </div>
             ))}
           </div>
         </div>

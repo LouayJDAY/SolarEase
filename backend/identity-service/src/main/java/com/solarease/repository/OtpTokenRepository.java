@@ -19,4 +19,6 @@ public interface OtpTokenRepository extends JpaRepository<OtpToken, Long> {
     @Modifying
     @Query("UPDATE OtpToken o SET o.isUsed = true WHERE o.user = :user AND o.isUsed = false")
     int invalidateUnusedOtpsForUser(@Param("user") User user);
+
+    void deleteByUser(User user);
 }

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageThread, Message } from "../../components/client/MessageThread";
 import { User, Search, Loader2, MessageSquare } from "lucide-react";
-import messageService, { Conversation } from "../../services/messageService";
+import messageService, { Conversation, messageToAttachments } from "../../services/messageService";
 import { useAuth } from "../../context/AuthContext";
 import { useLiveRefresh } from "../../hooks/useLiveRefresh";
 import {
@@ -104,15 +104,25 @@ export function ClientMessagesPage() {
     };
   }, [conversations.length, user?.userId, user?.role, canViewMessage]);
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, _recipientRoles?: string[], file?: File) => {
     if (!user?.userId || !selectedConversation) return;
+    const selected = conversations.find((c) => c.id === selectedConversation);
     try {
-      const msg = await messageService.sendMessage(user.userId, selectedConversation, {
+      const payload = {
         senderId: user.userId,
         senderName: `${user.firstName} ${user.lastName}`.trim(),
         senderRole: user.role,
         content,
-      });
+        projectId: selected?.projectId,
+      };
+      const msg = file
+        ? await messageService.sendMessageWithAttachment(
+            user.userId,
+            selectedConversation,
+            payload,
+            file
+          )
+        : await messageService.sendMessage(user.userId, selectedConversation, payload);
       setConversations((prev) =>
         prev.map((c) => {
           if (c.id !== selectedConversation) return c;
@@ -123,6 +133,7 @@ export function ClientMessagesPage() {
       );
     } catch (e) {
       console.error(e);
+      throw e;
     }
   };
 
@@ -150,6 +161,7 @@ export function ClientMessagesPage() {
     content: m.content,
     timestamp: new Date(m.timestamp).toLocaleString(),
     read: true,
+    attachments: messageToAttachments(m),
   });
 
   return (

@@ -95,4 +95,26 @@ class DimensioningControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1L));
     }
+
+    @Test
+    void calculate_Returns400WithFields_WhenInclinationOutOfRange() throws Exception {
+        request.setInclination(120.0);
+
+        mockMvc.perform(post("/api/dimensioning/calculate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.inclination").exists());
+    }
+
+    @Test
+    void calculate_Returns400WithFields_WhenAreaMissing() throws Exception {
+        request.setArea(null);
+
+        mockMvc.perform(post("/api/dimensioning/calculate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields").exists());
+    }
 }

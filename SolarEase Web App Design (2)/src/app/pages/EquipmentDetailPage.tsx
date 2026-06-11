@@ -5,23 +5,29 @@ import { Link, useParams, useNavigate } from "react-router";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import equipmentService, { EquipmentResponse } from "../services/equipmentService";
+import { EquipmentImage } from "../components/EquipmentImage";
+import { AddEquipmentModal } from "../components/AddEquipmentModal";
 
 const typeLabelMap: Record<string, string> = {
-  PANEL: "Panneau Solaire",
+  SOLAR_PANEL: "Panneau solaire",
+  NIGHT_PANEL: "Night Panel",
   INVERTER: "Onduleur",
   BATTERY: "Batterie",
-  MOUNTING: "Structure de Montage",
+  MOUNTING_SYSTEM: "Structure de montage",
   CABLE: "Câble",
-  PROTECTION: "Protection",
+  CIRCUIT_BREAKER_DC: "Disjoncteur DC",
+  CIRCUIT_BREAKER_AC: "Disjoncteur AC",
 };
 
 const categoryPathMap: Record<string, string> = {
-  PANEL: "Panneaux",
+  SOLAR_PANEL: "Panneaux",
+  NIGHT_PANEL: "Night Panel",
   INVERTER: "Onduleurs",
   BATTERY: "Batteries",
-  MOUNTING: "Structures",
+  MOUNTING_SYSTEM: "Structures",
   CABLE: "Câbles",
-  PROTECTION: "Protections",
+  CIRCUIT_BREAKER_DC: "Protection",
+  CIRCUIT_BREAKER_AC: "Protection",
 };
 
 export function EquipmentDetailPage() {
@@ -29,6 +35,15 @@ export function EquipmentDetailPage() {
   const navigate = useNavigate();
   const [product, setProduct] = useState<EquipmentResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const reloadProduct = () => {
+    if (!id) return;
+    equipmentService
+      .getById(Number(id))
+      .then(setProduct)
+      .catch(() => setProduct(null));
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -80,11 +95,23 @@ export function EquipmentDetailPage() {
   }
 
   const specs = [
-    { label: "Puissance", value: product.power || "—" },
-    { label: "Rendement", value: product.efficiency || "—" },
-    { label: "Garantie", value: product.warranty ? `${product.warranty} ans` : "—" },
-    { label: "Marque", value: product.brand || "—" },
-  ].filter((s) => s.value !== "—");
+    {
+      label: "Puissance",
+      value: product.nominalPower ? `${product.nominalPower} W` : null,
+    },
+    {
+      label: "Rendement",
+      value: product.efficiency
+        ? `${Math.round(product.efficiency * 100)}%`
+        : null,
+    },
+    {
+      label: "Garantie",
+      value: product.warrantyYears ? `${product.warrantyYears} ans` : null,
+    },
+    { label: "Marque", value: product.brand || null },
+    { label: "Modèle", value: product.model || null },
+  ].filter((s) => s.value);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAFAFA" }}>
@@ -120,53 +147,20 @@ export function EquipmentDetailPage() {
             {/* Left – Image 40% */}
             <div className="lg:col-span-2 space-y-3">
               <div
-                className="bg-white rounded-xl overflow-hidden flex items-center justify-center"
+                className="bg-white rounded-xl overflow-hidden"
                 style={{
                   boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                   height: 340,
-                  backgroundColor: "#F5F5F5",
                 }}
               >
-                {/* Solar panel illustration */}
-                <svg viewBox="0 0 120 80" className="w-48 h-32 text-gray-300">
-                  <rect
-                    x="10"
-                    y="5"
-                    width="100"
-                    height="65"
-                    rx="4"
-                    fill="#E0E0E0"
-                    stroke="#BDBDBD"
-                    strokeWidth="1"
-                  />
-                  {[0, 1, 2, 3].map((r) =>
-                    [0, 1, 2, 3, 4].map((c) => (
-                      <rect
-                        key={`${r}-${c}`}
-                        x={14 + c * 19}
-                        y={9 + r * 15}
-                        width={16}
-                        height={12}
-                        rx="1"
-                        fill="#BDBDBD"
-                        stroke="#A0A0A0"
-                        strokeWidth="0.3"
-                      />
-                    ))
-                  )}
-                </svg>
-              </div>
-              {/* Thumbnails */}
-              <div className="flex gap-2">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="w-20 h-20 bg-gray-100 rounded-lg border-2 cursor-pointer hover:border-[#4CAF50] transition-colors"
-                    style={{
-                      borderColor: i === 1 ? "#4CAF50" : "#E0E0E0",
-                    }}
-                  />
-                ))}
+                <EquipmentImage
+                  imageUrl={product.imageUrl}
+                  type={product.type}
+                  alt={product.name}
+                  className="w-full h-full object-contain p-4"
+                  containerClassName="h-[340px] bg-gray-50"
+                  enlargeOnClick
+                />
               </div>
             </div>
 
@@ -226,7 +220,10 @@ export function EquipmentDetailPage() {
 
                 {/* Action buttons */}
                 <div className="flex gap-3 mt-6">
-                  <button className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors hover:bg-green-50"
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(true)}
+                    className="flex-1 py-2.5 rounded-lg text-sm font-medium border-2 transition-colors hover:bg-green-50"
                     style={{ borderColor: "#4CAF50", color: "#4CAF50" }}
                   >
                     Modifier
@@ -251,11 +248,22 @@ export function EquipmentDetailPage() {
               Description
             </h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              {product.description || "Aucune description disponible."}
+              {product.specifications || "Aucune description disponible."}
             </p>
           </div>
         </div>
       </main>
+
+      {showEditModal && product && (
+        <AddEquipmentModal
+          equipment={product}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false);
+            reloadProduct();
+          }}
+        />
+      )}
     </div>
   );
 }

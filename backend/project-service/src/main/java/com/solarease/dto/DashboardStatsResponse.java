@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,4 +25,7 @@ public class DashboardStatsResponse {
 
     /** Demands created since today 00:00 (admin-facing only). */
     private long newDemandsTodayCount;
+
+    /** Project creation counts for the last 12 calendar months (oldest first). */
+    private List<MonthlyCountDto> projectsByMonth;
 }

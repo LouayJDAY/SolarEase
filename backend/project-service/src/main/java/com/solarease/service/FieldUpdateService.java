@@ -6,7 +6,9 @@ import com.solarease.entity.FieldUpdateEntity;
 import com.solarease.entity.Project;
 import com.solarease.enums.InstallationPhase;
 import com.solarease.enums.InstallerFieldStatus;
+import com.solarease.enums.ProjectStatus;
 import com.solarease.exception.ResourceNotFoundException;
+import com.solarease.repository.ClientRepository;
 import com.solarease.repository.FieldUpdateRepository;
 import com.solarease.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +21,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +33,7 @@ public class FieldUpdateService {
 
     private final FieldUpdateRepository fieldUpdateRepository;
     private final ProjectRepository projectRepository;
+    private final ClientRepository clientRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationWebSocketService notificationService;
 
@@ -77,6 +82,7 @@ public class FieldUpdateService {
         if (currentPhase != null) {
             project.setCurrentPhase(currentPhase);
         }
+        autoAdvanceProjectStatus(project, saved, completedSteps);
         projectRepository.save(project);
 
         FieldUpdateDTO dto = toDTO(saved);
@@ -87,6 +93,7 @@ public class FieldUpdateService {
         } catch (Exception e) {
             log.warn("WebSocket push failed for project {}: {}", projectId, e.getMessage());
         }
+        broadcastProjectLiveUpdate(project);
 
         // Notify the admin who assigned the project (or use a broadcast)
         String adminId = project.getAssignedByAdminId();
@@ -94,6 +101,8 @@ public class FieldUpdateService {
             String message = buildAdminNotification(project.getName(), installerEmail, saved);
             notificationService.notifyUser(adminId, "Mise à jour terrain", message);
         }
+
+        notifyClientFieldUpdate(project, saved);
 
         log.info("Field update {} created for project {} by installer {}", saved.getId(), projectId, installerId);
         return dto;
@@ -256,5 +265,59 @@ public class FieldUpdateService {
             case "BLOCAGE"         -> "Blocage";
             default                -> status;
         };
+    }
+
+    private void notifyClientFieldUpdate(Project project, FieldUpdateEntity update) {
+        if (project.getClientId() == null) {
+            return;
+        }
+        clientRepository.findById(project.getClientId()).ifPresent(client -> {
+            String userId = client.getUserId();
+            if (userId == null || userId.isBlank()) {
+                userId = String.valueOf(client.getId());
+            }
+            int pct = update.getProgressPercent() != null ? update.getProgressPercent() : 0;
+            notificationService.notifyUser(
+                    userId,
+                    "Mise à jour chantier",
+                    String.format("Votre projet « %s » progresse : %d%% accompli.", project.getName(), pct));
+        });
+    }
+
+    /** Move project into IN_PROGRESS when installer starts field work. */
+    private void autoAdvanceProjectStatus(Project project, FieldUpdateEntity update, List<String> completedSteps) {
+        ProjectStatus status = project.getStatus();
+        if (status == null || status == ProjectStatus.COMPLETED || status == ProjectStatus.CANCELLED) {
+            return;
+        }
+        boolean fieldWorkStarted =
+                !completedSteps.isEmpty()
+                || (update.getProgressPercent() != null && update.getProgressPercent() > 0)
+                || InstallerFieldStatus.EN_INSTALLATION.equals(update.getFieldStatus())
+                || InstallerFieldStatus.SUR_SITE.equals(update.getFieldStatus())
+                || InstallerFieldStatus.EN_DEPLACEMENT.equals(update.getFieldStatus())
+                || InstallerFieldStatus.FIN_CHANTIER.equals(update.getFieldStatus());
+        if (fieldWorkStarted && (status == ProjectStatus.CREATED
+                || status == ProjectStatus.EN_PREPARATION
+                || status == ProjectStatus.INSTALLATEUR_AFFECTE)) {
+            project.setStatus(ProjectStatus.IN_PROGRESS);
+        }
+    }
+
+    private void broadcastProjectLiveUpdate(Project project) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", "PROJECT_UPDATED");
+        payload.put("projectId", project.getId());
+        payload.put("status", project.getStatus() != null ? project.getStatus().name() : null);
+        payload.put("currentProgress", project.getCurrentProgress());
+        payload.put("currentPhase", project.getCurrentPhase() != null ? project.getCurrentPhase().name() : null);
+        payload.put("currentFieldStatus",
+                project.getCurrentFieldStatus() != null ? project.getCurrentFieldStatus().name() : null);
+        payload.put("timestamp", LocalDateTime.now().toString());
+        try {
+            messagingTemplate.convertAndSend("/topic/project-updates/" + project.getId(), payload);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast project update for {}: {}", project.getId(), e.getMessage());
+        }
     }
 }

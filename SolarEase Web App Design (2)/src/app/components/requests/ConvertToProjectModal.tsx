@@ -3,6 +3,9 @@ import { X, Search, UserPlus, FolderKanban, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import clientService, { ClientResponse } from "../../services/clientService";
 import demandService, { Demand } from "../../services/demandService";
+import { LocationPicker, LocationValue } from "../LocationPicker";
+import { isValidProjectCoordinates } from "../../utils/geo";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 interface Props {
   open: boolean;
@@ -16,8 +19,11 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
   const [clients, setClients] = useState<ClientResponse[]>([]);
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [latitude, setLatitude]   = useState<string>("");
-  const [longitude, setLongitude] = useState<string>("");
+  const [locationGeo, setLocationGeo] = useState<LocationValue>({
+    location: "",
+    latitude: null,
+    longitude: null,
+  });
   const [loadingClients, setLoadingClients] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,8 +33,15 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
     if (!open || !demand) return;
     setSelectedClientId(null);
     setSearch("");
-    setLatitude(demand.latitude != null ? String(demand.latitude) : "");
-    setLongitude(demand.longitude != null ? String(demand.longitude) : "");
+    const hasCoords =
+      demand.latitude != null &&
+      demand.longitude != null &&
+      isValidProjectCoordinates(demand.latitude, demand.longitude);
+    setLocationGeo({
+      location: demand.location || "",
+      latitude: hasCoords ? demand.latitude! : null,
+      longitude: hasCoords ? demand.longitude! : null,
+    });
   }, [open, demand]);
 
   useEffect(() => {
@@ -42,13 +55,14 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
   }, [open, search]);
 
   const coordinates = useMemo(() => {
-    const lat = latitude ? Number(latitude) : undefined;
-    const lng = longitude ? Number(longitude) : undefined;
+    if (!isValidProjectCoordinates(locationGeo.latitude, locationGeo.longitude)) {
+      return { latitude: undefined, longitude: undefined };
+    }
     return {
-      latitude: lat != null && !Number.isNaN(lat) ? lat : undefined,
-      longitude: lng != null && !Number.isNaN(lng) ? lng : undefined,
+      latitude: locationGeo.latitude!,
+      longitude: locationGeo.longitude!,
     };
-  }, [latitude, longitude]);
+  }, [locationGeo.latitude, locationGeo.longitude]);
 
   if (!open || !demand) return null;
 
@@ -63,8 +77,8 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
       toast.success(`Projet #${project.id} créé`);
       onConverted(project.id);
       onClose();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? "Conversion impossible");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -83,8 +97,8 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
       }
       onConverted(project.id);
       onClose();
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Promotion impossible";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err);
       toast.error(msg.includes("SMTP") ? `Email non envoyé : ${msg}` : msg);
     } finally {
       setSubmitting(false);
@@ -199,29 +213,11 @@ export function ConvertToProjectModal({ open, demand, onClose, onConverted }: Pr
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-secondary mb-1">Latitude (optionnel)</label>
-              <input
-                type="number"
-                step="any"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="36.8..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-secondary mb-1">Longitude (optionnel)</label>
-              <input
-                type="number"
-                step="any"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="10.1..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-secondary mb-2">
+              Emplacement du chantier
+            </label>
+            <LocationPicker value={locationGeo} onChange={setLocationGeo} compact showStatus />
           </div>
         </div>
 

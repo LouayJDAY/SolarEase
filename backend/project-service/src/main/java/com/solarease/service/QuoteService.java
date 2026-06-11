@@ -317,10 +317,10 @@ public class QuoteService {
     }
 
     /**
-     * Get all quotes for a client (paginated)
+     * Get all quotes for a client (paginated, excludes DRAFT — client action workflow only).
      */
     public Page<QuoteDTO> getQuotesByClientId(Long clientId, Pageable pageable) {
-        return quoteRepository.findByClientId(clientId, pageable)
+        return quoteRepository.findVisibleByClientId(clientId, pageable)
                 .map(this::mapToDTO);
     }
 
@@ -488,6 +488,10 @@ public class QuoteService {
         if (quote.getProject() == null) {
             return;
         }
+        if ("CLIENT".equalsIgnoreCase(userRole)
+                && QuoteEntity.QuoteStatus.DRAFT.equals(quote.getStatus())) {
+            throw new ResourceNotFoundException("Quote not found with id: " + quote.getId());
+        }
         accessControlService.requireProjectAccess(userRole, userId, userEmail, quote.getProject().getId());
     }
 
@@ -510,6 +514,9 @@ public class QuoteService {
                 .installerId(quote.getInstallerId())
                 .date(LocalDate.now())
                 .dueDate(LocalDate.now().plusDays(30))
+                .subtotal(quote.getTotalAmount())
+                .discountPercent(BigDecimal.ZERO)
+                .discountAmount(BigDecimal.ZERO)
                 .amount(quote.getTotalAmount())
                 .status(InvoiceEntity.InvoiceStatus.SENT)
                 .quoteId(quote.getId())

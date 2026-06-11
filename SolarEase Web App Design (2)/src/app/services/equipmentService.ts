@@ -1,14 +1,28 @@
 import api from "./api";
 
+export type EquipmentTypeCode =
+  | "SOLAR_PANEL"
+  | "NIGHT_PANEL"
+  | "INVERTER"
+  | "BATTERY"
+  | "MOUNTING_SYSTEM"
+  | "CABLE"
+  | "CIRCUIT_BREAKER_DC"
+  | "CIRCUIT_BREAKER_AC";
+
+export type PanelCategoryCode = "TOPCON_N_TYPE" | "BIFACIAL" | "GLASS_GLASS";
+
 export interface EquipmentRequest {
   name: string;
   brand: string;
-  type: "SOLAR_PANEL" | "NIGHT_PANEL" | "INVERTER" | "BATTERY" | "MOUNTING_SYSTEM" | "CABLE";
-  power?: string;
-  efficiency?: string;
+  type: EquipmentTypeCode;
+  panelCategory?: PanelCategoryCode;
+  nominalPower?: number;
+  efficiency?: number;
   price: number;
-  warranty?: string;
-  description?: string;
+  warrantyYears?: number;
+  specifications?: string;
+  imageUrl?: string;
 }
 
 export interface EquipmentResponse {
@@ -16,7 +30,8 @@ export interface EquipmentResponse {
   name: string;
   brand: string;
   model: string;
-  type: "SOLAR_PANEL" | "NIGHT_PANEL" | "INVERTER" | "BATTERY" | "MOUNTING_SYSTEM" | "CABLE";
+  type: EquipmentTypeCode;
+  panelCategory?: PanelCategoryCode;
   nominalPower: number;
   efficiency: number;
   area: number;
@@ -31,8 +46,12 @@ const equipmentService = {
   getAll: () =>
     api.get<EquipmentResponse[]>("/equipment").then((r) => r.data),
 
-  getByType: (type: string) =>
-    api.get<EquipmentResponse[]>(`/equipment/type/${type}`).then((r) => r.data),
+  getByType: (type: string, category?: PanelCategoryCode) =>
+    api
+      .get<EquipmentResponse[]>(`/equipment/type/${type}`, {
+        params: category ? { category } : undefined,
+      })
+      .then((r) => r.data),
 
   getById: (id: number) =>
     api.get<EquipmentResponse>(`/equipment/${id}`).then((r) => r.data),
@@ -45,6 +64,14 @@ const equipmentService = {
 
   delete: (id: number) =>
     api.delete(`/equipment/${id}`).then((r) => r.data),
+
+  uploadPhoto: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post<{ imageUrl: string }>("/equipment/photos", formData)
+      .then((r) => r.data);
+  },
 };
 
 export default equipmentService;

@@ -12,16 +12,17 @@ import { ProjectMessagesPage } from "./pages/ProjectMessagesPage";
 import { ClientsPage } from "./pages/ClientsPage";
 import { ClientDetailPage } from "./pages/ClientDetailPage";
 import { CatalogPage } from "./pages/CatalogPage";
+import { InstallersPage } from "./pages/InstallersPage";
 import { EquipmentDetailPage } from "./pages/EquipmentDetailPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { QuotesPage } from "./pages/QuotesPage";
 import { QuoteDetailPage } from "./pages/QuoteDetailPage";
 import { InstallerInvoicesPage } from "./pages/InstallerInvoicesPage";
 import AdminRequestsPage from "./pages/AdminRequestsPage";
+import AdminSupportTicketsPage from "./pages/AdminSupportTicketsPage";
 import { ClientLayout } from "./components/client/ClientLayout";
 import { ClientDashboardPage } from "./pages/client/ClientDashboardPage";
 import { ClientProjectsPage } from "./pages/client/ClientProjectsPage";
-import { ClientDocumentsPage } from "./pages/client/ClientDocumentsPage";
 import { ClientBillingPage } from "./pages/client/ClientBillingPage";
 import { ClientMessagesPage } from "./pages/client/ClientMessagesPage";
 import { ClientProfilePage } from "./pages/client/ClientProfilePage";
@@ -99,6 +100,10 @@ export const router = createBrowserRouter([
     Component: ClientsPage,
   },
   {
+    path: "/installers",
+    Component: InstallersPage,
+  },
+  {
     path: "/clients/:id",
     Component: ClientDetailPage,
   },
@@ -127,6 +132,10 @@ export const router = createBrowserRouter([
     Component: AdminRequestsPage,
   },
   {
+    path: "/support-tickets",
+    Component: AdminSupportTicketsPage,
+  },
+  {
     path: "/invoices",
     Component: InstallerInvoicesPage,
   },
@@ -153,10 +162,6 @@ export const router = createBrowserRouter([
       {
         path: "projects/:id/messages",
         Component: ProjectMessagesPage,
-      },
-      {
-        path: "documents",
-        Component: ClientDocumentsPage,
       },
       {
         path: "billing",

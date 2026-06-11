@@ -1,35 +1,68 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { StatusBadge } from "../../components/client/StatusBadge";
 import { Search, Filter, Calendar, Zap, MapPin, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
+import { useAuth } from "../../context/AuthContext";
 import projectService, { ProjectResponse } from "../../services/projectService";
+import {
+  getProjectPhaseLabel,
+  getProjectProgressPercent,
+} from "../../utils/projectProgress";
+import {
+  connectWebSocket,
+  releaseWebSocketConnection,
+  subscribeToNotifications,
+  unsubscribeFromNotifications,
+} from "../../services/websocketService";
 
 export function ClientProjectsPage() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const { id } = useParams();
 
-  useEffect(() => {
+  const loadProjects = useCallback(async () => {
     setLoading(true);
     const clientId = id ? Number(id) : null;
-    if (clientId) {
-      projectService
-        .getProjectsByClientId(clientId)
-        .then(setProjects)
-        .catch(() => setProjects([]))
-        .finally(() => setLoading(false));
-    } else {
-      // Client portal: fetch MY projects via GET /api/projects/my
-      projectService
-        .getMyProjects()
-        .then(setProjects)
-        .catch(() => setProjects([]))
-        .finally(() => setLoading(false));
+    try {
+      if (clientId) {
+        const data = await projectService.getProjectsByClientId(clientId);
+        setProjects(data);
+      } else {
+        const data = await projectService.getMyProjects();
+        setProjects(data);
+      }
+    } catch {
+      setProjects([]);
+    } finally {
+      setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  useEffect(() => {
+    if (!user?.userId) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    const refresh = () => {
+      void loadProjects();
+    };
+
+    connectWebSocket(user.userId, token);
+    subscribeToNotifications(user.userId, refresh);
+
+    return () => {
+      unsubscribeFromNotifications(refresh);
+      releaseWebSocketConnection();
+    };
+  }, [user?.userId, loadProjects]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
@@ -50,24 +83,6 @@ export function ClientProjectsPage() {
     { value: "COMPLETED", label: "Terminés" },
     { value: "CANCELLED", label: "Annulés" },
   ];
-
-  function getProgress(status: string) {
-    if (status === "COMPLETED") return 100;
-    if (status === "IN_PROGRESS") return 70;
-    if (status === "INSTALLATEUR_AFFECTE") return 45;
-    if (status === "EN_PREPARATION") return 25;
-    if (status === "CREATED") return 10;
-    return 0;
-  }
-
-  function getPhaseLabel(status: string) {
-    if (status === "COMPLETED") return "Projet terminé";
-    if (status === "IN_PROGRESS") return "Installation en cours";
-    if (status === "INSTALLATEUR_AFFECTE") return "Installateur affecté";
-    if (status === "EN_PREPARATION") return "En préparation";
-    if (status === "CREATED") return "Étude en cours";
-    return "Annulé";
-  }
 
   return (
     <div className="space-y-6">
@@ -153,15 +168,15 @@ export function ClientProjectsPage() {
                   </div>
                   <div className="mb-4">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-gray-600">{getPhaseLabel(project.status)}</span>
+                      <span className="text-gray-600">{getProjectPhaseLabel(project)}</span>
                       <span className="font-semibold text-secondary">
-                        {getProgress(project.status)}%
+                        {getProjectProgressPercent(project)}%
                       </span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${getProgress(project.status)}%` }}
+                        style={{ width: `${getProjectProgressPercent(project)}%` }}
                       />
                     </div>
                   </div>

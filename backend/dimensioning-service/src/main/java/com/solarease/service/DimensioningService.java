@@ -4,6 +4,7 @@ import com.solarease.client.PvgisClient;
 import com.solarease.dto.DimensioningRequest;
 import com.solarease.dto.DimensioningResponse;
 import com.solarease.dto.ComparisonResponse;
+import com.solarease.dto.EquipmentSummaryDto;
 import com.solarease.entity.Dimensioning;
 import com.solarease.entity.Equipment;
 import com.solarease.entity.RoofCharacteristic;
@@ -11,7 +12,11 @@ import com.solarease.entity.RoofCharacteristic;
 import com.solarease.entity.SolarInstallation;
 import com.solarease.enums.DimensioningStatus;
 import com.solarease.enums.Orientation;
+import com.solarease.enums.PanelCategory;
 import com.solarease.repository.DimensioningRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.solarease.rag.InstallerRecommendationDto;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +40,7 @@ public class DimensioningService {
     private final DecisionSupportService decisionSupportService; // New Dependency
     private final FinancialService financialService; // New Financial Service
     private final PdfGenerationService pdfGenerationService; // For Report Generation
+    private final ObjectMapper objectMapper;
 
     // Constants for calculation
     private static final double DEFAULT_PANEL_POWER_W = 400.0;
@@ -57,39 +63,38 @@ public class DimensioningService {
                 .longitude(request.getLongitude())
                 .build();
 
-        // Determine panel type
+        // Mode dimensionnement : CLASSIC ou NIGHT_PANEL
         boolean isNightPanel = "NIGHT_PANEL".equalsIgnoreCase(request.getPanelType());
-        
-        // 1b. Fetch Equipment (Panel & Inverter)
-        Equipment panel;
-        if (isNightPanel) {
-            panel = getNightPanel(request.getNightPanelId());
-        } else {
-            panel = getPanel(request.getPanelId());
-        }
+
+        Equipment panel = isNightPanel
+                ? resolveNightPanel(request.getNightPanelId())
+                : resolveClassicPanel(request.getPanelId());
         Equipment inverter = getInverter(request.getInverterId());
 
-        // 2. Perform Calculation
         SolarInstallation installation;
         if (isNightPanel) {
-            double dailyConsumption = (request.getDailyConsumptionKwh() != null && request.getDailyConsumptionKwh() > 0)
-                    ? request.getDailyConsumptionKwh() : 15.0; // Default 15 kWh/day
-            installation = performNightPanelCalculation(roof, panel, inverter, dailyConsumption);
+            double dailyForMetrics = (request.getDailyConsumptionKwh() != null && request.getDailyConsumptionKwh() > 0)
+                    ? request.getDailyConsumptionKwh() : 15.0;
+            installation = performNightPanelCalculation(
+                    roof, panel, inverter, dailyForMetrics,
+                    request.getDailyConsumptionKwh(), request.getQuarterlyBillTnd());
         } else {
-            installation = performCalculation(roof, panel, inverter);
+            installation = performCalculation(
+                    roof, panel, inverter,
+                    request.getDailyConsumptionKwh(), request.getQuarterlyBillTnd());
         }
 
-        // 2b. Generate AI Recommendation (hybrid pgvector RAG)
         com.solarease.dto.FinancialMetrics metrics = financialService.calculateMetrics(installation);
 
         String aiRecommendation = "AI Recommendation Unavailable (Service Down)";
         com.solarease.rag.InstallerRecommendationDto installerRecommendation = null;
+        String panelTypeCode = isNightPanel ? "NIGHT_PANEL" : "CLASSIC";
         try {
             DimensioningResponse tempResponse = DimensioningResponse.builder()
                     .installation(installation)
                     .roof(roof)
                     .financials(metrics)
-                    .panelType(isNightPanel ? "NIGHT_PANEL" : "CLASSIC")
+                    .panelType(panelTypeCode)
                     .build();
             DecisionSupportService.Result rag = decisionSupportService.generate(
                     tempResponse, panel, inverter);
@@ -99,30 +104,27 @@ public class DimensioningService {
             log.error("Failed to generate AI recommendation: {}", e.getMessage());
         }
 
-        // 3. Save Context
         Dimensioning dimensioning = Dimensioning.builder()
                 .projectId(request.getProjectId())
                 .roofCharacteristic(roof)
                 .solarInstallation(installation)
                 .panel(panel)
                 .inverter(inverter)
-                .panelType(isNightPanel ? "NIGHT_PANEL" : "CLASSIC")
+                .panelType(panelTypeCode)
                 .status(DimensioningStatus.COMPLETED)
                 .aiRecommendation(aiRecommendation)
+                .installerRecommendationJson(serializeRecommendation(installerRecommendation))
                 .build();
 
         Dimensioning saved = dimensioningRepository.save(dimensioning);
-        DimensioningResponse response = mapToResponse(saved);
-        response.setInstallerRecommendation(installerRecommendation);
-        return response;
+        return mapToResponse(saved);
     }
 
     /**
-     * Compare Classic vs Night Panel dimensioning for the same project parameters
+     * Compare Classique vs Night Panel for the same project parameters.
      */
     @Transactional
     public ComparisonResponse compareDimensioning(DimensioningRequest request) {
-        // Calculate Classic
         DimensioningRequest classicRequest = DimensioningRequest.builder()
                 .projectId(request.getProjectId())
                 .area(request.getArea())
@@ -138,7 +140,6 @@ public class DimensioningService {
                 .build();
         DimensioningResponse classicResult = calculateDimensioning(classicRequest);
 
-        // Calculate Night Panel
         DimensioningRequest nightRequest = DimensioningRequest.builder()
                 .projectId(request.getProjectId())
                 .area(request.getArea())
@@ -154,7 +155,6 @@ public class DimensioningService {
                 .build();
         DimensioningResponse nightResult = calculateDimensioning(nightRequest);
 
-        // Build 24h curves
         double dailyConsumption = (request.getDailyConsumptionKwh() != null && request.getDailyConsumptionKwh() > 0)
                 ? request.getDailyConsumptionKwh() : 15.0;
         double classicDailyProd = classicResult.getInstallation().getEstimatedAnnualProductionKwh() / 365.0;
@@ -162,17 +162,17 @@ public class DimensioningService {
         double storageKwh = nightResult.getInstallation().getStorageCapacityKwh() != null
                 ? nightResult.getInstallation().getStorageCapacityKwh() : 0.0;
 
-        List<ComparisonResponse.HourlyData> classicCurve = generateHourlyCurve(classicDailyProd, dailyConsumption, 0, false);
-        List<ComparisonResponse.HourlyData> nightCurve = generateHourlyCurve(nightDailyProd, dailyConsumption, storageKwh, true);
+        List<ComparisonResponse.HourlyData> classicCurve =
+                generateHourlyCurve(classicDailyProd, dailyConsumption, 0, false);
+        List<ComparisonResponse.HourlyData> nightCurve =
+                generateHourlyCurve(nightDailyProd, dailyConsumption, storageKwh, true);
 
-        // Calculate deltas
         double prodDiff = nightResult.getInstallation().getEstimatedAnnualProductionKwh()
                 - classicResult.getInstallation().getEstimatedAnnualProductionKwh();
         double costDiff = nightResult.getInstallation().getEstimatedCost()
                 - classicResult.getInstallation().getEstimatedCost();
         double selfConsGain = (nightResult.getInstallation().getSelfConsumptionRate() != null
-                ? nightResult.getInstallation().getSelfConsumptionRate() : 0.0) * 100
-                - 30.0; // Classic assumed ~30%
+                ? nightResult.getInstallation().getSelfConsumptionRate() : 0.0) * 100 - 30.0;
         double paybackDiff = nightResult.getFinancials().getPaybackPeriodYears()
                 - classicResult.getFinancials().getPaybackPeriodYears();
         double roiDiff = nightResult.getFinancials().getRoiPercentage()
@@ -198,38 +198,45 @@ public class DimensioningService {
         Dimensioning dimensioning = dimensioningRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dimensioning not found with id: " + id));
 
-        // Reuse the structured recommendation so the PDF can render the kit
-        // table (inverter, cables, Schneider breakers) instead of a single
-        // free-form paragraph. Failures are tolerated -- the PDF still works
-        // with the legacy aiRecommendation field.
-        com.solarease.rag.InstallerRecommendationDto recommendation = null;
-        try {
-            com.solarease.dto.FinancialMetrics metrics =
-                    financialService.calculateMetrics(dimensioning.getSolarInstallation());
-            DimensioningResponse temp = DimensioningResponse.builder()
-                    .installation(dimensioning.getSolarInstallation())
-                    .roof(dimensioning.getRoofCharacteristic())
-                    .financials(metrics)
-                    .panelType(dimensioning.getPanelType())
-                    .build();
-            recommendation = decisionSupportService.generate(
-                    temp, dimensioning.getPanel(), dimensioning.getInverter())
-                    .recommendation();
-        } catch (Exception e) {
-            log.warn("Could not enrich PDF with structured kit, falling back: {}",
-                    e.getMessage());
+        com.solarease.rag.InstallerRecommendationDto recommendation =
+                deserializeRecommendation(dimensioning.getInstallerRecommendationJson());
+        if (recommendation == null) {
+            try {
+                com.solarease.dto.FinancialMetrics metrics =
+                        financialService.calculateMetrics(dimensioning.getSolarInstallation());
+                DimensioningResponse temp = DimensioningResponse.builder()
+                        .installation(dimensioning.getSolarInstallation())
+                        .roof(dimensioning.getRoofCharacteristic())
+                        .financials(metrics)
+                        .panelType(dimensioning.getPanelType())
+                        .build();
+                recommendation = decisionSupportService.generate(
+                        temp, dimensioning.getPanel(), dimensioning.getInverter())
+                        .recommendation();
+            } catch (Exception e) {
+                log.warn("Could not enrich PDF with structured kit, falling back: {}",
+                        e.getMessage());
+            }
         }
 
         return pdfGenerationService.generateDimensioningReport(dimensioning, recommendation);
     }
 
-    private Equipment getPanel(Long panelId) {
-
+    private Equipment resolveClassicPanel(Long panelId) {
         if (panelId != null) {
             return equipmentService.getEquipmentById(panelId);
         }
-        // Try to find any panel in DB
-        List<Equipment> panels = equipmentService.getEquipmentByType(com.solarease.enums.EquipmentType.SOLAR_PANEL);
+        List<Equipment> panels = equipmentService.getEquipmentByType(
+                com.solarease.enums.EquipmentType.SOLAR_PANEL);
+        return equipmentService.pickDefaultPanel(panels);
+    }
+
+    private Equipment resolveNightPanel(Long nightPanelId) {
+        if (nightPanelId != null) {
+            return equipmentService.getEquipmentById(nightPanelId);
+        }
+        List<Equipment> panels = equipmentService.getEquipmentByType(
+                com.solarease.enums.EquipmentType.NIGHT_PANEL);
         return panels.isEmpty() ? null : panels.get(0);
     }
 
@@ -237,79 +244,8 @@ public class DimensioningService {
         if (inverterId != null) {
             return equipmentService.getEquipmentById(inverterId);
         }
-        // Try to find any inverter in DB
         List<Equipment> inverters = equipmentService.getEquipmentByType(com.solarease.enums.EquipmentType.INVERTER);
         return inverters.isEmpty() ? null : inverters.get(0);
-    }
-
-    private Equipment getNightPanel(Long nightPanelId) {
-        if (nightPanelId != null) {
-            return equipmentService.getEquipmentById(nightPanelId);
-        }
-        List<Equipment> nightPanels = equipmentService.getEquipmentByType(com.solarease.enums.EquipmentType.NIGHT_PANEL);
-        return nightPanels.isEmpty() ? null : nightPanels.get(0);
-    }
-
-    /**
-     * Night Panel calculation: same as classic + storage/self-consumption calculations
-     */
-    private SolarInstallation performNightPanelCalculation(RoofCharacteristic roof, Equipment panel, Equipment inverter, double dailyConsumption) {
-        // Base calculation (same as classic but with night panel specs)
-        SolarInstallation baseInstallation = performCalculation(roof, panel, inverter);
-
-        if (baseInstallation.getPanelCount() == 0) {
-            return baseInstallation;
-        }
-
-        // Night Panel specifics
-        double storagePerPanel = (panel != null && panel.getStorageCapacityKwh() != null)
-                ? panel.getStorageCapacityKwh() : 1.2; // Default 1.2 kWh per panel
-        double totalStorageKwh = baseInstallation.getPanelCount() * storagePerPanel;
-
-        // Daily production
-        double dailyProductionKwh = baseInstallation.getEstimatedAnnualProductionKwh() / 365.0;
-
-        // Self-consumption calculation
-        // Classic panels: ~30% self-consumption (surplus goes to grid)
-        // Night panels: store daytime surplus → use at night
-        double daytimeConsumption = dailyConsumption * 0.4; // 40% of consumption is during day
-        double nighttimeConsumption = dailyConsumption * 0.6; // 60% at night
-
-        // How much surplus can be stored
-        double daytimeSurplus = Math.max(0, dailyProductionKwh - daytimeConsumption);
-        double actualStored = Math.min(daytimeSurplus, totalStorageKwh); // Can't store more than capacity
-        double nightCoverage = Math.min(actualStored, nighttimeConsumption);
-
-        // Self-consumption rate
-        double directConsumption = Math.min(dailyProductionKwh, daytimeConsumption);
-        double totalSelfConsumed = directConsumption + nightCoverage;
-        double selfConsumptionRate = Math.min(1.0, totalSelfConsumed / dailyConsumption);
-
-        // Night coverage rate
-        double nightCoverageRate = nighttimeConsumption > 0 ? Math.min(1.0, nightCoverage / nighttimeConsumption) : 0;
-
-        // Enhanced savings: self-consumed energy saves more (no grid losses)
-        double enhancedAnnualSavings = totalSelfConsumed * 365 * ELECTRICITY_PRICE_TND_KWH;
-        double gridSurplus = Math.max(0, dailyProductionKwh - totalSelfConsumed);
-        double gridSavings = gridSurplus * 365 * 0.10; // Lower feed-in tariff
-        double totalAnnualSavings = enhancedAnnualSavings + gridSavings;
-
-        return SolarInstallation.builder()
-                .panelCount(baseInstallation.getPanelCount())
-                .panelModel(baseInstallation.getPanelModel())
-                .totalCapacityKw(baseInstallation.getTotalCapacityKw())
-                .estimatedCost(baseInstallation.getEstimatedCost())
-                .estimatedAnnualProductionKwh(baseInstallation.getEstimatedAnnualProductionKwh())
-                .inverterModel(baseInstallation.getInverterModel())
-                .monthlySavings(Math.round((totalAnnualSavings / 12) * 100.0) / 100.0)
-                .co2Savings(baseInstallation.getCo2Savings())
-                .isNightPanel(true)
-                .storageCapacityKwh(Math.round(totalStorageKwh * 100.0) / 100.0)
-                .selfConsumptionRate(Math.round(selfConsumptionRate * 1000.0) / 1000.0)
-                .nightCoverageRate(Math.round(nightCoverageRate * 1000.0) / 1000.0)
-                .dailyProductionKwh(Math.round(dailyProductionKwh * 100.0) / 100.0)
-                .nightlyConsumptionKwh(Math.round(nightCoverage * 100.0) / 100.0)
-                .build();
     }
 
     /**
@@ -354,16 +290,99 @@ public class DimensioningService {
         return curve;
     }
 
-    private SolarInstallation performCalculation(RoofCharacteristic roof, Equipment panel, Equipment inverter) {
-        // Use equipment values if available, else defaults
-        double panelPowerW = (panel != null && panel.getNominalPower() != null) ? panel.getNominalPower() : DEFAULT_PANEL_POWER_W;
-        double panelAreaM2 = (panel != null && panel.getArea() != null) ? panel.getArea() : DEFAULT_PANEL_AREA_M2;
-        String inverterModel = (inverter != null) ? inverter.getModel() : "Generic Inverter";
+    private SolarInstallation performNightPanelCalculation(
+            RoofCharacteristic roof,
+            Equipment panel,
+            Equipment inverter,
+            double dailyConsumption,
+            Double dailyConsumptionKwh,
+            Double quarterlyBillTnd) {
+        SolarInstallation base = performCalculation(
+                roof, panel, inverter, dailyConsumptionKwh, quarterlyBillTnd);
+        if (base.getPanelCount() == null || base.getPanelCount() < 1) {
+            return base;
+        }
 
-        // Number of panels that fit in the area
-        // Tunisie (validé): ~70% de surface réellement exploitable
+        double storagePerPanel = (panel != null && panel.getStorageCapacityKwh() != null)
+                ? panel.getStorageCapacityKwh() : 1.2;
+        double totalStorageKwh = base.getPanelCount() * storagePerPanel;
+        double dailyProductionKwh = base.getEstimatedAnnualProductionKwh() / 365.0;
+
+        double daytimeConsumption = dailyConsumption * 0.4;
+        double nighttimeConsumption = dailyConsumption * 0.6;
+        double daytimeSurplus = Math.max(0, dailyProductionKwh - daytimeConsumption);
+        double actualStored = Math.min(daytimeSurplus, totalStorageKwh);
+        double nightCoverage = Math.min(actualStored, nighttimeConsumption);
+
+        double directConsumption = Math.min(dailyProductionKwh, daytimeConsumption);
+        double totalSelfConsumed = directConsumption + nightCoverage;
+        double selfConsumptionRate = Math.min(1.0, totalSelfConsumed / dailyConsumption);
+        double nightCoverageRate = nighttimeConsumption > 0
+                ? Math.min(1.0, nightCoverage / nighttimeConsumption) : 0;
+
+        double enhancedAnnualSavings = totalSelfConsumed * 365 * ELECTRICITY_PRICE_TND_KWH;
+        double gridSurplus = Math.max(0, dailyProductionKwh - totalSelfConsumed);
+        double gridSavings = gridSurplus * 365 * 0.10;
+        double totalAnnualSavings = enhancedAnnualSavings + gridSavings;
+
+        return SolarInstallation.builder()
+                .panelCount(base.getPanelCount())
+                .panelModel(base.getPanelModel())
+                .totalCapacityKw(base.getTotalCapacityKw())
+                .estimatedCost(base.getEstimatedCost())
+                .estimatedAnnualProductionKwh(base.getEstimatedAnnualProductionKwh())
+                .inverterModel(base.getInverterModel())
+                .monthlySavings(Math.round((totalAnnualSavings / 12) * 100.0) / 100.0)
+                .co2Savings(base.getCo2Savings())
+                .isNightPanel(true)
+                .storageCapacityKwh(Math.round(totalStorageKwh * 100.0) / 100.0)
+                .selfConsumptionRate(Math.round(selfConsumptionRate * 1000.0) / 1000.0)
+                .nightCoverageRate(Math.round(nightCoverageRate * 1000.0) / 1000.0)
+                .dailyProductionKwh(Math.round(dailyProductionKwh * 100.0) / 100.0)
+                .nightlyConsumptionKwh(Math.round(nightCoverage * 100.0) / 100.0)
+                .sizingConstraint(base.getSizingConstraint())
+                .dailyConsumptionUsed(base.getDailyConsumptionUsed())
+                .build();
+    }
+
+    private SolarInstallation performCalculation(
+            RoofCharacteristic roof,
+            Equipment panel,
+            Equipment inverter,
+            Double dailyConsumptionKwh,
+            Double quarterlyBillTnd) {
+        double panelPowerW = (panel != null && panel.getNominalPower() != null)
+                ? panel.getNominalPower() : DEFAULT_PANEL_POWER_W;
+        double panelAreaM2 = (panel != null && panel.getArea() != null)
+                ? panel.getArea() : DEFAULT_PANEL_AREA_M2;
+
         double usableArea = roof.getArea() * USABLE_SURFACE_COEFFICIENT;
-        int panelCount = (int) (usableArea / panelAreaM2);
+        int panelCountRoof = (int) (usableArea / panelAreaM2);
+
+        Double dailyUsed = resolveDailyConsumption(dailyConsumptionKwh, quarterlyBillTnd);
+        int panelCountNeed = -1;
+        String sizingConstraint = "ROOF";
+
+        if (dailyUsed != null && panelCountRoof >= 1) {
+            double yieldPerKwp = resolveYieldPerKwp(roof, panel);
+            double targetKw = (dailyUsed * 365.0) / yieldPerKwp;
+            panelCountNeed = (int) Math.ceil(targetKw * 1000.0 / panelPowerW);
+            if (panelCountNeed < 1) {
+                panelCountNeed = 1;
+            }
+            if (panelCountNeed < panelCountRoof) {
+                sizingConstraint = "CONSUMPTION";
+            } else if (panelCountNeed == panelCountRoof) {
+                sizingConstraint = "BOTH_EQUAL";
+            } else {
+                sizingConstraint = "ROOF";
+            }
+        }
+
+        int panelCount = panelCountRoof;
+        if (panelCountNeed > 0) {
+            panelCount = Math.min(panelCountRoof, panelCountNeed);
+        }
 
         if (panelCount < 1) {
             return SolarInstallation.builder()
@@ -373,55 +392,30 @@ public class DimensioningService {
                     .inverterModel("None")
                     .co2Savings(0.0)
                     .monthlySavings(0.0)
+                    .sizingConstraint(sizingConstraint)
+                    .dailyConsumptionUsed(dailyUsed)
                     .build();
         }
 
         double totalCapacityKw = (panelCount * panelPowerW) / 1000.0;
+        double estimatedProduction = estimateAnnualProduction(roof, panel, totalCapacityKw);
 
-        double estimatedProduction;
-        
-        // Try calling PVGIS first
-        if (roof.getLatitude() != null && roof.getLongitude() != null) {
-            double aspect = convertOrientationToDegrees(roof.getOrientation());
-            double pvgisProduction = pvgisClient.getAnnualProduction(
-                    roof.getLatitude(), 
-                    roof.getLongitude(), 
-                    totalCapacityKw, 
-                    roof.getInclination(), 
-                    aspect
-            );
-            
-            if (pvgisProduction > 0) {
-                estimatedProduction = pvgisProduction;
-                log.info("Calculated production using PVGIS for {} kWp: {} kWh", totalCapacityKw, estimatedProduction);
-            } else {
-                log.warn("PVGIS failed, falling back to static calculation");
-                estimatedProduction = calculateStaticProduction(roof, totalCapacityKw);
-            }
-        } else {
-            estimatedProduction = calculateStaticProduction(roof, totalCapacityKw);
-        }
-        
-        // Inverter choice
         String finalInverterModel;
         if (inverter != null) {
             finalInverterModel = inverter.getModel();
         } else {
-            // Fallback logic if no specific inverter selected
             finalInverterModel = totalCapacityKw < 3.0 ? "Micro-Inverter System" : "Central String Inverter 5kW";
-            if (totalCapacityKw > 6.0) finalInverterModel = "Three-Phase Hybrid Inverter 10kW";
+            if (totalCapacityKw > 6.0) {
+                finalInverterModel = "Three-Phase Hybrid Inverter 10kW";
+            }
         }
 
-        // Savings (Tunisie: 0.25 - 0.30 TND/kWh)
         double annualSavings = estimatedProduction * ELECTRICITY_PRICE_TND_KWH;
-
-        // Cost Calculation
         double panelPrice = (panel != null && panel.getPrice() != null) ? panel.getPrice().doubleValue() : 450.0;
-        double inverterPrice = (inverter != null && inverter.getPrice() != null) ? inverter.getPrice().doubleValue() : 2500.0;
-        
+        double inverterPrice = (inverter != null && inverter.getPrice() != null)
+                ? inverter.getPrice().doubleValue() : 2500.0;
         double totalMaterialCost = (panelCount * panelPrice) + inverterPrice;
-        double installationLabor = totalMaterialCost * INSTALLATION_LABOR_RATE;
-        double totalProjectCost = totalMaterialCost + installationLabor;
+        double totalProjectCost = totalMaterialCost + (totalMaterialCost * INSTALLATION_LABOR_RATE);
 
         return SolarInstallation.builder()
                 .panelCount(panelCount)
@@ -431,9 +425,60 @@ public class DimensioningService {
                 .estimatedAnnualProductionKwh(Math.round(estimatedProduction * 100.0) / 100.0)
                 .inverterModel(finalInverterModel)
                 .monthlySavings(Math.round((annualSavings / 12) * 100.0) / 100.0)
-
                 .co2Savings(Math.round(estimatedProduction * CO2_FACTOR_KG_KWH * 100.0) / 100.0)
+                .sizingConstraint(dailyUsed != null ? sizingConstraint : null)
+                .dailyConsumptionUsed(dailyUsed != null
+                        ? Math.round(dailyUsed * 100.0) / 100.0 : null)
                 .build();
+    }
+
+    /**
+     * Resolves daily kWh from direct input or quarterly STEG bill (same formula as public simulator).
+     */
+    private Double resolveDailyConsumption(Double dailyConsumptionKwh, Double quarterlyBillTnd) {
+        if (dailyConsumptionKwh != null && dailyConsumptionKwh > 0) {
+            return dailyConsumptionKwh;
+        }
+        if (quarterlyBillTnd != null && quarterlyBillTnd > 0) {
+            double annualKwh = (quarterlyBillTnd * 4.0) / ELECTRICITY_PRICE_TND_KWH;
+            return annualKwh / 365.0;
+        }
+        return null;
+    }
+
+    /** Site-specific yield for 1 kWp (kWh/kWp/year), used to translate consumption into target power. */
+    private double resolveYieldPerKwp(RoofCharacteristic roof, Equipment panel) {
+        double yield = estimateAnnualProduction(roof, panel, 1.0);
+        return yield > 0 ? yield : AVERAGE_IRRADIANCE;
+    }
+
+    private double estimateAnnualProduction(RoofCharacteristic roof, Equipment panel, double totalCapacityKw) {
+        double estimatedProduction;
+        if (roof.getLatitude() != null && roof.getLongitude() != null) {
+            double aspect = convertOrientationToDegrees(roof.getOrientation());
+            double pvgisProduction = pvgisClient.getAnnualProduction(
+                    roof.getLatitude(),
+                    roof.getLongitude(),
+                    totalCapacityKw,
+                    roof.getInclination(),
+                    aspect);
+            if (pvgisProduction > 0) {
+                estimatedProduction = pvgisProduction;
+                log.info("Calculated production using PVGIS for {} kWp: {} kWh",
+                        totalCapacityKw, estimatedProduction);
+            } else {
+                log.warn("PVGIS failed, falling back to static calculation");
+                estimatedProduction = calculateStaticProduction(roof, totalCapacityKw);
+            }
+        } else {
+            estimatedProduction = calculateStaticProduction(roof, totalCapacityKw);
+        }
+
+        double productionFactor = 1.0;
+        if (panel != null && panel.getPanelCategory() != null) {
+            productionFactor = panel.getPanelCategory().getProductionFactor();
+        }
+        return estimatedProduction * productionFactor;
     }
 
     private double calculateStaticProduction(RoofCharacteristic roof, double totalCapacityKw) {
@@ -476,12 +521,14 @@ public class DimensioningService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<DimensioningResponse> getDimensioningByProjectId(Long projectId) {
-        return dimensioningRepository.findByProjectId(projectId).stream()
+        return dimensioningRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public DimensioningResponse getDimensioningById(Long id) {
         return dimensioningRepository.findById(id)
                 .map(this::mapToResponse)
@@ -512,11 +559,10 @@ public class DimensioningService {
         DecisionSupportService.Result rag = decisionSupportService.generate(
                 temp, d.getPanel(), d.getInverter());
         d.setAiRecommendation(rag.narrativeSummary());
+        d.setInstallerRecommendationJson(serializeRecommendation(rag.recommendation()));
         Dimensioning saved = dimensioningRepository.save(d);
 
-        DimensioningResponse response = mapToResponse(saved);
-        response.setInstallerRecommendation(rag.recommendation());
-        return response;
+        return mapToResponse(saved);
     }
 
     private DimensioningResponse mapToResponse(Dimensioning d) {
@@ -528,8 +574,52 @@ public class DimensioningService {
                 .status(d.getStatus())
                 .aiRecommendation(d.getAiRecommendation())
                 .panelType(d.getPanelType() != null ? d.getPanelType() : "CLASSIC")
-                .financials(financialService.calculateMetrics(d.getSolarInstallation())) // Calculate financials
+                .panel(toEquipmentSummary(d.getPanel()))
+                .inverter(toEquipmentSummary(d.getInverter()))
+                .financials(financialService.calculateMetrics(d.getSolarInstallation()))
+                .installerRecommendation(deserializeRecommendation(d.getInstallerRecommendationJson()))
                 .createdAt(d.getCreatedAt())
+                .build();
+    }
+
+    private String serializeRecommendation(InstallerRecommendationDto recommendation) {
+        if (recommendation == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(recommendation);
+        } catch (JsonProcessingException e) {
+            log.warn("Could not serialize installer recommendation: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private InstallerRecommendationDto deserializeRecommendation(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, InstallerRecommendationDto.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Could not deserialize installer recommendation: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private EquipmentSummaryDto toEquipmentSummary(Equipment equipment) {
+        if (equipment == null) {
+            return null;
+        }
+        return EquipmentSummaryDto.builder()
+                .id(equipment.getId())
+                .name(equipment.getName())
+                .brand(equipment.getBrand())
+                .model(equipment.getModel())
+                .equipmentType(equipment.getType() != null ? equipment.getType().name() : null)
+                .panelCategory(equipment.getPanelCategory() != null
+                        ? equipment.getPanelCategory().name() : null)
+                .nominalPower(equipment.getNominalPower())
+                .price(equipment.getPrice() != null ? equipment.getPrice().doubleValue() : null)
                 .build();
     }
 }

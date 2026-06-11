@@ -64,6 +64,28 @@ public class ClientExtrasController {
         return clientExtrasService.sendMessage(clientId, conversationId, projectId, message);
     }
 
+    @PostMapping(value = "/messages/{conversationId}/with-attachment", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public MessageDto sendMessageWithAttachment(
+            @PathVariable String clientId,
+            @PathVariable String conversationId,
+            @RequestParam(required = false) Long projectId,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String userRole,
+            @RequestPart("content") String content,
+            @RequestPart(value = "senderId", required = false) String senderId,
+            @RequestPart(value = "senderName", required = false) String senderName,
+            @RequestPart("file") org.springframework.web.multipart.MultipartFile file) {
+        accessControlService.requireAnyRole(userRole, "CLIENT", "INSTALLER", "ADMIN");
+        accessControlService.requireClientOwnsResource(userRole, userId, clientId);
+        MessageDto message = new MessageDto();
+        message.setContent(content);
+        message.setSenderId(senderId != null ? senderId : userId);
+        message.setSenderName(senderName);
+        message.setSenderRole(userRole);
+        return clientExtrasService.sendMessage(clientId, conversationId, projectId, message, file);
+    }
+
     @GetMapping("/documents")
     public List<DocumentDto> getDocuments(
             @PathVariable String clientId,

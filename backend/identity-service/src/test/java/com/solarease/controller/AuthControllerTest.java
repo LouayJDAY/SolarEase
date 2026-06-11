@@ -149,4 +149,38 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("Identity Service is running"));
     }
+
+    @Test
+    void register_Returns400WithFields_WhenEmailInvalid() throws Exception {
+        RegisterRequest invalid = RegisterRequest.builder()
+                .email("bad-email")
+                .username("newuser")
+                .password("password123")
+                .firstName("John")
+                .lastName("Doe")
+                .build();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.email").exists());
+    }
+
+    @Test
+    void register_Returns400WithFields_WhenPasswordTooShort() throws Exception {
+        RegisterRequest invalid = RegisterRequest.builder()
+                .email("newuser@solarease.com")
+                .username("newuser")
+                .password("12345")
+                .firstName("John")
+                .lastName("Doe")
+                .build();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.password").exists());
+    }
 }

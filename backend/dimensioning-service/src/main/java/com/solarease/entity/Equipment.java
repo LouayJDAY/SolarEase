@@ -1,6 +1,7 @@
 package com.solarease.entity;
 
 import com.solarease.enums.EquipmentType;
+import com.solarease.enums.PanelCategory;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,6 +34,11 @@ public class Equipment {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EquipmentType type;
+
+    /** TOPCon, bifacial ou biverre — uniquement pour SOLAR_PANEL. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "panel_category")
+    private PanelCategory panelCategory;
 
     // Specific to Solar Panel / Inverter
     private Double nominalPower; // Watts (W)

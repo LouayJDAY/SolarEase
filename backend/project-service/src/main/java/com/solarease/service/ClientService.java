@@ -1,5 +1,6 @@
 package com.solarease.service;
 
+import com.solarease.dto.ClientMeUpdateRequest;
 import com.solarease.dto.ClientRequest;
 import com.solarease.dto.ClientResponse;
 import com.solarease.dto.ClientStatsResponse;
@@ -39,6 +40,10 @@ public class ClientService {
                 .email(request.getEmail())
                 .phoneNumber(request.getPhoneNumber())
                 .address(request.getAddress())
+                .city(request.getCity())
+                .postalCode(request.getPostalCode())
+                .clientType(request.getClientType())
+                .notes(request.getNotes())
                 .installerId(installerId)
                 .build();
 
@@ -51,6 +56,35 @@ public class ClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
         long count = projectRepository.countByClientId(id);
         return mapToResponse(client, count);
+    }
+
+    public ClientResponse getClientByUserId(String userId) {
+        Client client = clientRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client profile not found for user: " + userId));
+        long count = projectRepository.countByClientId(client.getId());
+        return mapToResponse(client, count);
+    }
+
+    @Transactional
+    public ClientResponse updateClientByUserId(String userId, ClientMeUpdateRequest request) {
+        Client client = clientRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client profile not found for user: " + userId));
+
+        if (request.getFirstName() != null) {
+            client.setFirstName(request.getFirstName());
+        }
+        if (request.getLastName() != null) {
+            client.setLastName(request.getLastName());
+        }
+        if (request.getPhoneNumber() != null) {
+            client.setPhoneNumber(request.getPhoneNumber());
+        }
+        if (request.getAddress() != null) {
+            client.setAddress(request.getAddress());
+        }
+
+        log.info("Updated client profile for user {}", userId);
+        return mapToResponse(clientRepository.save(client), projectRepository.countByClientId(client.getId()));
     }
 
     public Page<ClientResponse> getClientsByInstaller(String installerId, String search, Pageable pageable) {
@@ -96,6 +130,10 @@ public class ClientService {
         client.setLastName(request.getLastName());
         client.setPhoneNumber(request.getPhoneNumber());
         client.setAddress(request.getAddress());
+        client.setCity(request.getCity());
+        client.setPostalCode(request.getPostalCode());
+        client.setClientType(request.getClientType());
+        client.setNotes(request.getNotes());
         
         // Only update email if it's different and not taken
         if (!client.getEmail().equals(request.getEmail())) {
@@ -154,6 +192,10 @@ public class ClientService {
                 .email(client.getEmail())
                 .phoneNumber(client.getPhoneNumber())
                 .address(client.getAddress())
+                .city(client.getCity())
+                .postalCode(client.getPostalCode())
+                .clientType(client.getClientType())
+                .notes(client.getNotes())
                 .createdAt(client.getCreatedAt())
                 .updatedAt(client.getUpdatedAt())
                 .projectCount(projectCount)

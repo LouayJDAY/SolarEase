@@ -1,12 +1,11 @@
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "../../components/client/StatusBadge";
 import { KPICard } from "../../components/KPICard";
 import { ProductionChart } from "../../components/client/ProductionChart";
 import {
   Zap,
   TrendingDown,
-  Leaf,
   Calendar,
   ArrowRight,
   FileText,
@@ -18,56 +17,99 @@ import { motion } from "motion/react";
 import { useAuth } from "../../context/AuthContext";
 import projectService, { ProjectResponse } from "../../services/projectService";
 import notificationService from "../../services/notificationService";
+import dimensioningService from "../../services/dimensioningService";
+import {
+  buildEstimatedMonthlyProduction,
+  getLatestDimensioningAnnualKwh,
+} from "../../utils/estimatedProduction";
+import {
+  getProjectPhaseLabel,
+  getProjectProgressPercent,
+} from "../../utils/projectProgress";
+import {
+  connectWebSocket,
+  releaseWebSocketConnection,
+  subscribeToNotifications,
+  unsubscribeFromNotifications,
+} from "../../services/websocketService";
 
 export function ClientDashboardPage() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productionData, setProductionData] = useState<
+    { month: string; production: number; target: number }[]
+  >([]);
+  const [hasDimensioning, setHasDimensioning] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!user?.userId) return;
+    setLoading(true);
+    try {
+      const [myProjects, notifs] = await Promise.all([
+        projectService.getMyProjects(),
+        notificationService.getNotifications(user.userId).catch(() => []),
+      ]);
+      setProjects(myProjects);
+      setNotifications(notifs.slice(0, 3));
+
+      const active =
+        myProjects.find((p) => p.status === "IN_PROGRESS") ??
+        myProjects.find((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED") ??
+        myProjects[0] ??
+        null;
+
+      if (active) {
+        const dimensionings = await dimensioningService
+          .getByProject(active.id)
+          .catch(() => []);
+        const annualKwh = getLatestDimensioningAnnualKwh(dimensionings);
+        if (annualKwh) {
+          setProductionData(buildEstimatedMonthlyProduction(annualKwh));
+          setHasDimensioning(true);
+        } else {
+          setProductionData([]);
+          setHasDimensioning(false);
+        }
+      } else {
+        setProductionData([]);
+        setHasDimensioning(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.userId]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user?.userId) return;
-      setLoading(true);
-      try {
-        const [myProjects, notifs] = await Promise.all([
-          projectService.getMyProjects(),
-          notificationService.getNotifications(user.userId).catch(() => []),
-        ]);
-        setProjects(myProjects);
-        setNotifications(notifs.slice(0, 3));
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [user]);
+    void fetchData();
+  }, [fetchData]);
 
-  const STATUS_PROGRESS: Record<string, number> = {
-    CREATED: 10,
-    EN_PREPARATION: 25,
-    INSTALLATEUR_AFFECTE: 40,
-    IN_PROGRESS: 65,
-    COMPLETED: 100,
-    CANCELLED: 0,
-  };
+  useEffect(() => {
+    if (!user?.userId) return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    const refresh = () => {
+      void fetchData();
+    };
+
+    connectWebSocket(user.userId, token);
+    subscribeToNotifications(user.userId, refresh);
+
+    return () => {
+      unsubscribeFromNotifications(refresh);
+      releaseWebSocketConnection();
+    };
+  }, [user?.userId, fetchData]);
 
   const activeProject =
     projects.find((p) => p.status === "IN_PROGRESS") ??
     projects.find((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED") ??
     projects[0] ??
     null;
-
-  const productionData = [
-    { month: "Oct", production: 680, target: 700 },
-    { month: "Nov", production: 720, target: 700 },
-    { month: "Déc", production: 650, target: 700 },
-    { month: "Jan", production: 780, target: 700 },
-    { month: "Fév", production: 810, target: 700 },
-    { month: "Mar", production: 850, target: 700 },
-  ];
 
   const notifIcons: Record<string, any> = {
     default: Bell,
@@ -103,10 +145,16 @@ export function ClientDashboardPage() {
           subtitle="Non lues"
         />
         <KPICard
-          title="Prochaine maintenance"
-          value="À planifier"
+          title="Phase en cours"
+          value={
+            activeProject ? getProjectPhaseLabel(activeProject) : "—"
+          }
           icon={Calendar}
-          subtitle="Contactez votre installateur"
+          subtitle={
+            activeProject
+              ? `${getProjectProgressPercent(activeProject)}% d'avancement`
+              : "Aucun projet actif"
+          }
         />
       </div>
 
@@ -130,15 +178,17 @@ export function ClientDashboardPage() {
           </div>
           <div>
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">Progression globale</span>
+              <span className="text-gray-600">
+                {getProjectPhaseLabel(activeProject)}
+              </span>
               <span className="font-semibold text-secondary">
-                {STATUS_PROGRESS[activeProject.status] ?? 10}%
+                {getProjectProgressPercent(activeProject)}%
               </span>
             </div>
             <div className="h-3 bg-white rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: `${STATUS_PROGRESS[activeProject.status] ?? 10}%` }}
+                style={{ width: `${getProjectProgressPercent(activeProject)}%` }}
               />
             </div>
             <p className="text-sm text-gray-600 mt-2 flex items-center">
@@ -193,12 +243,6 @@ export function ClientDashboardPage() {
             Suivre mes projets
           </Link>
           <Link
-            to="/client/documents"
-            className="block bg-white rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all"
-          >
-            Mes documents
-          </Link>
-          <Link
             to="/client/quotes"
             className="block bg-white rounded-xl p-4 border border-gray-200 hover:shadow-lg transition-all"
           >
@@ -220,8 +264,28 @@ export function ClientDashboardPage() {
       </div>
 
       <div className="bg-white rounded-xl p-6 border border-gray-200">
-        <h2 className="text-xl font-bold text-secondary mb-6">Production mensuelle</h2>
-        <ProductionChart data={productionData} type="bar" />
+        <h2 className="text-xl font-bold text-secondary mb-2">Production estimée (kWh/mois)</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Estimation basée sur le dimensionnement PVGIS de votre projet
+        </p>
+        {hasDimensioning && productionData.length > 0 ? (
+          <ProductionChart data={productionData} type="bar" />
+        ) : (
+          <div className="text-center py-10 text-gray-500">
+            {loading ? (
+              "Chargement..."
+            ) : activeProject ? (
+              <>
+                Aucun dimensionnement disponible pour ce projet.{" "}
+                <Link to={`/client/projects/${activeProject.id}`} className="text-primary hover:underline">
+                  Voir le détail du projet
+                </Link>
+              </>
+            ) : (
+              "Aucun projet actif pour afficher la production estimée."
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

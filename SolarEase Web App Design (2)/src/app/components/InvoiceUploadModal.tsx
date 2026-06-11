@@ -268,12 +268,20 @@ export default function InvoiceUploadModal({
                   {quarterlyPreview > 0 ? `${quarterlyPreview} TND` : "—"}{" "}
                   <span className="text-sm font-normal text-gray-600">/ trimestre</span>
                 </p>
+                {(result?.supplierName ?? supplierName).toLowerCase().includes("steg") && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    Total électricité uniquement (hors gaz et taxes). Si le montant est vide,
+                    saisissez la ligne « Électricité » de votre facture (ex. 118 TND).
+                  </p>
+                )}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Montant détecté (TND)
+                    {(result?.supplierName ?? supplierName).toLowerCase().includes("steg")
+                      ? "Total électricité (TND)"
+                      : "Montant détecté (TND)"}
                     <span
                       className={`ml-2 text-xs ${confidenceTone(result?.confidences?.totalTTC)}`}
                     >

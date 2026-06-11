@@ -1,6 +1,7 @@
 package com.solarease.controller;
 
 import com.solarease.dto.InvoiceDto;
+import com.solarease.dto.InvoiceUpdateRequest;
 import com.solarease.entity.Client;
 import com.solarease.entity.InvoiceEntity;
 import com.solarease.exception.ResourceNotFoundException;
@@ -8,7 +9,9 @@ import com.solarease.repository.ClientRepository;
 import com.solarease.repository.InvoiceRepository;
 import com.solarease.service.AccessControlService;
 import com.solarease.service.InvoicePdfService;
+import com.solarease.service.N8nInvoiceWebhookService;
 import com.solarease.service.NotificationWebSocketService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +39,7 @@ public class InvoiceController {
     private final ClientRepository clientRepository;
     private final AccessControlService accessControlService;
     private final NotificationWebSocketService notificationWebSocketService;
+    private final N8nInvoiceWebhookService n8nInvoiceWebhookService;
     private final InvoicePdfService invoicePdfService;
 
     @GetMapping("/{id}")
@@ -131,7 +137,64 @@ public class InvoiceController {
             notificationWebSocketService.notifyUser(updated.getInstallerId(), "Facture envoyée", message);
         }
 
+        n8nInvoiceWebhookService.notifyInvoiceReady(updated, "invoice.manual_send");
+
         return toDto(updated);
+    }
+
+    @PutMapping("/{id}")
+    public InvoiceDto updateInvoice(
+            @PathVariable Long id,
+            @RequestBody @Valid InvoiceUpdateRequest request,
+            @RequestHeader("X-User-Role") String userRole) {
+        accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
+        InvoiceEntity inv = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
+
+        if (request.getDate() != null) {
+            inv.setDate(request.getDate());
+        }
+        if (request.getDueDate() != null) {
+            inv.setDueDate(request.getDueDate());
+        }
+        if (request.getNotes() != null) {
+            inv.setNotes(request.getNotes());
+        }
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            inv.setStatus(InvoiceEntity.InvoiceStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+
+        BigDecimal subtotal = request.getSubtotal() != null ? request.getSubtotal() : inv.getSubtotal();
+        if (subtotal == null && inv.getAmount() != null) {
+            subtotal = inv.getAmount();
+        }
+        if (subtotal != null) {
+            inv.setSubtotal(subtotal);
+        }
+
+        BigDecimal discountPercent = request.getDiscountPercent() != null
+                ? request.getDiscountPercent() : inv.getDiscountPercent();
+        BigDecimal discountAmount = request.getDiscountAmount() != null
+                ? request.getDiscountAmount() : inv.getDiscountAmount();
+
+        if (discountPercent != null) {
+            inv.setDiscountPercent(discountPercent);
+        }
+        if (discountAmount != null) {
+            inv.setDiscountAmount(discountAmount);
+        }
+
+        if (request.getAmount() != null) {
+            inv.setAmount(request.getAmount());
+        } else if (subtotal != null) {
+            BigDecimal pct = discountPercent != null ? discountPercent : BigDecimal.ZERO;
+            BigDecimal fixed = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+            BigDecimal fromPct = subtotal.multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            BigDecimal totalDiscount = fromPct.add(fixed);
+            inv.setAmount(subtotal.subtract(totalDiscount).max(BigDecimal.ZERO));
+        }
+
+        return toDto(invoiceRepository.save(inv));
     }
 
     @PatchMapping("/{id}/status")
@@ -168,8 +231,12 @@ public class InvoiceController {
                 i.getNumber(),
                 i.getDate(),
                 i.getDueDate(),
-                i.getAmount().doubleValue(),
-                i.getStatus().name()
+                i.getAmount() != null ? i.getAmount().doubleValue() : 0.0,
+                i.getSubtotal() != null ? i.getSubtotal().doubleValue() : null,
+                i.getDiscountPercent() != null ? i.getDiscountPercent().doubleValue() : null,
+                i.getDiscountAmount() != null ? i.getDiscountAmount().doubleValue() : null,
+                i.getStatus().name(),
+                i.getNotes()
         );
     }
 

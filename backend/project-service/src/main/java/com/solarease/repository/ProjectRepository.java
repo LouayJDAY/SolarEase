@@ -76,4 +76,30 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     @Query("SELECT COUNT(DISTINCT p.clientId) FROM Project p")
     long countDistinctClients();
+
+    @Query(value = """
+            SELECT CAST(EXTRACT(YEAR FROM created_at) AS INTEGER) AS y,
+                   CAST(EXTRACT(MONTH FROM created_at) AS INTEGER) AS m,
+                   CAST(COUNT(*) AS BIGINT) AS cnt
+            FROM projects
+            WHERE created_at >= :startDate
+            GROUP BY y, m
+            ORDER BY y, m
+            """, nativeQuery = true)
+    List<Object[]> countProjectsByMonthSince(@Param("startDate") java.time.LocalDateTime startDate);
+
+    @Query(value = """
+            SELECT CAST(EXTRACT(YEAR FROM created_at) AS INTEGER) AS y,
+                   CAST(EXTRACT(MONTH FROM created_at) AS INTEGER) AS m,
+                   CAST(COUNT(*) AS BIGINT) AS cnt
+            FROM projects
+            WHERE installer_id = :installerId
+              AND assigned_by_admin_id IS NOT NULL
+              AND created_at >= :startDate
+            GROUP BY y, m
+            ORDER BY y, m
+            """, nativeQuery = true)
+    List<Object[]> countProjectsByMonthForInstallerSince(
+            @Param("installerId") String installerId,
+            @Param("startDate") java.time.LocalDateTime startDate);
 }

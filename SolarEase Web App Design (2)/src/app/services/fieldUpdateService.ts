@@ -73,6 +73,17 @@ export interface FieldUpdateCreateRequest {
 }
 
 const fieldUpdateService = {
+  uploadFieldPhoto: (projectId: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api
+      .post<{ photoUrl: string; fileName: string }>(
+        `/projects/${projectId}/field-updates/photos`,
+        formData
+      )
+      .then((r) => r.data);
+  },
+
   createFieldUpdate: (projectId: number, data: FieldUpdateCreateRequest) =>
     api
       .post<FieldUpdate>(`/projects/${projectId}/field-updates`, data)

@@ -6,6 +6,7 @@ import {
   ImageIcon,
   XCircle,
 } from "lucide-react";
+import { AuthenticatedImage } from "../AuthenticatedImage";
 import {
   FIELD_STATUS_COLORS,
   FIELD_STATUS_LABELS,
@@ -159,22 +160,18 @@ export function FieldUpdateTimeline({
               )}
 
               {update.photoUrl && (
-                <a
-                  href={update.photoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 group"
-                >
-                  <img
+                <div className="inline-flex items-center gap-2 group">
+                  <AuthenticatedImage
                     src={update.photoUrl}
                     alt="Photo terrain"
+                    enlargeOnClick
                     className="w-24 h-24 object-cover rounded-lg border border-slate-200 group-hover:opacity-90 transition"
                   />
                   <span className="inline-flex items-center gap-1 text-xs text-slate-500 group-hover:text-primary">
                     <ImageIcon className="w-3.5 h-3.5" />
-                    Voir la photo
+                    Photo terrain — cliquer pour agrandir
                   </span>
-                </a>
+                </div>
               )}
 
               {update.isBlockage && (

@@ -47,7 +47,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://project-service:8082/api/internal/invoices/{{ $json.body.invoiceId }}/pdf",
+        "url": "=http://project-service:8082/api/internal/invoices/{{ $('Webhook Facture').item.json.body.invoiceId }}/pdf",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

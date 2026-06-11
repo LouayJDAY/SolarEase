@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import demandService, { DemandCreateRequest } from "../../services/demandService";
+import { demandCreateSchema } from "../../validation/projectSchemas";
 
 const initialForm: DemandCreateRequest = {
   name: "",
@@ -48,9 +49,12 @@ export function ClientRequestPage() {
   };
 
   const goNext = () => {
-    if (step === 0 && !form.name?.trim()) {
-      toast.error("Le nom du projet est requis pour continuer.");
-      return;
+    if (step === 0) {
+      const parsed = demandCreateSchema.safeParse({ name: form.name?.trim() });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Le nom du projet est requis.");
+        return;
+      }
     }
     setStep((s) => Math.min(2, (s + 1) as Step));
   };
@@ -80,14 +84,25 @@ export function ClientRequestPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name?.trim()) {
-      toast.error("Le nom du projet est requis");
+    const parsed = demandCreateSchema.safeParse({
+      name: form.name?.trim(),
+      description: form.description?.trim() || undefined,
+      location: form.location?.trim() || undefined,
+      latitude: form.latitude,
+      longitude: form.longitude,
+      availableArea: form.availableArea,
+      inclination: form.inclination,
+      orientation: form.orientation,
+      budget: form.budget,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Données invalides.");
       setStep(0);
       return;
     }
     setSubmitting(true);
     try {
-      await demandService.createDemand(form);
+      await demandService.createDemand({ ...form, ...parsed.data });
       toast.success("Votre demande a été soumise avec succès !");
       navigate("/client/requests");
     } catch (err: any) {

@@ -6,7 +6,12 @@ export interface ClientRequest {
   lastName: string;
   email: string;
   phone?: string;
+  phoneNumber?: string;
   address?: string;
+  city?: string;
+  postalCode?: string;
+  clientType?: string;
+  notes?: string;
 }
 
 export interface ClientResponse {
@@ -14,8 +19,13 @@ export interface ClientResponse {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phone?: string;
+  phoneNumber?: string;
   address: string;
+  city?: string;
+  postalCode?: string;
+  clientType?: string;
+  notes?: string;
   installerId: string;
   userId?: string | null;
   createdAt: string;
@@ -40,6 +50,27 @@ export interface ClientUserDto {
   createdAt?: string;
 }
 
+export interface ClientMeUpdateRequest {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  address?: string;
+}
+
+function toPayload(data: ClientRequest) {
+  return {
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    phoneNumber: data.phoneNumber ?? data.phone,
+    address: data.address,
+    city: data.city,
+    postalCode: data.postalCode,
+    clientType: data.clientType,
+    notes: data.notes,
+  };
+}
+
 const clientService = {
   getClientStats: () =>
     api.get<ClientStats>("/clients/stats").then((r) => r.data),
@@ -61,11 +92,17 @@ const clientService = {
   getClient: (id: number) =>
     api.get<ClientResponse>(`/clients/${id}`).then((r) => r.data),
 
+  getMyClientProfile: () =>
+    api.get<ClientResponse>("/clients/me").then((r) => r.data),
+
+  updateMyClientProfile: (data: ClientMeUpdateRequest) =>
+    api.put<ClientResponse>("/clients/me", data).then((r) => r.data),
+
   createClient: (data: ClientRequest) =>
-    api.post<ClientResponse>("/clients", data).then((r) => r.data),
+    api.post<ClientResponse>("/clients", toPayload(data)).then((r) => r.data),
 
   updateClient: (id: number, data: ClientRequest) =>
-    api.put<ClientResponse>(`/clients/${id}`, data).then((r) => r.data),
+    api.put<ClientResponse>(`/clients/${id}`, toPayload(data)).then((r) => r.data),
 
   deleteClient: (id: number) =>
     api.delete(`/clients/${id}`).then((r) => r.data),

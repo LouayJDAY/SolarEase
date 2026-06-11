@@ -23,7 +23,9 @@ public class DimensioningResponse {
     private DimensioningStatus status;
     private LocalDateTime createdAt;
     private String aiRecommendation;
-    private String panelType; // "CLASSIC" or "NIGHT_PANEL"
+    private String panelType; // TOPCON_N_TYPE, BIFACIAL, GLASS_GLASS
+    private EquipmentSummaryDto panel;
+    private EquipmentSummaryDto inverter;
     private FinancialMetrics financials; // Financial projections for the project
     /**
      * Structured RAG-based installer recommendation produced by

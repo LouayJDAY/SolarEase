@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   BarChart,
   Bar,
@@ -21,28 +21,36 @@ import {
   RefreshCw,
   CheckCircle,
   Users,
-  Zap,
   FileText,
-  UserPlus,
   Clock,
   BarChart3,
   PieChart as PieChartIcon,
   Loader2,
   ArrowRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import projectService, { DashboardStats, ProjectResponse } from "../services/projectService";
-import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { useDashboardLive } from "../hooks/useDashboardLive";
 
 /* ── Component ───────────────────────────────────────────────── */
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentProjects, setRecentProjects] = useState<ProjectResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [wsLive, setWsLive] = useState(false);
   const initialLoadRef = useRef(true);
+
+  useEffect(() => {
+    if (user?.role === "CLIENT") {
+      navigate("/client/dashboard", { replace: true });
+    }
+  }, [user?.role, navigate]);
 
   const fetchDashboard = useCallback(async () => {
     const isInitialLoad = initialLoadRef.current;
@@ -74,12 +82,29 @@ export function DashboardPage() {
     }
   }, [user?.role]);
 
-  useLiveRefresh({
-    userId: user?.userId,
+  useEffect(() => {
+    if (!user?.userId) return;
+    void fetchDashboard();
+  }, [user?.userId, user?.role, fetchDashboard]);
+
+  useDashboardLive({
+    userId: user?.userId ?? null,
     token: localStorage.getItem("accessToken"),
-    intervalMs: 10000,
+    isAdmin: user?.role === "ADMIN",
+    enabled: Boolean(user?.userId),
     onRefresh: fetchDashboard,
+    onConnected: () => setWsLive(true),
+    onDisconnected: () => setWsLive(false),
   });
+
+  // Fallback polling when WebSocket is unavailable (every 30s)
+  useEffect(() => {
+    if (!user?.userId || wsLive) return;
+    const interval = setInterval(() => {
+      void fetchDashboard();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [user?.userId, wsLive, fetchDashboard]);
 
   const statusLabel = (s: string) => {
     const map: Record<string, { label: string; color: string }> = {
@@ -122,13 +147,15 @@ export function DashboardPage() {
       ].filter((d) => d.value > 0)
     : [];
 
-  const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-  const barData = monthNames.map((month) => ({ month, projets: 0 }));
-  // Fill current month with total projects count if available
-  if (stats) {
-    const currentMonth = new Date().getMonth();
-    barData[currentMonth].projets = stats.totalProjects;
-  }
+  const monthLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+
+  const barData = (stats?.projectsByMonth ?? []).map((entry) => ({
+    month: monthLabels[entry.month - 1] ?? String(entry.month),
+    projets: entry.count,
+  }));
+
+  const maxMonthlyProjects = barData.reduce((max, d) => Math.max(max, d.projets), 0);
+  const yAxisMax = Math.max(5, maxMonthlyProjects + 1);
 
   // Map points based on real project coordinates
   const geolocatedProjects = recentProjects.filter(
@@ -185,9 +212,31 @@ export function DashboardPage() {
             </div>
             <div className="text-right">
               <span className="text-sm text-gray-500 capitalize block">{today}</span>
-              <span className="text-xs text-[#4CAF50] font-medium mt-1 inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#4CAF50]" />
-                {lastSyncedAt ? `Mis à jour à ${lastSyncedAt}` : "Synchronisation en direct"}
+              <span
+                className={`text-xs font-medium mt-1 inline-flex items-center gap-1.5 ${
+                  wsLive ? "text-[#4CAF50]" : "text-amber-600"
+                }`}
+                title={
+                  wsLive
+                    ? "Les KPI se mettent à jour instantanément via WebSocket"
+                    : "Mode secours : rafraîchissement toutes les 30 s"
+                }
+              >
+                {wsLive ? (
+                  <Wifi className="w-3.5 h-3.5" />
+                ) : (
+                  <WifiOff className="w-3.5 h-3.5" />
+                )}
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    wsLive ? "bg-[#4CAF50] animate-pulse" : "bg-amber-500"
+                  }`}
+                />
+                {wsLive
+                  ? `Temps réel actif${lastSyncedAt ? ` · ${lastSyncedAt}` : ""}`
+                  : lastSyncedAt
+                    ? `Hors ligne · ${lastSyncedAt}`
+                    : "Connexion en cours…"}
               </span>
             </div>
           </div>
@@ -291,7 +340,7 @@ export function DashboardPage() {
               <div className="flex items-center gap-2 mb-6">
                 <BarChart3 className="w-5 h-5 text-gray-400" />
                 <h3 className="font-semibold text-gray-900">
-                  Projets par mois
+                  Projets créés par mois (12 derniers mois)
                 </h3>
               </div>
               <div className="h-64">
@@ -309,8 +358,8 @@ export function DashboardPage() {
                       tick={{ fill: "#9E9E9E", fontSize: 13 }}
                     />
                     <YAxis
-                      domain={[0, 5]}
-                      ticks={[0, 1, 2, 3, 4, 5]}
+                      domain={[0, yAxisMax]}
+                      allowDecimals={false}
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "#9E9E9E", fontSize: 13 }}

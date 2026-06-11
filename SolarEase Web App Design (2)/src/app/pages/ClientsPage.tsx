@@ -5,10 +5,16 @@ import toast from "react-hot-toast";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
 import { ClientStatsCards } from "../components/ClientStatsCards";
-import { ClientsTable, Client } from "../components/ClientsTable";
+import { ClientsTable } from "../components/ClientsTable";
+import { NewClientModal } from "../components/NewClientModal";
+import { EditClientModal } from "../components/EditClientModal";
+import { Client } from "../components/ClientsTable";
 import { ClientEmptyState } from "../components/ClientEmptyState";
 import { ClientPagination } from "../components/ClientPagination";
-import clientService, { ClientResponse, ClientStats, ClientUserDto } from "../services/clientService";
+import clientService, { ClientResponse, ClientStats } from "../services/clientService";
+import { getApiErrorMessage } from "../utils/apiError";
+import { toClientRequest } from "../utils/formMappers";
+import type { ClientCreateFormValues } from "../validation/clientSchemas";
 import { subscribeToClientProjectCounts } from "../services/websocketService";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { useAuth } from "../context/AuthContext";
@@ -22,30 +28,10 @@ function toClient(c: ClientResponse, idx: number): Client {
     firstName: c.firstName,
     lastName: c.lastName,
     email: c.email,
-    phone: c.phone || "",
+    phone: c.phone || c.phoneNumber || "",
     address: c.address || "",
     projectCount: c.projectCount ?? 0,
     addedDate: new Date(c.createdAt).toLocaleDateString("fr-FR"),
-    avatarColor: avatarColors[idx % avatarColors.length],
-  };
-}
-
-function userDtoToClient(
-  u: ClientUserDto,
-  idx: number,
-  projectCount = 0,
-  clientProfileId: number | null = null
-): Client {
-  return {
-    id: u.uuid,
-    clientProfileId,
-    firstName: u.firstName,
-    lastName: u.lastName,
-    email: u.email,
-    phone: u.phone || "",
-    address: "",
-    projectCount,
-    addedDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString("fr-FR") : "—",
     avatarColor: avatarColors[idx % avatarColors.length],
   };
 }
@@ -66,6 +52,8 @@ export function ClientsPage() {
   const [totalItems, setTotalItems] = React.useState(0);
   const [loadError, setLoadError] = React.useState("");
   const [clientStats, setClientStats] = React.useState<ClientStats>({ totalClients: 0, totalProjectsLinked: 0, addedThisMonth: 0 });
+  const [showNewModal, setShowNewModal] = React.useState(false);
+  const [editClient, setEditClient] = React.useState<Client | null>(null);
   const itemsPerPage = 6;
 
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
@@ -81,54 +69,27 @@ export function ClientsPage() {
       setLoadError("");
 
       if (isAdmin) {
-        // Admin: fetch CLIENT role users from identity service + items_client for project counts
-        const [users, projectClients, stats] = await Promise.all([
-          clientService.getClientUsers(),
-          clientService.getClients({ size: 1000 }),
+        // Admin + installateur: profils clients depuis project-service (items_client)
+        const sortByMap: Record<SortOption, { field: string; dir: string }> = {
+          nameAZ: { field: "lastName", dir: "asc" },
+          nameZA: { field: "lastName", dir: "desc" },
+          dateNew: { field: "createdAt", dir: "desc" },
+          dateOld: { field: "createdAt", dir: "asc" },
+        };
+        const sort = sortByMap[sortBy];
+        const [data, stats] = await Promise.all([
+          clientService.getClients({
+            search: debouncedSearch || undefined,
+            page: currentPage - 1,
+            size: itemsPerPage,
+            sortBy: sort.field,
+            sortDir: sort.dir,
+          }),
           clientService.getClientStats(),
         ]);
-
-        // Build a map of userId → linked client profile data from project-service
-        const clientLinkByUserId = new Map<string, { clientProfileId: number; projectCount: number }>();
-        for (const c of projectClients.content) {
-          if (c.userId) {
-            clientLinkByUserId.set(c.userId, {
-              clientProfileId: c.id,
-              projectCount: c.projectCount ?? 0,
-            });
-          }
-        }
-
-        let filtered = users;
-        if (debouncedSearch) {
-          const q = debouncedSearch.toLowerCase();
-          filtered = users.filter(
-            (u) =>
-              u.firstName.toLowerCase().includes(q) ||
-              u.lastName.toLowerCase().includes(q) ||
-              u.email.toLowerCase().includes(q) ||
-              (u.phone || "").includes(q)
-          );
-        }
-
-        // Sort
-        filtered = [...filtered].sort((a, b) => {
-          if (sortBy === "nameAZ") return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
-          if (sortBy === "nameZA") return `${b.lastName}${b.firstName}`.localeCompare(`${a.lastName}${a.firstName}`);
-          if (sortBy === "dateNew") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-          if (sortBy === "dateOld") return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-          return 0;
-        });
-
-        setTotalItems(filtered.length);
-        const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-        setClients(
-          paginated.map((u, i) => {
-            const link = clientLinkByUserId.get(u.uuid);
-            return userDtoToClient(u, i, link?.projectCount ?? 0, link?.clientProfileId ?? null);
-          })
-        );
-        setClientStats({ ...stats, totalClients: users.length });
+        setClients(data.content.map((c, i) => toClient(c, i)));
+        setTotalItems(data.totalElements);
+        setClientStats(stats);
       } else {
         // Installer: fetch from project-service items_client
         const sortByMap: Record<SortOption, { field: string; dir: string }> = {
@@ -207,6 +168,46 @@ export function ClientsPage() {
     addedThisMonth: clientStats.addedThisMonth,
   };
 
+  const handleCreateClient = async (data: ClientCreateFormValues) => {
+    try {
+      await clientService.createClient(toClientRequest(data));
+      toast.success("Client ajouté avec succès.");
+      fetchClients();
+      return true;
+    } catch (err: unknown) {
+      throw new Error(getApiErrorMessage(err, "Impossible d'ajouter le client. Veuillez réessayer."));
+    }
+  };
+
+  const handleUpdateClient = async (
+    id: number,
+    data: ClientCreateFormValues
+  ) => {
+    try {
+      await clientService.updateClient(id, toClientRequest(data));
+      toast.success("Client mis à jour.");
+      fetchClients();
+      return true;
+    } catch (err: unknown) {
+      throw new Error(getApiErrorMessage(err, "Impossible de modifier le client."));
+    }
+  };
+
+  const handleDeleteClient = async (client: Client) => {
+    if (!client.clientProfileId) {
+      toast.error("Impossible de supprimer : fiche client absente.");
+      return;
+    }
+    if (!window.confirm(`Supprimer ${client.firstName} ${client.lastName} ?`)) return;
+    try {
+      await clientService.deleteClient(client.clientProfileId);
+      toast.success("Client supprimé.");
+      fetchClients();
+    } catch {
+      toast.error("Impossible de supprimer ce client.");
+    }
+  };
+
   const handleClientClick = (client: Client) => {
     if (!client.clientProfileId) {
       toast.error("Ce client n'a pas encore de fiche projet. Créez/liez un projet d'abord.");
@@ -246,7 +247,7 @@ export function ClientsPage() {
       <main className="ml-64 pt-16">
         <div className="p-6 space-y-6">
           {/* Header */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-secondary">Clients</h1>
               <p className="text-muted-foreground mt-1">
@@ -261,17 +262,26 @@ export function ClientsPage() {
               )}
             </div>
 
-            <div className="text-sm text-muted-foreground lg:text-right">
-              <p>Synchronisation automatique toutes les 30 secondes</p>
-              <p className="text-xs mt-1 text-[#4CAF50]">
-                {lastSyncedAt ? `Dernière mise à jour à ${lastSyncedAt}` : "Chargement initial en cours"}
-              </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowNewModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 text-sm font-medium shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Nouveau client
+              </button>
+              <div className="text-sm text-muted-foreground lg:text-right">
+                <p>Synchronisation automatique toutes les 30 secondes</p>
+                <p className="text-xs mt-1 text-[#4CAF50]">
+                  {lastSyncedAt ? `Dernière mise à jour à ${lastSyncedAt}` : "Chargement initial en cours"}
+                </p>
+              </div>
             </div>
-
           </div>
 
           {showEmptyState ? (
-            <ClientEmptyState />
+            <ClientEmptyState onAddClient={() => setShowNewModal(true)} />
           ) : showSearchEmptyState ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
@@ -377,6 +387,8 @@ export function ClientsPage() {
                     clients={clients}
                     onClientClick={handleClientClick}
                     onProjectsClick={handleProjectsClick}
+                    onEdit={setEditClient}
+                    onDelete={handleDeleteClient}
                   />
 
                   {/* Pagination */}
@@ -396,6 +408,17 @@ export function ClientsPage() {
         </div>
       </main>
 
+      <NewClientModal
+        isOpen={showNewModal}
+        onClose={() => setShowNewModal(false)}
+        onSubmit={handleCreateClient}
+      />
+      <EditClientModal
+        isOpen={!!editClient}
+        client={editClient}
+        onClose={() => setEditClient(null)}
+        onSubmit={handleUpdateClient}
+      />
     </div>
   );
 }

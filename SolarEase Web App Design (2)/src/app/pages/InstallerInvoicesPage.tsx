@@ -18,6 +18,7 @@ import { TopBar } from "../components/TopBar";
 import { Pagination } from "../components/Pagination";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { EditInvoiceModal, InvoiceEditData } from "../components/EditInvoiceModal";
 import { toast } from "sonner";
 
 interface Invoice {
@@ -26,7 +27,11 @@ interface Invoice {
   date: string;
   dueDate: string;
   amount: number;
+  subtotal?: number | null;
+  discountPercent?: number | null;
+  discountAmount?: number | null;
   status: string;
+  notes?: string | null;
 }
 
 interface Page<T> {
@@ -70,6 +75,7 @@ export function InstallerInvoicesPage() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
+  const [editInvoice, setEditInvoice] = useState<InvoiceEditData | null>(null);
   const itemsPerPage = 10;
   const isAdmin = user?.role === "ADMIN";
 
@@ -239,6 +245,14 @@ export function InstallerInvoicesPage() {
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
+                            onClick={() => setEditInvoice(inv)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700"
+                            title="Modifier la facture"
+                          >
+                            <FileEdit className="w-4 h-4" />
+                            Modifier
+                          </button>
+                          <button
                             onClick={() => openInvoicePdf(inv.id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700"
                             title="Voir la facture en PDF"
@@ -275,6 +289,14 @@ export function InstallerInvoicesPage() {
           )}
         </div>
       </main>
+      <EditInvoiceModal
+        invoice={editInvoice}
+        onClose={() => setEditInvoice(null)}
+        onSaved={() => {
+          toast.success("Facture mise à jour.");
+          fetchInvoices(currentPage);
+        }}
+      />
     </div>
   );
 }

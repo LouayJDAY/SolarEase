@@ -19,6 +19,10 @@ public class ClientResponse {
     private String email;
     private String phoneNumber;
     private String address;
+    private String city;
+    private String postalCode;
+    private String clientType;
+    private String notes;
     private String installerId;
     private String userId;
     private LocalDateTime createdAt;

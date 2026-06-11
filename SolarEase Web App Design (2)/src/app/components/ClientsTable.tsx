@@ -19,9 +19,17 @@ interface ClientsTableProps {
   clients: Client[];
   onClientClick?: (client: Client) => void;
   onProjectsClick?: (client: Client) => void;
+  onEdit?: (client: Client) => void;
+  onDelete?: (client: Client) => void;
 }
 
-export function ClientsTable({ clients, onClientClick }: ClientsTableProps) {
+export function ClientsTable({
+  clients,
+  onClientClick,
+  onProjectsClick,
+  onEdit,
+  onDelete,
+}: ClientsTableProps) {
   const [openMenuId, setOpenMenuId] = React.useState<string | null>(null);
 
   const getInitials = (firstName: string, lastName: string) => {
@@ -171,7 +179,7 @@ export function ClientsTable({ clients, onClientClick }: ClientsTableProps) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log("Edit", client.id);
+                          onEdit?.(client);
                           setOpenMenuId(null);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-secondary hover:bg-gray-50 flex items-center gap-2"
@@ -183,7 +191,7 @@ export function ClientsTable({ clients, onClientClick }: ClientsTableProps) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log("Delete", client.id);
+                          onDelete?.(client);
                           setOpenMenuId(null);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-destructive hover:bg-red-50 flex items-center gap-2"

@@ -119,6 +119,7 @@ Réponse attendue : `{"status":"sent",...}` et e-mail reçu avec PDF.
 | Aucune exécution n8n | `N8N_ENABLED=true` + workflow **Active** |
 | 403 sur PDF | `X-Internal-Secret` ≠ `N8N_INTERNAL_SECRET` |
 | E-mail non reçu | Vérifier SMTP credential, spam, mot de passe app Gmail |
+| PDF 404 dans n8n (exécution rouge) | Corrigé côté backend : webhook appelé **après commit** DB ; réimporter/activer le workflow |
 | `clientEmail missing` | Le client n'a pas d'e-mail en base (`items_client.email`) |
 | Webhook 404 | Workflow inactif ou mauvaise URL |
 

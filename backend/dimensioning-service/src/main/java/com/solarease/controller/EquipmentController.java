@@ -1,7 +1,9 @@
 package com.solarease.controller;
 
+import com.solarease.dto.EquipmentRequest;
 import com.solarease.entity.Equipment;
 import com.solarease.enums.EquipmentType;
+import com.solarease.enums.PanelCategory;
 import com.solarease.service.EquipmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +27,12 @@ public class EquipmentController {
     }
 
     @GetMapping("/type/{type}")
-    public List<Equipment> getEquipmentByType(@PathVariable EquipmentType type) {
+    public List<Equipment> getEquipmentByType(
+            @PathVariable EquipmentType type,
+            @RequestParam(required = false) PanelCategory category) {
+        if (type == EquipmentType.SOLAR_PANEL && category != null) {
+            return equipmentService.getSolarPanels(category);
+        }
         return equipmentService.getEquipmentByType(type);
     }
 
@@ -35,14 +42,14 @@ public class EquipmentController {
     }
 
     @PostMapping
-    public ResponseEntity<Equipment> createEquipment(@RequestBody @Valid Equipment equipment) {
-        Equipment created = equipmentService.createEquipment(equipment);
+    public ResponseEntity<Equipment> createEquipment(@RequestBody @Valid EquipmentRequest request) {
+        Equipment created = equipmentService.createEquipment(request);
         return ResponseEntity.created(URI.create("/api/equipment/" + created.getId())).body(created);
     }
 
     @PutMapping("/{id}")
-    public Equipment updateEquipment(@PathVariable Long id, @RequestBody @Valid Equipment equipment) {
-        return equipmentService.updateEquipment(id, equipment);
+    public Equipment updateEquipment(@PathVariable Long id, @RequestBody @Valid EquipmentRequest request) {
+        return equipmentService.updateEquipment(id, request);
     }
 
     @DeleteMapping("/{id}")

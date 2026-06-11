@@ -2,6 +2,7 @@ package com.solarease.rag;
 
 import com.solarease.entity.Equipment;
 import com.solarease.enums.EquipmentType;
+import com.solarease.enums.PanelCategory;
 import com.solarease.repository.EquipmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -115,8 +116,8 @@ public class KnowledgeIndexerService implements CommandLineRunner {
         StringBuilder content = new StringBuilder();
         switch (type) {
             case INVERTER -> describeInverter(e, content, meta);
-            case SOLAR_PANEL -> describePanel(e, content, meta, false);
-            case NIGHT_PANEL -> describePanel(e, content, meta, true);
+            case SOLAR_PANEL -> describePanel(e, content, meta, e.getPanelCategory());
+            case NIGHT_PANEL -> describeNightPanel(e, content, meta);
             case CIRCUIT_BREAKER_DC, CIRCUIT_BREAKER_AC -> describeBreaker(e, content, meta);
             default -> content.append(e.getName()).append(' ').append(orDash(e.getBrand()));
         }
@@ -159,9 +160,14 @@ public class KnowledgeIndexerService implements CommandLineRunner {
     }
 
     private void describePanel(Equipment e, StringBuilder content,
-                               Map<String, Object> meta, boolean nightPanel) {
-        meta.put("category", nightPanel ? "night_panel" : "panel");
-        content.append(nightPanel ? "Panneau Night Panel " : "Panneau solaire ")
+                               Map<String, Object> meta, PanelCategory category) {
+        meta.put("category", "panel");
+        String label = category != null ? category.getLabel() : "Monocristallin";
+        if (category != null) {
+            meta.put("panelCategory", category.name());
+            meta.put("technology", category.name());
+        }
+        content.append("Panneau ").append(label).append(' ')
                 .append(orDash(e.getBrand())).append(' ').append(orDash(e.getModel()));
         if (e.getNominalPower() != null) {
             content.append(", ").append(String.format("%.0f Wc", e.getNominalPower()));
@@ -170,14 +176,30 @@ public class KnowledgeIndexerService implements CommandLineRunner {
             content.append(", rendement ")
                     .append(String.format("%.0f%%", e.getEfficiency() * 100));
         }
-        if (nightPanel && e.getStorageCapacityKwh() != null) {
-            content.append(", stockage intégré ")
-                    .append(String.format("%.1f kWh", e.getStorageCapacityKwh()));
+        if (category == PanelCategory.BIFACIAL) {
+            content.append(", gain bifacial estimé +10% sur surface réfléchissante");
+        }
+        if (category == PanelCategory.GLASS_GLASS) {
+            content.append(", encapsulation biverre pour durabilité accrue");
         }
         if (e.getWarrantyYears() != null) {
             content.append(", garantie ").append(e.getWarrantyYears()).append(" ans");
         }
         content.append('.');
+    }
+
+    private void describeNightPanel(Equipment e, StringBuilder content, Map<String, Object> meta) {
+        meta.put("category", "night_panel");
+        content.append("Panneau Night Panel ").append(orDash(e.getBrand())).append(' ')
+                .append(orDash(e.getModel()));
+        if (e.getNominalPower() != null) {
+            content.append(", ").append(String.format("%.0f Wc", e.getNominalPower()));
+        }
+        if (e.getStorageCapacityKwh() != null) {
+            content.append(", stockage intégré ")
+                    .append(String.format("%.1f kWh/panneau", e.getStorageCapacityKwh()));
+        }
+        content.append(". Permet l'autoconsommation nocturne via stockage intégré.");
     }
 
     private void describeBreaker(Equipment e, StringBuilder content,

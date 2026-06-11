@@ -14,14 +14,18 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import notificationService from "../../services/notificationService";
-import { connectWebSocket, disconnectWebSocket, subscribeToNotifications } from "../../services/websocketService";
+import {
+  connectWebSocket,
+  releaseWebSocketConnection,
+  subscribeToNotifications,
+  unsubscribeFromNotifications,
+} from "../../services/websocketService";
 
 const navItems = [
   { path: "/client/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/client/projects", label: "Mes projets", icon: FolderKanban },
   { path: "/client/quotes", label: "Devis", icon: FileText },
   { path: "/client/requests", label: "Mes demandes", icon: FileQuestion },
-  { path: "/client/documents", label: "Documents", icon: FileText },
   { path: "/client/billing", label: "Facturation", icon: CreditCard },
   { path: "/client/messages", label: "Messages", icon: MessageSquare },
   { path: "/client/notifications", label: "Notifications", icon: Bell },
@@ -44,14 +48,16 @@ export function ClientLayout() {
     if (!user?.userId) return;
     refreshUnreadCount();
     const token = localStorage.getItem("accessToken");
+    const onNotif = () => {
+      setUnreadCount((prev) => prev + 1);
+    };
     if (token) {
-      subscribeToNotifications(user.userId, () => {
-        setUnreadCount((prev) => prev + 1);
-      });
+      subscribeToNotifications(user.userId, onNotif);
       connectWebSocket(user.userId, token);
     }
     return () => {
-      disconnectWebSocket();
+      unsubscribeFromNotifications(onNotif);
+      releaseWebSocketConnection();
     };
   }, [user?.userId]);
 

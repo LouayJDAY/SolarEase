@@ -40,6 +40,10 @@ public class Dimensioning {
     @Column(columnDefinition = "TEXT")
     private String aiRecommendation;
 
+    /** JSON serialisation of {@link com.solarease.rag.InstallerRecommendationDto}. */
+    @Column(columnDefinition = "TEXT")
+    private String installerRecommendationJson;
+
     @ManyToOne
     @JoinColumn(name = "panel_id")
     private Equipment panel;
@@ -49,7 +53,7 @@ public class Dimensioning {
     private Equipment inverter;
 
     @Column(length = 20)
-    private String panelType; // "CLASSIC" or "NIGHT_PANEL"
+    private String panelType; // TOPCON_N_TYPE, BIFACIAL, GLASS_GLASS
 
     @CreationTimestamp
     private LocalDateTime createdAt;

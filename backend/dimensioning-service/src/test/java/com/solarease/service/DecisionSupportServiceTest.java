@@ -5,6 +5,7 @@ import com.solarease.dto.FinancialMetrics;
 import com.solarease.entity.Equipment;
 import com.solarease.entity.SolarInstallation;
 import com.solarease.enums.EquipmentType;
+import com.solarease.enums.PanelCategory;
 import com.solarease.rag.CompatibilityRuleEngine;
 import com.solarease.rag.EmbeddingService;
 import com.solarease.rag.EquipmentSelectionService;
@@ -90,6 +91,7 @@ class DecisionSupportServiceTest {
                 .brand("JA Solar")
                 .model("JAM72S30-540")
                 .type(EquipmentType.SOLAR_PANEL)
+                .panelCategory(PanelCategory.TOPCON_N_TYPE)
                 .nominalPower(540.0)
                 .price(BigDecimal.valueOf(1399))
                 .build();

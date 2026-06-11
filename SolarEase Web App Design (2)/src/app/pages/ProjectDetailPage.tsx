@@ -32,6 +32,7 @@ import {
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
 import { ProjectQuotesPanel } from "../components/ProjectQuotesPanel";
+import { getPanelTypeLabel } from "../constants/panelTypes";
 import {
   AreaChart,
   Area,
@@ -61,12 +62,24 @@ import { BlockageForm } from "../components/terrain/BlockageForm";
 import { FieldUpdateTimeline } from "../components/terrain/FieldUpdateTimeline";
 import { TerrainKitReminder } from "../components/terrain/TerrainKitReminder";
 import { ActiveChantiersPanel } from "../components/terrain/ActiveChantiersPanel";
+import { AuthenticatedImage } from "../components/AuthenticatedImage";
 import type {
   BlockageImpactKey,
   BlockageTypeKey,
 } from "../constants/installationPhases";
+import { computeProgress } from "../constants/installationPhases";
 import { useAuth } from "../context/AuthContext";
 import { EditProjectModal } from "../components/EditProjectModal";
+import { ProjectSiteMap } from "../components/ProjectSiteMap";
+import { LocationValue } from "../components/LocationPicker";
+import { formatCoordinates, isValidProjectCoordinates } from "../utils/geo";
+import { getLatestDimensioning } from "../utils/quoteFromDimensioning";
+import {
+  resolveAvailableArea,
+  resolveInclination,
+  resolveOrientationLabel,
+  resolvePeakPowerKw,
+} from "../utils/dimensioningDisplay";
 import toast from "react-hot-toast";
 
 export function ProjectDetailPage() {
@@ -118,30 +131,18 @@ export function ProjectDetailPage() {
   const [pendingStatus, setPendingStatus] = useState<string>("");
   const [statusChanging, setStatusChanging] = useState(false);
 
-  const loadRecommendationInBackground = (dimensioningId: number) => {
-    setRecommendationLoading(true);
-    dimensioningService
-      .regenerateRecommendation(dimensioningId)
-      .then((refreshed) => setDimensioning(refreshed))
-      .catch(() => {
-        /* Garder aiRecommendation en fallback */
-      })
-      .finally(() => setRecommendationLoading(false));
-  };
-
   const fetchDimensioning = async (projectId: number) => {
     try {
       const dims = await dimensioningService.getByProject(projectId);
-      if (dims && dims.length > 0) {
-        const latest = dims[dims.length - 1];
+      const latest = getLatestDimensioning(dims);
+      if (latest) {
         setDimensioning(latest);
-        // Régénération non bloquante — Ollama peut prendre 30-60 s
-        if (!latest.installerRecommendation) {
-          loadRecommendationInBackground(latest.id);
-        }
+      } else {
+        setDimensioning(null);
       }
-    } catch {
-      // Dimensioning may not exist yet
+    } catch (err) {
+      console.error("Error fetching dimensioning:", err);
+      setDimensioning(null);
     }
   };
 
@@ -161,26 +162,75 @@ export function ProjectDetailPage() {
     }
   };
 
-  const fetchFieldUpdates = useCallback(async (projectId: number) => {
-    setFieldUpdatesLoading(true);
-    try {
-      const updates = await fieldUpdateService.getFieldUpdates(projectId);
-      setFieldUpdates(updates);
-    } catch {
-      // Field updates may not exist yet
-    } finally {
-      setFieldUpdatesLoading(false);
-    }
-  }, []);
+  const syncTerrainFormFromLatest = useCallback(
+    (updates: FieldUpdate[], proj: ProjectResponse | null) => {
+      const latest = updates[0];
+      if (latest) {
+        setFormStatus(latest.fieldStatus);
+        const steps = latest.completedSteps?.filter(Boolean) ?? [];
+        setFormCompletedSteps(steps);
+        setFormProgress(
+          steps.length > 0
+            ? computeProgress(steps)
+            : latest.progressPercent ?? proj?.currentProgress ?? 0
+        );
+        setFormIsBlockage(Boolean(latest.isBlockage));
+        setFormBlockageReason(latest.blockageReason ?? "");
+        setFormBlockageType(latest.blockageType ?? "");
+        setFormBlockageImpact(latest.blockageImpact ?? "");
+        return;
+      }
+      if (proj) {
+        if (proj.currentFieldStatus) {
+          setFormStatus(proj.currentFieldStatus as InstallerFieldStatus);
+        }
+        setFormProgress(proj.currentProgress ?? 0);
+        setFormCompletedSteps([]);
+      }
+    },
+    []
+  );
+
+  const fetchFieldUpdates = useCallback(
+    async (
+      projectId: number,
+      options?: { syncForm?: boolean; project?: ProjectResponse | null }
+    ) => {
+      setFieldUpdatesLoading(true);
+      try {
+        const updates = await fieldUpdateService.getFieldUpdates(projectId);
+        setFieldUpdates(updates);
+        if (options?.syncForm) {
+          syncTerrainFormFromLatest(updates, options.project ?? null);
+        }
+        return updates;
+      } catch {
+        // Field updates may not exist yet
+        return [];
+      } finally {
+        setFieldUpdatesLoading(false);
+      }
+    },
+    [syncTerrainFormFromLatest]
+  );
 
   useEffect(() => {
     if (!id) return;
+    setFormStatus("SUR_SITE");
+    setFormProgress(0);
+    setFormCompletedSteps([]);
+    setFormNote("");
+    setFormIsBlockage(false);
+    setFormBlockageReason("");
+    setFormBlockageType("");
+    setFormBlockageImpact("");
+    setFormPhotoUrl("");
     const fetchData = async () => {
       try {
         const proj = await projectService.getProject(Number(id));
         setProject(proj);
         await fetchDimensioning(Number(id));
-        await fetchFieldUpdates(Number(id));
+        await fetchFieldUpdates(Number(id), { syncForm: true, project: proj });
       } catch (err) {
         console.error("Error fetching project:", err);
       } finally {
@@ -211,25 +261,56 @@ export function ProjectDetailPage() {
     if (!project) return false;
 
     try {
-      const updated = await projectService.updateProject(project.id, {
+      const lat = Number(data.latitude);
+      const lon = Number(data.longitude);
+      const availableArea = Number(data.availableArea) || project.availableArea || 0;
+      const payload = {
         name: data.name,
         description: data.description,
         location: data.location,
-        latitude: Number(data.latitude) || 0,
-        longitude: Number(data.longitude) || 0,
-        peakPower: Number(data.peakPower) || 0,
-        availableArea: Number(data.availableArea) || 0,
-        inclination: Number(data.inclination) || 35,
-        orientation: Number(data.orientation) || 0,
-        budget: Number(data.budget) || 0,
+        latitude: isValidProjectCoordinates(lat, lon) ? lat : project.latitude,
+        longitude: isValidProjectCoordinates(lat, lon) ? lon : project.longitude,
+        peakPower: Number(data.peakPower) || project.peakPower || 0,
+        availableArea,
+        inclination: Number(data.inclination) ?? project.inclination ?? 35,
+        orientation: Number(data.orientation) ?? project.orientation ?? 0,
+        budget: Number(data.budget) || project.budget || 0,
         clientId: project.client?.id,
         installerId: user?.role === "ADMIN" ? data.installerId?.trim() || project.installerId : project.installerId,
         installerEmail: user?.role === "ADMIN" ? data.installerEmail?.trim() || project.installerEmail : project.installerEmail,
-      });
+      };
+      const updated = await projectService.updateProject(project.id, payload);
       setProject(updated);
       return true;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error updating project:", err);
+      return false;
+    }
+  };
+
+  const handleProjectLocationUpdate = async (value: LocationValue) => {
+    if (!project || !isValidProjectCoordinates(value.latitude, value.longitude)) return false;
+    try {
+      const updated = await projectService.updateProject(project.id, {
+        name: project.name,
+        description: project.description,
+        location: value.location,
+        latitude: value.latitude!,
+        longitude: value.longitude!,
+        peakPower: project.peakPower,
+        availableArea: project.availableArea,
+        inclination: project.inclination,
+        orientation: project.orientation,
+        budget: project.budget,
+        clientId: project.client?.id,
+        installerId: project.installerId,
+        installerEmail: project.installerEmail,
+      });
+      setProject(updated);
+      toast.success("Emplacement enregistré — météo PVGIS activée");
+      return true;
+    } catch {
+      toast.error("Impossible d'enregistrer l'emplacement");
       return false;
     }
   };
@@ -259,16 +340,11 @@ export function ProjectDetailPage() {
       await fieldUpdateService.createFieldUpdate(project.id, req);
       toast.success("Mise à jour terrain enregistrée");
       setFormNote("");
-      setFormIsBlockage(false);
-      setFormBlockageReason("");
       setFormRequiresValidation(false);
-      setFormCompletedSteps([]);
-      setFormBlockageType("");
-      setFormBlockageImpact("");
       setFormPhotoUrl("");
-      await fetchFieldUpdates(project.id);
       const updated = await projectService.getProject(project.id);
       setProject(updated);
+      await fetchFieldUpdates(project.id, { syncForm: true, project: updated });
     } catch {
       toast.error("Erreur lors de l'envoi de la mise à jour");
     } finally {
@@ -276,26 +352,25 @@ export function ProjectDetailPage() {
     }
   };
 
-  const handlePhotoChange = (file: File | null) => {
-    if (!file) {
+  const handlePhotoChange = async (file: File | null) => {
+    if (!file || !project) {
       setFormPhotoUrl("");
       return;
     }
-    if (file.size > 800 * 1024) {
-      toast.error("Photo trop lourde (max 800 Ko)");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Photo trop lourde (max 5 Mo)");
       return;
     }
     setPhotoLoading(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFormPhotoUrl(typeof reader.result === "string" ? reader.result : "");
+    try {
+      const uploaded = await fieldUpdateService.uploadFieldPhoto(project.id, file);
+      setFormPhotoUrl(uploaded.photoUrl);
+    } catch {
+      toast.error("Impossible d'envoyer la photo");
+      setFormPhotoUrl("");
+    } finally {
       setPhotoLoading(false);
-    };
-    reader.onerror = () => {
-      toast.error("Lecture du fichier impossible");
-      setPhotoLoading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const handleValidate = async (validated: boolean) => {
@@ -413,6 +488,10 @@ export function ProjectDetailPage() {
   // Financial data from dimensioning
   const inst = dimensioning?.installation;
   const fin = dimensioning?.financials;
+  const displayPeakPower = resolvePeakPowerKw(dimensioning, project);
+  const displayArea = resolveAvailableArea(dimensioning, project);
+  const displayInclination = resolveInclination(dimensioning, project);
+  const displayOrientation = resolveOrientationLabel(dimensioning, project);
 
   const annualProduction = inst?.estimatedAnnualProductionKwh
     ? `${Math.round(inst.estimatedAnnualProductionKwh).toLocaleString()} kWh/an`
@@ -443,7 +522,10 @@ export function ProjectDetailPage() {
         { year: 25, savings: 36750 },
       ];
 
-  const isNightPanelResult = dimensioning?.panelType === "NIGHT_PANEL";
+  const panelTypeLabel = getPanelTypeLabel(dimensioning?.panelType);
+  const isLegacyNightPanel =
+    dimensioning?.panelType === "NIGHT_PANEL" &&
+    Boolean(inst?.storageCapacityKwh);
 
   return (
     <div className="min-h-screen bg-background">
@@ -684,19 +766,19 @@ export function ProjectDetailPage() {
                     {/* Photo upload (data-URL MVP) */}
                     <div>
                       <label className="block text-xs font-medium text-slate-500 mb-1">
-                        Photo (optionnel, max 800 Ko)
+                        Photo (optionnel, max 5 Mo)
                       </label>
                       <div className="flex items-center gap-3">
                         <input
                           type="file"
-                          accept="image/*"
-                          onChange={(e) => handlePhotoChange(e.target.files?.[0] ?? null)}
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => void handlePhotoChange(e.target.files?.[0] ?? null)}
                           className="text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                         />
                         {photoLoading && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
                         {formPhotoUrl && !photoLoading && (
                           <div className="flex items-center gap-2">
-                            <img
+                            <AuthenticatedImage
                               src={formPhotoUrl}
                               alt="Aperçu"
                               className="w-12 h-12 object-cover rounded-md border border-slate-200"
@@ -813,31 +895,22 @@ export function ProjectDetailPage() {
                   </p>
                 </div>
 
-                <div>
+                <div className="col-span-2">
                   <p className="text-xs text-muted-foreground mb-1">
                     Localisation
                   </p>
                   <p className="text-sm font-medium text-secondary">
-                    {project.location}
+                    {project.location?.trim() || "Non renseignée"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 font-mono">
+                    {formatCoordinates(project.latitude, project.longitude)}
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Latitude
-                  </p>
-                  <p className="text-sm font-medium text-secondary">
-                    {project.latitude}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Longitude
-                  </p>
-                  <p className="text-sm font-medium text-secondary">
-                    {project.longitude}
-                  </p>
+                <div className="col-span-2">
+                  {!showEditModal && !showDimensioningModal && (
+                    <ProjectSiteMap latitude={project.latitude} longitude={project.longitude} height={160} />
+                  )}
                 </div>
 
                 <div>
@@ -846,7 +919,7 @@ export function ProjectDetailPage() {
                   </p>
                   <p className="text-sm font-medium text-primary flex items-center gap-2">
                     <Battery className="w-4 h-4" />
-                    {project.peakPower} kWc
+                    {displayPeakPower} kWc
                   </p>
                 </div>
 
@@ -854,7 +927,7 @@ export function ProjectDetailPage() {
                   <p className="text-xs text-muted-foreground mb-1">Surface</p>
                   <p className="text-sm font-medium text-secondary flex items-center gap-2">
                     <Maximize className="w-4 h-4 text-muted-foreground" />
-                    {project.availableArea ? `${project.availableArea} m²` : "—"}
+                    {displayArea}
                   </p>
                 </div>
 
@@ -872,16 +945,12 @@ export function ProjectDetailPage() {
 
             {/* Card 2: Dimensioning Results */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-secondary mb-4 flex items-center gap-2">
-                {isNightPanelResult ? (
-                  <Moon className="w-5 h-5 text-indigo-500" />
-                ) : (
-                  <Sun className="w-5 h-5 text-accent" />
-                )}
+              <h2 className="text-lg font-semibold text-secondary mb-4 flex items-center gap-2 flex-wrap">
+                <Sun className="w-5 h-5 text-accent" />
                 Résultats du dimensionnement
-                {isNightPanelResult && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                    Night Panel
+                {hasDimensioning && (
+                  <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+                    {panelTypeLabel}
                   </span>
                 )}
               </h2>
@@ -916,14 +985,43 @@ export function ProjectDetailPage() {
                   </p>
                 </div>
 
+                {inst?.dailyConsumptionUsed != null && inst.dailyConsumptionUsed > 0 && (
+                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-sm">
+                    <p className="text-xs text-muted-foreground mb-1">Consommation utilisée</p>
+                    <p className="font-medium text-secondary">
+                      {inst.dailyConsumptionUsed.toLocaleString("fr-FR", {
+                        maximumFractionDigits: 1,
+                      })}{" "}
+                      kWh/jour
+                    </p>
+                    {inst.sizingConstraint && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {inst.sizingConstraint === "CONSUMPTION"
+                          ? "Limité par la consommation client (facture STEG)"
+                          : inst.sizingConstraint === "ROOF"
+                            ? "Limité par la surface toit disponible"
+                            : "Besoin énergétique et surface toit équilibrés"}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">
                       Panneaux
                     </p>
                     <p className="text-lg font-semibold text-secondary">
-                      {inst?.panelCount || "—"} × {inst?.panelModel || ""}
+                      {inst?.panelCount || "—"} × {dimensioning?.panel?.name || inst?.panelModel || ""}
                     </p>
+                    {dimensioning?.panel && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {dimensioning.panel.brand} {dimensioning.panel.model}
+                        {dimensioning.panel.nominalPower
+                          ? ` · ${dimensioning.panel.nominalPower} W`
+                          : ""}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -931,11 +1029,11 @@ export function ProjectDetailPage() {
                       Puissance crête
                     </p>
                     <p className="text-lg font-semibold text-secondary">
-                      {inst?.totalCapacityKw || project.peakPower} kWc
+                      {displayPeakPower} kWc
                     </p>
                   </div>
 
-                  {isNightPanelResult && inst?.storageCapacityKwh && (
+                  {isLegacyNightPanel && inst?.storageCapacityKwh && (
                     <>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
@@ -956,26 +1054,23 @@ export function ProjectDetailPage() {
                     </>
                   )}
 
-                  {!isNightPanelResult && (
-                    <>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Inclinaison
-                        </p>
-                        <p className="text-lg font-semibold text-secondary">
-                          {project.inclination}°
-                        </p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Orientation
-                        </p>
-                        <p className="text-lg font-semibold text-secondary">
-                          {project.orientation}°
-                        </p>
-                      </div>
-                    </>
-                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Inclinaison
+                    </p>
+                    <p className="text-lg font-semibold text-secondary">
+                      {displayInclination}
+                      {typeof displayInclination === "number" ? "°" : ""}
+                    </p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Orientation
+                    </p>
+                    <p className="text-lg font-semibold text-secondary">
+                      {displayOrientation}
+                    </p>
+                  </div>
                 </div>
               </div>
               )}
@@ -1219,12 +1314,15 @@ export function ProjectDetailPage() {
           isOpen={showDimensioningModal}
           projectId={project.id}
           projectData={{
+            location: project.location,
             latitude: project.latitude,
             longitude: project.longitude,
-            availableArea: project.availableArea || 25,
-            inclination: project.inclination || 35,
-            orientation: project.orientation || 0,
+            availableArea: project.availableArea,
+            inclination: project.inclination,
+            orientation: project.orientation,
+            description: project.description,
           }}
+          onLocationUpdate={handleProjectLocationUpdate}
           onClose={() => setShowDimensioningModal(false)}
           onResult={handleDimensioningResult}
         />

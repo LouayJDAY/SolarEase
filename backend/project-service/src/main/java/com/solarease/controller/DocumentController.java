@@ -5,8 +5,10 @@ import com.solarease.entity.DocumentEntity;
 import com.solarease.exception.ResourceNotFoundException;
 import com.solarease.repository.DocumentRepository;
 import com.solarease.service.AccessControlService;
+import com.solarease.service.DocumentDownloadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,17 @@ public class DocumentController {
 
     private final DocumentRepository documentRepository;
     private final AccessControlService accessControlService;
+    private final DocumentDownloadService documentDownloadService;
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<?> downloadDocument(
+            @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String userRole,
+            @RequestParam(defaultValue = "false") boolean attachment) {
+        accessControlService.requireAnyRole(userRole, "CLIENT", "INSTALLER", "ADMIN");
+        return documentDownloadService.downloadDocument(id, userId, userRole, attachment);
+    }
 
     @GetMapping("/{id}")
     public DocumentDto getDocumentById(

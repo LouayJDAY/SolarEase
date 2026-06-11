@@ -30,6 +30,11 @@ api.interceptors.request.use((config) => {
     }
   }
 
+  // Let the browser set multipart boundary; default application/json breaks FormData uploads
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
   return config;
 });
 

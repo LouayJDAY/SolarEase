@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solarease.dto.ProjectRequest;
 import com.solarease.dto.ProjectResponse;
 import com.solarease.enums.ProjectStatus;
+import com.solarease.service.AccessControlService;
 import com.solarease.service.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,9 @@ class ProjectControllerTest {
 
     @MockBean
     private ProjectService projectService;
+
+    @MockBean
+    private AccessControlService accessControlService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -102,5 +106,21 @@ class ProjectControllerTest {
 
         mockMvc.perform(delete("/api/projects/1"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void createProject_Returns400WithFields_WhenNameBlank() throws Exception {
+        ProjectRequest invalid = ProjectRequest.builder()
+                .name("")
+                .clientId(1L)
+                .build();
+
+        mockMvc.perform(post("/api/projects")
+                        .header("X-User-Id", "installer-1")
+                        .header("X-User-Role", "INSTALLER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.name").exists());
     }
 }

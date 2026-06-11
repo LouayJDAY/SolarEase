@@ -111,10 +111,22 @@ export function InstallerRecommendationCard({
         </div>
       </div>
 
-      {loading && !hasStructured && (
+      {loading && !hasStructured && !fallbackText && (
         <div className="flex items-center gap-2 text-sm text-purple-600 py-4">
           <RefreshCw className="w-4 h-4 animate-spin" />
           Analyse du kit en cours…
+        </div>
+      )}
+
+      {loading && !hasStructured && fallbackText && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs text-purple-600">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            Mise à jour du kit en cours…
+          </div>
+          <p className="text-secondary leading-relaxed whitespace-pre-line text-sm">
+            {fallbackText}
+          </p>
         </div>
       )}
 
@@ -331,7 +343,7 @@ export function InstallerRecommendationCard({
       )}
 
       {/* Fallback when no structured data yet */}
-      {!hasStructured && !loading && fallbackText && (
+      {!hasStructured && !loading && fallbackText && !recommendation && (
         <p className="text-secondary leading-relaxed whitespace-pre-line">
           {fallbackText}
         </p>

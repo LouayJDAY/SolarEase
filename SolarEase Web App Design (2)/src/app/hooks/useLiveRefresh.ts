@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import {
   connectWebSocket,
-  disconnectWebSocket,
+  releaseWebSocketConnection,
   subscribeToNotifications,
+  unsubscribeFromNotifications,
+  type NotificationPayload,
 } from "../services/websocketService";
 
 interface UseLiveRefreshOptions {
@@ -24,10 +26,17 @@ export function useLiveRefresh({
 }: UseLiveRefreshOptions): void {
   const onRefreshRef = useRef(onRefresh);
   const intervalIdRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationHandlerRef = useRef<(n: NotificationPayload) => void>(() => {});
 
   useEffect(() => {
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
+
+  useEffect(() => {
+    notificationHandlerRef.current = () => {
+      void onRefreshRef.current();
+    };
+  });
 
   // Initial load immediately
   useEffect(() => {
@@ -50,7 +59,6 @@ export function useLiveRefresh({
       }
     };
 
-    // Set up polling
     if (intervalIdRef.current) {
       clearInterval(intervalIdRef.current);
     }
@@ -69,9 +77,11 @@ export function useLiveRefresh({
   useEffect(() => {
     if (!enabled || !userId || !token) return;
 
-    subscribeToNotifications(userId, () => {
-      void onRefreshRef.current();
-    });
+    const handler = (_n: NotificationPayload) => {
+      notificationHandlerRef.current(_n);
+    };
+
+    subscribeToNotifications(userId, handler);
 
     connectWebSocket(userId, token, {
       onConnected: () => {
@@ -81,7 +91,8 @@ export function useLiveRefresh({
     });
 
     return () => {
-      disconnectWebSocket();
+      unsubscribeFromNotifications(handler);
+      releaseWebSocketConnection();
     };
   }, [enabled, userId, token, onConnected]);
 }

@@ -10,6 +10,8 @@ import {
   Eye,
   User as UserIcon,
   RotateCcw,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -22,6 +24,13 @@ import { QuoteList } from "../components/QuoteList";
 import quoteService, { Quote, QuoteCreateRequest } from "../services/quoteService";
 import projectService, { ProjectResponse } from "../services/projectService";
 import catalogService, { CatalogCategory, CatalogProduct } from "../services/catalogService";
+import dimensioningService from "../services/dimensioningService";
+import {
+  buildQuotePrefillFromDimensioning,
+  computeTva,
+  getLatestDimensioning,
+  TVA_RATE,
+} from "../utils/quoteFromDimensioning";
 import { useAuth } from "../context/AuthContext";
 
 const CATEGORY_LABELS: Record<CatalogCategory, string> = {
@@ -72,6 +81,11 @@ export function QuotesPage() {
   const [addedItems, setAddedItems] = useState<AddedItem[]>([]);
 
   const [showForm, setShowForm] = useState(false);
+  const [prefillSource, setPrefillSource] = useState<{
+    dimensioningId: number;
+    dimensioningDate: string;
+  } | null>(null);
+  const [loadingPrefill, setLoadingPrefill] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCategory, setCatalogCategory] = useState<string>("");
@@ -124,11 +138,63 @@ export function QuotesPage() {
     };
   }, []);
 
+  const applyPrefillFromProject = async (
+    projectId: number,
+    options?: { silent?: boolean }
+  ) => {
+    if (!projectId || projectId <= 0) return false;
+    setLoadingPrefill(true);
+    try {
+      const dimensionings = await dimensioningService.getByProject(projectId);
+      const latest = getLatestDimensioning(dimensionings);
+      if (!latest) {
+        setPrefillSource(null);
+        if (!options?.silent) {
+          toast.error("Aucun dimensionnement trouve pour ce projet");
+        }
+        return false;
+      }
+
+      const prefill = buildQuotePrefillFromDimensioning(latest);
+      setForm((prev) => ({
+        ...prev,
+        projectId,
+        description: prefill.form.description,
+        laborCost: prefill.form.laborCost,
+        materialsCost: prefill.form.materialsCost,
+        tax: prefill.form.tax,
+        notes: prefill.form.notes,
+      }));
+      setPrefillSource({
+        dimensioningId: prefill.dimensioningId,
+        dimensioningDate: prefill.dimensioningDate,
+      });
+      if (!options?.silent) {
+        toast.success("Devis pre-rempli depuis le dimensionnement");
+      }
+      return true;
+    } catch {
+      setPrefillSource(null);
+      if (!options?.silent) {
+        toast.error("Impossible de charger le dimensionnement");
+      }
+      return false;
+    } finally {
+      setLoadingPrefill(false);
+    }
+  };
+
   useEffect(() => {
     if (!createForProjectId) return;
     setForm((prev) => ({ ...prev, projectId: createForProjectId }));
     setShowForm(true);
+    void applyPrefillFromProject(createForProjectId, { silent: true }).then((ok) => {
+      if (ok) {
+        toast.success("Devis pre-rempli depuis le dimensionnement du projet");
+      }
+    });
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth" }), 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createForProjectId]);
 
   const fetchCatalog = async () => {
@@ -159,6 +225,17 @@ export function QuotesPage() {
 
   const selectedProject = projects.find((p) => p.id === form.projectId);
   const linkedClient = selectedProject?.client;
+
+  const applyAutoTva = (
+    prev: QuoteCreateRequest,
+    patch: Partial<QuoteCreateRequest>
+  ): QuoteCreateRequest => {
+    const next = { ...prev, ...patch };
+    if (prefillSource) {
+      next.tax = computeTva((next.laborCost ?? 0) + (next.materialsCost ?? 0));
+    }
+    return next;
+  };
 
   const total = (form.laborCost ?? 0) + (form.materialsCost ?? 0) + (form.tax ?? 0);
 
@@ -215,8 +292,7 @@ export function QuotesPage() {
         product.category === "MATERIEL" ||
         product.category === "TRANSPORT" ||
         product.category === "AUTRE";
-      return {
-        ...prev,
+      return applyAutoTva(prev, {
         materialsCost: isMaterial
           ? (prev.materialsCost ?? 0) + product.defaultPrice
           : prev.materialsCost,
@@ -224,7 +300,7 @@ export function QuotesPage() {
           product.category === "MAIN_OEUVRE"
             ? (prev.laborCost ?? 0) + product.defaultPrice
             : prev.laborCost,
-      };
+      });
     });
   };
 
@@ -233,8 +309,7 @@ export function QuotesPage() {
     setForm((prev) => {
       const isMaterial =
         item.category === "MATERIEL" || item.category === "TRANSPORT" || item.category === "AUTRE";
-      return {
-        ...prev,
+      return applyAutoTva(prev, {
         materialsCost: isMaterial
           ? Math.max(0, (prev.materialsCost ?? 0) - item.price)
           : prev.materialsCost,
@@ -242,13 +317,31 @@ export function QuotesPage() {
           item.category === "MAIN_OEUVRE"
             ? Math.max(0, (prev.laborCost ?? 0) - item.price)
             : prev.laborCost,
-      };
+      });
     });
   };
 
   const handleReset = () => {
     setForm(emptyForm);
     setAddedItems([]);
+    setPrefillSource(null);
+  };
+
+  const handleProjectChange = (projectId: number) => {
+    setForm((f) => {
+      const isEmpty =
+        (f.laborCost ?? 0) === 0 &&
+        (f.materialsCost ?? 0) === 0 &&
+        !f.description?.trim();
+
+      if (projectId > 0 && isEmpty) {
+        void applyPrefillFromProject(projectId, { silent: true });
+      } else {
+        setPrefillSource(null);
+      }
+
+      return { ...f, projectId };
+    });
   };
 
   const handlePreview = () => {
@@ -379,6 +472,34 @@ export function QuotesPage() {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-5">
+              {prefillSource && (
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <div className="flex items-start gap-2 text-sm text-emerald-900">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>
+                      Pre-rempli depuis le dimensionnement #{prefillSource.dimensioningId}{" "}
+                      ({new Date(prefillSource.dimensioningDate).toLocaleDateString("fr-TN")}).
+                      Vous pouvez ajuster les montants avant envoi.
+                    </span>
+                  </div>
+                  {form.projectId > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void applyPrefillFromProject(form.projectId)}
+                      disabled={loadingPrefill}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-white text-emerald-800 text-xs font-medium hover:bg-emerald-100 disabled:opacity-60"
+                    >
+                      {loadingPrefill ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      )}
+                      Reimporter
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-secondary mb-1.5">
                   Projet
@@ -386,9 +507,7 @@ export function QuotesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <select
                     value={form.projectId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, projectId: Number(e.target.value) }))
-                    }
+                    onChange={(e) => handleProjectChange(Number(e.target.value))}
                     className="md:col-span-2 px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-white"
                   >
                     <option value={0}>
@@ -406,9 +525,7 @@ export function QuotesPage() {
                     type="number"
                     placeholder="Ou ID"
                     value={form.projectId || ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, projectId: Number(e.target.value) }))
-                    }
+                    onChange={(e) => handleProjectChange(Number(e.target.value))}
                     className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                   />
                 </div>
@@ -605,7 +722,9 @@ export function QuotesPage() {
                     step={0.01}
                     value={form.laborCost ?? 0}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, laborCost: parseFloat(e.target.value) || 0 }))
+                      setForm((f) =>
+                        applyAutoTva(f, { laborCost: parseFloat(e.target.value) || 0 })
+                      )
                     }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                   />
@@ -620,14 +739,16 @@ export function QuotesPage() {
                     step={0.01}
                     value={form.materialsCost ?? 0}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, materialsCost: parseFloat(e.target.value) || 0 }))
+                      setForm((f) =>
+                        applyAutoTva(f, { materialsCost: parseFloat(e.target.value) || 0 })
+                      )
                     }
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-secondary mb-1.5">
-                    Taxes / TVA (TND)
+                    Taxes / TVA {Math.round(TVA_RATE * 100)}% (TND)
                   </label>
                   <input
                     type="number"
@@ -653,7 +774,7 @@ export function QuotesPage() {
                     <span>{(form.materialsCost ?? 0).toLocaleString("fr-TN")} TND</span>
                   </div>
                   <div className="flex justify-between text-sm text-slate-600">
-                    <span>Taxes / TVA</span>
+                    <span>Taxes / TVA ({Math.round(TVA_RATE * 100)}%)</span>
                     <span>{(form.tax ?? 0).toLocaleString("fr-TN")} TND</span>
                   </div>
                   <div className="border-t border-slate-200 pt-2 flex justify-between items-center">

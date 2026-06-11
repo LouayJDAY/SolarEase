@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { LayoutDashboard, FolderKanban, Users, Package, Settings, LogOut, FileText, Receipt, Inbox } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Users, Package, Settings, LogOut, FileText, Receipt, Inbox, HardHat, LifeBuoy } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import projectService from "../services/projectService";
-import { subscribeToAdminDemands } from "../services/websocketService";
+import supportService from "../services/supportService";
+import {
+  connectWebSocket,
+  releaseWebSocketConnection,
+  subscribeToAdminDemands,
+  unsubscribeFromAdminDemands,
+} from "../services/websocketService";
 
 export function Sidebar() {
   const location = useLocation();
@@ -11,18 +17,25 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const [pendingDemands, setPendingDemands] = useState<number>(0);
+  const [openSupportTickets, setOpenSupportTickets] = useState<number>(0);
 
   // Poll the admin KPI every 60s for the "Demandes" badge, and bump it instantly
   // when a new demand arrives over STOMP.
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !user?.userId) return;
     let cancelled = false;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
 
     const fetchPending = async () => {
       try {
-        const stats = await projectService.getDashboardStats();
+        const [stats, openTickets] = await Promise.all([
+          projectService.getDashboardStats(),
+          supportService.getOpenCountAdmin().catch(() => 0),
+        ]);
         if (!cancelled) {
           setPendingDemands(stats.pendingDemandsCount ?? 0);
+          setOpenSupportTickets(openTickets);
         }
       } catch {
         // best-effort -- silent
@@ -32,24 +45,28 @@ export function Sidebar() {
     fetchPending();
     const interval = setInterval(fetchPending, 60_000);
 
-    // Optimistic increment when a brand new demand arrives. The next poll will reconcile.
     subscribeToAdminDemands((event) => {
       if (event.event === "DEMAND_CREATED") {
         setPendingDemands((c) => c + 1);
       }
     });
 
+    connectWebSocket(user.userId, token);
+
     return () => {
       cancelled = true;
       clearInterval(interval);
+      unsubscribeFromAdminDemands();
+      releaseWebSocketConnection();
     };
-  }, [isAdmin]);
+  }, [isAdmin, user?.userId]);
 
   const navItems: Array<{
     path: string;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: number;
+    adminOnly?: boolean;
   }> = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { path: "/projects",  label: "Projets",   icon: FolderKanban },
@@ -59,12 +76,23 @@ export function Sidebar() {
       label: "Demandes",
       icon: Inbox,
       badge: isAdmin && pendingDemands > 0 ? pendingDemands : undefined,
+      adminOnly: true,
+    },
+    {
+      path: "/support-tickets",
+      label: "Support",
+      icon: LifeBuoy,
+      badge: isAdmin && openSupportTickets > 0 ? openSupportTickets : undefined,
+      adminOnly: true,
     },
     { path: "/invoices",  label: "Factures",  icon: Receipt },
     { path: "/clients",   label: "Clients",   icon: Users },
+    { path: "/installers", label: "Installateurs", icon: HardHat, adminOnly: true },
     { path: "/catalog",   label: "Catalogue", icon: Package },
     { path: "/settings",  label: "Paramètres", icon: Settings },
   ];
+
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
@@ -102,7 +130,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
 

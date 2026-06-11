@@ -3,6 +3,7 @@ import api from "./api";
 export interface LoginRequest {
   email: string;
   password: string;
+  invitationToken?: string;
 }
 
 export interface AuthUser {
@@ -106,7 +107,7 @@ const authService = {
     api.post<AuthResponse>("/auth/resend-otp", data).then((r) => r.data),
 
   getProfile: () =>
-    api.get<AuthResponse>("/auth/me").then((r) => r.data),
+    api.get<AuthUser>("/auth/me").then((r) => r.data),
 
   getInstallers: () =>
     api.get<InstallerOption[]>("/auth/installers").then((r) => r.data),
@@ -121,7 +122,7 @@ const authService = {
     api.delete<void>(`/auth/installers/${installerUuid}`).then((r) => r.data),
 
   updateProfile: (data: UpdateProfileRequest) =>
-    api.put<AuthResponse>("/auth/me", data).then((r) => r.data),
+    api.put<AuthUser>("/auth/me", data).then((r) => r.data),
 
   changePassword: (data: ChangePasswordRequest) =>
     api.put<{ message: string }>("/auth/me/password", data).then((r) => r.data),

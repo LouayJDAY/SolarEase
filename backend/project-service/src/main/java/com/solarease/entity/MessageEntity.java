@@ -31,4 +31,10 @@ public class MessageEntity {
     @Lob
     private String content;
     private Instant timestamp;
+
+    /** Stored file name on disk (UUID + extension). */
+    private String attachmentFileName;
+    private String attachmentOriginalName;
+    private String attachmentContentType;
+    private Long attachmentSizeBytes;
 }

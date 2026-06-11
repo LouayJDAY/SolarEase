@@ -153,6 +153,7 @@ public class DemandService {
         DemandDTO dto = toDto(saved);
         if (previousStatus != newStatus) {
             notificationService.notifyDemandStatusChange(dto);
+            notificationService.notifyAdminDashboardRefresh("DEMAND_STATUS_CHANGED");
         }
         return dto;
     }

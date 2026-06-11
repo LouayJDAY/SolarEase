@@ -55,6 +55,7 @@ export interface DashboardStats {
   pendingDemandsCount?: number;
   /** Admin-only: demands created today (start of local day) */
   newDemandsTodayCount?: number;
+  projectsByMonth?: Array<{ year: number; month: number; count: number }>;
 }
 
 export interface Page<T> {

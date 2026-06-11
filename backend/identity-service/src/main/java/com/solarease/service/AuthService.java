@@ -4,6 +4,7 @@ import com.solarease.dto.*;
 import com.solarease.entity.User;
 import com.solarease.exception.BadRequestException;
 import com.solarease.exception.ResourceNotFoundException;
+import com.solarease.repository.OtpTokenRepository;
 import com.solarease.repository.UserRepository;
 import com.solarease.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -25,19 +26,22 @@ public class AuthService {
     private final OtpService otpService;
     private final EmailService emailService;
     private final ProjectServiceClient projectServiceClient;
+    private final OtpTokenRepository otpTokenRepository;
 
     public AuthService(UserRepository userRepository, 
                       PasswordEncoder passwordEncoder,
                       JwtTokenProvider jwtTokenProvider,
                       OtpService otpService,
                       EmailService emailService,
-                      ProjectServiceClient projectServiceClient) {
+                      ProjectServiceClient projectServiceClient,
+                      OtpTokenRepository otpTokenRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.otpService = otpService;
         this.emailService = emailService;
         this.projectServiceClient = projectServiceClient;
+        this.otpTokenRepository = otpTokenRepository;
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -52,6 +56,16 @@ public class AuthService {
 
         if (!user.getIsActive()) {
             throw new BadRequestException("User account is inactive");
+        }
+
+        if (user.getRole() == User.UserRole.CLIENT
+                && request.getInvitationToken() != null
+                && !request.getInvitationToken().isBlank()) {
+            projectServiceClient.linkClientAccount(
+                    user.getUuid(),
+                    user.getEmail(),
+                    request.getInvitationToken()
+            );
         }
 
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail(), user.getRole().name());
@@ -73,6 +87,12 @@ public class AuthService {
         log.info("Register attempt for email: {}", request.getEmail());
         
         if (userRepository.existsByEmail(request.getEmail())) {
+            User existing = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow();
+            if (existing.getRole() != User.UserRole.CLIENT) {
+                throw new BadRequestException(
+                        "Email already registered as " + existing.getRole().name().toLowerCase(Locale.ROOT));
+            }
             throw new BadRequestException("Email already registered");
         }
 
@@ -153,8 +173,15 @@ public class AuthService {
 
         log.info("Email verified for user: {}", request.getEmail());
 
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getUuid(), user.getEmail(), user.getRole().name());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUuid(), user.getEmail(), user.getRole().name());
+
         return AuthResponse.builder()
-                .message("Email verified successfully! You can now login.")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(jwtTokenProvider.getExpirationTime())
+                .user(buildUserDto(user))
+                .message("Email verified successfully!")
                 .email(request.getEmail())
                 .build();
     }
@@ -270,6 +297,7 @@ public class AuthService {
             throw new BadRequestException("Suppression autorisee uniquement pour les installateurs");
         }
 
+        otpTokenRepository.deleteByUser(installer);
         userRepository.delete(installer);
         log.info("Installer deleted by admin: {} ({})", installer.getEmail(), installer.getUuid());
     }

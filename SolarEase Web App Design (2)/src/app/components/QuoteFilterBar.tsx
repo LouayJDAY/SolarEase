@@ -19,11 +19,13 @@ interface Props {
   installerOptions?: InstallerOption[];
   showInstallerFilter?: boolean;
   showCounts?: Partial<Record<QuoteStatusFilter, number>>;
+  /** Hide installer-only filters (e.g. DRAFT) on client portal */
+  variant?: "installer" | "client";
 }
 
-const statusChips: Array<{ id: QuoteStatusFilter; label: string; activeClass: string }> = [
+const statusChips: Array<{ id: QuoteStatusFilter; label: string; activeClass: string; clientHidden?: boolean }> = [
   { id: "ALL", label: "Tous", activeClass: "bg-secondary text-white border-secondary" },
-  { id: "DRAFT", label: "Brouillon", activeClass: "bg-gray-700 text-white border-gray-700" },
+  { id: "DRAFT", label: "Brouillon", activeClass: "bg-gray-700 text-white border-gray-700", clientHidden: true },
   { id: "SENT", label: "Envoye", activeClass: "bg-blue-600 text-white border-blue-600" },
   { id: "ACCEPTED", label: "Accepte", activeClass: "bg-emerald-600 text-white border-emerald-600" },
   { id: "INVOICED", label: "Facture", activeClass: "bg-purple-600 text-white border-purple-600" },
@@ -41,7 +43,9 @@ export function QuoteFilterBar({
   installerOptions,
   showInstallerFilter,
   showCounts,
+  variant = "installer",
 }: Props) {
+  const visibleChips = statusChips.filter((chip) => variant !== "client" || !chip.clientHidden);
   const hasActiveFilters = statusFilter !== "ALL" || (installerFilter && installerFilter !== "ALL") || search.length > 0;
 
   const handleReset = () => {
@@ -105,7 +109,7 @@ export function QuoteFilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {statusChips.map((chip) => {
+        {visibleChips.map((chip) => {
           const active = statusFilter === chip.id;
           const count = showCounts?.[chip.id];
           return (

@@ -2,11 +2,18 @@ import React, { useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "./Input";
 import { Button } from "./Button";
+import { inviteUserSchema } from "../validation/authSchemas";
+import { zodFieldErrors } from "../validation/common";
 
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (userData: { firstName: string; lastName: string; email: string; role: "ADMIN" | "INSTALLATEUR" }) => void;
+  onAdd: (userData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: "ADMIN" | "INSTALLER";
+  }) => void;
 }
 
 export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
@@ -14,48 +21,31 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
     firstName: "",
     lastName: "",
     email: "",
-    role: "INSTALLATEUR" as "ADMIN" | "INSTALLATEUR"
+    role: "INSTALLER" as "ADMIN" | "INSTALLER",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+    setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.firstName) {
-      newErrors.firstName = "Le prénom est requis";
-    }
-
-    if (!formData.lastName) {
-      newErrors.lastName = "Le nom est requis";
-    }
-
-    if (!formData.email) {
-      newErrors.email = "L'adresse email est requise";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "L'adresse email n'est pas valide";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    const parsed = inviteUserSchema.safeParse(formData);
+    if (!parsed.success) {
+      setErrors(zodFieldErrors(parsed.error));
       return;
     }
 
-    onAdd(formData);
-    // Reset form
+    onAdd(parsed.data);
     setFormData({
       firstName: "",
       lastName: "",
       email: "",
-      role: "INSTALLATEUR"
+      role: "INSTALLER",
     });
     setErrors({});
   };
@@ -65,7 +55,7 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
       firstName: "",
       lastName: "",
       email: "",
-      role: "INSTALLATEUR"
+      role: "INSTALLER",
     });
     setErrors({});
     onClose();
@@ -75,19 +65,14 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
       />
 
-      {/* Modal */}
       <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl text-secondary">
-            Ajouter un employé
-          </h2>
+          <h2 className="text-xl text-secondary">Ajouter un employé</h2>
           <button
             onClick={handleClose}
             className="text-muted-foreground hover:text-secondary transition-colors"
@@ -96,7 +81,6 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
           </button>
         </div>
 
-        {/* Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <p className="text-sm text-muted-foreground">
             Un email d'invitation sera envoyé à l'employé pour qu'il crée son mot de passe.
@@ -130,16 +114,14 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
           />
 
           <div>
-            <label className="block mb-2 text-sm text-secondary">
-              Rôle
-            </label>
+            <label className="block mb-2 text-sm text-secondary">Rôle</label>
             <div className="space-y-2">
               <label className="flex items-center gap-3 p-3 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-primary transition-colors">
                 <input
                   type="radio"
                   name="role"
-                  value="INSTALLATEUR"
-                  checked={formData.role === "INSTALLATEUR"}
+                  value="INSTALLER"
+                  checked={formData.role === "INSTALLER"}
                   onChange={(e) => handleChange("role", e.target.value)}
                   className="w-4 h-4 text-primary focus:ring-2 focus:ring-primary cursor-pointer"
                 />
@@ -170,7 +152,6 @@ export function AddUserModal({ isOpen, onClose, onAdd }: AddUserModalProps) {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" fullWidth onClick={handleClose}>
               Annuler

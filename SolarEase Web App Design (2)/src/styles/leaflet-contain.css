@@ -1,0 +1,78 @@
+/* Contain Leaflet inside its wrapper. */
+.location-picker-map,
+.project-site-map {
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.location-picker-map .leaflet-container,
+.project-site-map .leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.location-picker-map .location-picker-overlay {
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Fixed map band at top of modals — does not scroll with form. */
+.modal-map-pin {
+  position: relative;
+  z-index: 5;
+  flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #fff;
+  clip-path: inset(0);
+}
+
+.modal-leaflet-host--modal {
+  contain: strict;
+}
+
+.modal-body-scroll {
+  position: relative;
+  z-index: 10;
+  isolation: isolate;
+  background: #fff;
+  overflow-x: hidden;
+}
+
+/*
+ * Hide stray Leaflet layers outside the modal map host (page map + ghost tiles).
+ * Modal map is portaled on body; page map lives under #root.
+ */
+body[data-leaflet-modal-open="true"] #root .leaflet-container,
+body[data-leaflet-modal-open="true"] #root .leaflet-pane {
+  display: none !important;
+}
+
+body[data-leaflet-modal-open="true"] .leaflet-tile-pane,
+body[data-leaflet-modal-open="true"] .leaflet-overlay-pane,
+body[data-leaflet-modal-open="true"] .leaflet-marker-pane,
+body[data-leaflet-modal-open="true"] .leaflet-shadow-pane,
+body[data-leaflet-modal-open="true"] .leaflet-tooltip-pane,
+body[data-leaflet-modal-open="true"] .leaflet-popup-pane {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-tile-pane,
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-overlay-pane,
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-marker-pane,
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-shadow-pane,
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-tooltip-pane,
+body[data-leaflet-modal-open="true"] [data-leaflet-modal="true"] .modal-leaflet-host .leaflet-popup-pane {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+body[data-leaflet-modal-open="true"] .project-site-map {
+  display: none !important;
+}

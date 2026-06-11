@@ -14,7 +14,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, invitationToken?: string) => Promise<void>;
+  applyAuthResponse: (res: AuthResponse) => void;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -45,8 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res: AuthResponse = await authService.login({ email, password });
+  const applyAuthResponse = useCallback((res: AuthResponse) => {
+    if (!res.accessToken || !res.user) return;
     localStorage.setItem("accessToken", res.accessToken);
     localStorage.setItem("refreshToken", res.refreshToken);
     const u = res.user;
@@ -61,6 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("user", JSON.stringify(userData));
     setUser(userData);
   }, []);
+
+  const login = useCallback(async (email: string, password: string, invitationToken?: string) => {
+    const res: AuthResponse = await authService.login({ email, password, invitationToken });
+    applyAuthResponse(res);
+  }, [applyAuthResponse]);
 
   const logout = useCallback(() => {
     authService.logout();
@@ -79,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        applyAuthResponse,
         logout,
         updateUser,
       }}

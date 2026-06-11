@@ -21,4 +21,7 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password should be at least 6 characters")
     private String password;
+
+    /** Optional invitation token from client portal invite link */
+    private String invitationToken;
 }

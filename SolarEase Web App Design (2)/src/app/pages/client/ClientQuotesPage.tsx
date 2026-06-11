@@ -30,7 +30,8 @@ export function ClientQuotesPage() {
     else setRefreshing(true);
     try {
       const page = await quoteService.getClientQuotes(0, 200);
-      setQuotes(page.content || []);
+      const visible = (page.content || []).filter((q) => q.status !== "DRAFT");
+      setQuotes(visible);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Impossible de charger vos devis");
     } finally {
@@ -97,7 +98,8 @@ export function ClientQuotesPage() {
         <div>
           <h1 className="text-3xl font-bold text-secondary mb-1">Mes devis</h1>
           <p className="text-sm text-slate-500">
-            Consultez, comparez et validez les devis envoyes par votre installateur.
+            Consultez, comparez et validez les devis envoyés par votre installateur.
+            Vous pouvez accepter ou refuser un devis une fois qu'il est marqué « Envoyé ».
           </p>
         </div>
         <button
@@ -119,6 +121,7 @@ export function ClientQuotesPage() {
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         showCounts={statusCounts}
+        variant="client"
       />
 
       <section className="space-y-3">
@@ -147,7 +150,7 @@ export function ClientQuotesPage() {
             onOpenDetail={(q) => navigate(`/client/quotes/${q.id}`)}
             emptyMessage={
               quotes.length === 0
-                ? "Aucun devis ne vous a encore ete envoye."
+                ? "Aucun devis ne vous a encore été envoyé. L'installateur doit d'abord envoyer le devis depuis son espace."
                 : "Aucun devis ne correspond aux filtres."
             }
           />

@@ -1,9 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
-import { BookOpen, ChevronDown, ChevronUp, Eye, Plus, Search, User, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp, Eye, Plus, Search, Sparkles, User, X } from "lucide-react";
 import type { QuoteCreateRequest } from "../services/quoteService";
 import quoteService from "../services/quoteService";
 import projectService, { ProjectResponse } from "../services/projectService";
 import catalogService, { CatalogProduct, CatalogCategory } from "../services/catalogService";
+import dimensioningService from "../services/dimensioningService";
+import {
+  buildQuotePrefillFromDimensioning,
+  getLatestDimensioning,
+} from "../utils/quoteFromDimensioning";
+import { quoteFormSchema } from "../validation/commerceSchemas";
+import { toast } from "sonner";
 
 interface Props {
   projectId: number;
@@ -53,6 +60,7 @@ export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
   const [catalogItems, setCatalogItems] = useState<CatalogProduct[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [addedItems, setAddedItems] = useState<AddedItem[]>([]);
+  const [prefillSource, setPrefillSource] = useState<number | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedProject = projects.find((p) => p.id === form.projectId);
@@ -70,6 +78,31 @@ export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
       .finally(() => { if (mounted) setLoadingProjects(false); });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!projectId || projectId <= 0) return;
+    let mounted = true;
+    dimensioningService
+      .getByProject(projectId)
+      .then((dims) => {
+        if (!mounted) return;
+        const latest = getLatestDimensioning(dims);
+        if (!latest) return;
+        const prefill = buildQuotePrefillFromDimensioning(latest);
+        setForm((prev) => ({
+          ...prev,
+          projectId,
+          description: prefill.form.description,
+          laborCost: prefill.form.laborCost,
+          materialsCost: prefill.form.materialsCost,
+          tax: prefill.form.tax,
+          notes: prefill.form.notes,
+        }));
+        setPrefillSource(prefill.dimensioningId);
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [projectId]);
 
   // Load catalog when section opens
   useEffect(() => {
@@ -158,7 +191,12 @@ export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit(form);
+    const parsed = quoteFormSchema.safeParse(form);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Données invalides.");
+      return;
+    }
+    await onSubmit(parsed.data);
   };
 
   return (
@@ -173,6 +211,13 @@ export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {prefillSource && (
+            <div className="flex items-start gap-2 px-3 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-900">
+              <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>Pré-rempli depuis le dimensionnement #{prefillSource}.</span>
+            </div>
+          )}
+
           {/* Project selector */}
           <div>
             <label className="block text-sm font-medium text-secondary mb-1">

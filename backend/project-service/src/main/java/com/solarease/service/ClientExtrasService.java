@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.solarease.storage.FileStorageService;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -29,6 +32,7 @@ public class ClientExtrasService {
     private final ClientRepository clientRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationWebSocketService notificationService;
+    private final FileStorageService fileStorageService;
 
     public List<NotificationDto> getNotifications(String clientId) {
         List<NotificationEntity> list = notificationRepository.findByClientIdOrderByCreatedAtDesc(clientId);
@@ -54,15 +58,65 @@ public class ClientExtrasService {
         return List.of(toConversationDto(conv, currentUserId, currentUserRole));
     }
 
+    @Transactional
     public MessageDto sendMessage(String clientId, String conversationId, Long projectId, MessageDto message) {
+        validateMessagePayload(message.getContent(), null);
         ConversationEntity conv = resolveConversation(conversationId, clientId, projectId);
         return appendMessage(conv, clientId, message);
     }
 
     @Transactional
     public MessageDto sendProjectMessage(Long projectId, MessageDto message) {
+        validateMessagePayload(message.getContent(), null);
         ConversationEntity conv = getOrCreateByProjectId(projectId);
         return appendMessage(conv, message.getSenderId(), message);
+    }
+
+    @Transactional
+    public MessageDto sendProjectMessage(Long projectId, MessageDto message, MultipartFile file) {
+        validateMessagePayload(message.getContent(), file);
+        if (file != null && !file.isEmpty()) {
+            FileStorageService.StoredFile stored = fileStorageService.saveMessageAttachment(projectId, file);
+            message.setAttachmentFileName(stored.fileName());
+            message.setAttachmentOriginalName(
+                    file.getOriginalFilename() != null ? file.getOriginalFilename() : stored.fileName());
+            message.setAttachmentContentType(stored.contentType());
+            message.setAttachmentSizeBytes(file.getSize());
+            message.setAttachmentUrl(stored.publicUrl());
+            if (message.getContent() == null || message.getContent().isBlank()) {
+                message.setContent("📎 " + message.getAttachmentOriginalName());
+            }
+        }
+        return sendProjectMessage(projectId, message);
+    }
+
+    @Transactional
+    public MessageDto sendMessage(String clientId, String conversationId, Long projectId, MessageDto message,
+            MultipartFile file) {
+        validateMessagePayload(message.getContent(), file);
+        ConversationEntity conv = resolveConversation(conversationId, clientId, projectId);
+        Long effectiveProjectId = conv.getProjectId() != null ? conv.getProjectId() : projectId;
+        if (file != null && !file.isEmpty() && effectiveProjectId != null) {
+            FileStorageService.StoredFile stored = fileStorageService.saveMessageAttachment(effectiveProjectId, file);
+            message.setAttachmentFileName(stored.fileName());
+            message.setAttachmentOriginalName(
+                    file.getOriginalFilename() != null ? file.getOriginalFilename() : stored.fileName());
+            message.setAttachmentContentType(stored.contentType());
+            message.setAttachmentSizeBytes(file.getSize());
+            message.setAttachmentUrl(stored.publicUrl());
+            if (message.getContent() == null || message.getContent().isBlank()) {
+                message.setContent("📎 " + message.getAttachmentOriginalName());
+            }
+        }
+        return appendMessage(conv, clientId, message);
+    }
+
+    private void validateMessagePayload(String content, MultipartFile file) {
+        boolean hasContent = content != null && !content.isBlank();
+        boolean hasFile = file != null && !file.isEmpty();
+        if (!hasContent && !hasFile) {
+            throw new IllegalArgumentException("Message content or attachment is required");
+        }
     }
 
     // ── Conversation helpers ──────────────────────────────────────────────────
@@ -118,11 +172,30 @@ public class ClientExtrasService {
                 c.getParticipants(),
                 c.getMessages().stream()
                     .filter(m -> isVisibleTo(m, currentUserId, currentUserRole))
-                    .map(m -> new MessageDto(String.valueOf(m.getId()), String.valueOf(c.getId()),
-                            m.getSenderId(), m.getSenderName(), m.getSenderRole(),
-                            m.getRecipientRoles(), m.getContent(), m.getTimestamp()))
+                    .map(m -> toMessageDto(m, c))
                     .collect(Collectors.toList())
         );
+    }
+
+    private MessageDto toMessageDto(MessageEntity m, ConversationEntity conv) {
+        String attachmentUrl = null;
+        if (m.getAttachmentFileName() != null && conv.getProjectId() != null) {
+            attachmentUrl = "/api/files/message-attachments/" + conv.getProjectId() + "/" + m.getAttachmentFileName();
+        }
+        return new MessageDto(
+                String.valueOf(m.getId()),
+                String.valueOf(conv.getId()),
+                m.getSenderId(),
+                m.getSenderName(),
+                m.getSenderRole(),
+                m.getRecipientRoles(),
+                m.getContent(),
+                m.getTimestamp(),
+                m.getAttachmentFileName(),
+                m.getAttachmentOriginalName(),
+                m.getAttachmentContentType(),
+                m.getAttachmentSizeBytes(),
+                attachmentUrl);
     }
 
     private MessageDto appendMessage(ConversationEntity conv, String senderId, MessageDto message) {
@@ -132,16 +205,16 @@ public class ClientExtrasService {
         me.setSenderName(message.getSenderName());
         me.setSenderRole(message.getSenderRole());
         me.setRecipientRoles(normalizeRecipientRoles(message.getRecipientRoles(), message.getSenderRole()));
-        me.setContent(message.getContent());
+        me.setContent(message.getContent() != null ? message.getContent() : "");
         me.setTimestamp(Instant.now());
+        me.setAttachmentFileName(message.getAttachmentFileName());
+        me.setAttachmentOriginalName(message.getAttachmentOriginalName());
+        me.setAttachmentContentType(message.getAttachmentContentType());
+        me.setAttachmentSizeBytes(message.getAttachmentSizeBytes());
         conv.getMessages().add(me);
         conversationRepository.save(conv);
 
-        MessageDto saved = new MessageDto(
-                String.valueOf(me.getId()), String.valueOf(conv.getId()),
-                me.getSenderId(), me.getSenderName(), me.getSenderRole(),
-                me.getRecipientRoles(),
-                me.getContent(), me.getTimestamp());
+        MessageDto saved = toMessageDto(me, conv);
 
         if (conv.getProjectId() != null) {
             // Push real-time WS frame to all subscribers of this project
@@ -253,7 +326,11 @@ public class ClientExtrasService {
                 i.getDate(),
                 i.getDueDate(),
                 i.getAmount().doubleValue(),
-                i.getStatus().name()
+                i.getSubtotal() != null ? i.getSubtotal().doubleValue() : null,
+                i.getDiscountPercent() != null ? i.getDiscountPercent().doubleValue() : null,
+                i.getDiscountAmount() != null ? i.getDiscountAmount().doubleValue() : null,
+                i.getStatus().name(),
+                i.getNotes()
             ))
             .collect(Collectors.toList());
     }

@@ -162,6 +162,17 @@ export function QuoteList({
                   </button>
                 )}
 
+                {role === "CLIENT" && onOpenDetail && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDetail(quote)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-slate-200 text-slate-700 text-sm rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Voir détail
+                  </button>
+                )}
+
                 {onPreviewPdf && (
                   <button
                     type="button"

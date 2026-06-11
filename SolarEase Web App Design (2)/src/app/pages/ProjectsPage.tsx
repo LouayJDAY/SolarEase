@@ -18,6 +18,8 @@ import { Pagination } from "../components/Pagination";
 import projectService, { ProjectResponse, DashboardStats } from "../services/projectService";
 import { useAuth } from "../context/AuthContext";
 import { useLiveRefresh } from "../hooks/useLiveRefresh";
+import { isValidProjectCoordinates } from "../utils/geo";
+import { getProjectProgressPercent } from "../utils/projectProgress";
 
 // Map backend status to frontend status
 function mapStatus(s: string): Project["status"] {
@@ -45,8 +47,7 @@ function toProject(p: ProjectResponse): Project {
     location: p.location,
     systemSize: p.peakPower ? `${p.peakPower} kWc` : "—",
     status: mapStatus(p.status),
-    progress: p.currentProgress ??
-      (p.status === "COMPLETED" ? 100 : p.status === "IN_PROGRESS" ? 70 : p.status === "INSTALLATEUR_AFFECTE" ? 40 : p.status === "EN_PREPARATION" ? 25 : p.status === "CREATED" ? 10 : 0),
+    progress: getProjectProgressPercent(p),
     startDate: new Date(p.createdAt).toLocaleDateString("fr-FR"),
   };
 }
@@ -157,12 +158,14 @@ export function ProjectsPage() {
 
   const handleCreateProject = async (data: any) => {
     try {
+      const lat = parseFloat(data.latitude);
+      const lon = parseFloat(data.longitude);
       await projectService.createProject({
         name: data.name,
         description: data.description,
         location: data.location,
-        latitude: parseFloat(data.latitude) || 0,
-        longitude: parseFloat(data.longitude) || 0,
+        latitude: isValidProjectCoordinates(lat, lon) ? lat : undefined,
+        longitude: isValidProjectCoordinates(lat, lon) ? lon : undefined,
         peakPower: parseFloat(data.peakPower) || 0,
         availableArea: parseFloat(data.availableArea) || 0,
         inclination: parseFloat(data.inclination) || 35,

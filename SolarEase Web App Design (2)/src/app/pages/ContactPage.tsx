@@ -17,6 +17,8 @@ import {
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import demandService from "../services/demandService";
+import { publicDemandSchema } from "../validation/projectSchemas";
+import { zodFieldErrors } from "../validation/common";
 
 interface FormErrors {
   name?: string;
@@ -24,9 +26,6 @@ interface FormErrors {
   phone?: string;
   message?: string;
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^\+?[\d\s().-]{6,20}$/;
 
 export function ContactPage() {
   const location = useLocation();
@@ -85,21 +84,20 @@ export function ContactPage() {
   }, [isFromSimulator, location.search]);
 
   const validate = (data: typeof formData): FormErrors => {
+    const parsed = publicDemandSchema.safeParse({
+      fullName: data.name.trim(),
+      email: data.email.trim(),
+      phone: data.phone.trim() || undefined,
+      subject: data.subject,
+      message: data.message.trim(),
+    });
+    if (parsed.success) return {};
+    const zErr = zodFieldErrors(parsed.error);
     const next: FormErrors = {};
-    if (!data.name.trim() || data.name.trim().length < 2) {
-      next.name = "Veuillez saisir votre nom complet (2 caractères minimum).";
-    }
-    if (!data.email.trim()) {
-      next.email = "L'email est requis.";
-    } else if (!EMAIL_RE.test(data.email.trim())) {
-      next.email = "Format d'email invalide.";
-    }
-    if (data.phone.trim() && !PHONE_RE.test(data.phone.trim())) {
-      next.phone = "Numéro de téléphone invalide.";
-    }
-    if (!data.message.trim() || data.message.trim().length < 10) {
-      next.message = "Décrivez votre projet en 10 caractères minimum.";
-    }
+    if (zErr.fullName) next.name = zErr.fullName;
+    if (zErr.email) next.email = zErr.email;
+    if (zErr.phone) next.phone = zErr.phone;
+    if (zErr.message) next.message = zErr.message;
     return next;
   };
 

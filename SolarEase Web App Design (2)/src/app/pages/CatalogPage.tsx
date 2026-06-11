@@ -15,7 +15,9 @@ import {
   ChevronRight,
   SlidersHorizontal,
 } from "lucide-react";
-import equipmentService from "../services/equipmentService";
+import equipmentService, { EquipmentResponse } from "../services/equipmentService";
+import { EquipmentImage } from "../components/EquipmentImage";
+import toast from "react-hot-toast";
 
 /* ── Equipment data ──────────────────────────────────────────── */
 
@@ -33,8 +35,11 @@ interface Equipment {
 }
 
 const typeBadgeMap: Record<string, { label: string; bg: string; text: string }> = {
-  SOLAR_PANEL: { label: "Panneau", bg: "#E8F5E9", text: "#2E7D32" },
-  NIGHT_PANEL: { label: "Night Panel", bg: "#EDE7F6", text: "#4527A0" },
+  SOLAR_PANEL: { label: "Panneau solaire", bg: "#E8F5E9", text: "#2E7D32" },
+  TOPCON_N_TYPE: { label: "TOPCon N-type", bg: "#E8F5E9", text: "#2E7D32" },
+  BIFACIAL: { label: "Bifacial", bg: "#E3F2FD", text: "#1565C0" },
+  GLASS_GLASS: { label: "Biverre", bg: "#E0F2F1", text: "#00695C" },
+  NIGHT_PANEL: { label: "Night Panel", bg: "#EDE9FE", text: "#5B21B6" },
   INVERTER: { label: "Onduleur", bg: "#E3F2FD", text: "#1565C0" },
   BATTERY: { label: "Batterie", bg: "#FFF3E0", text: "#E65100" },
   MOUNTING_SYSTEM: { label: "Montage", bg: "#F5F5F5", text: "#616161" },
@@ -44,8 +49,10 @@ const typeBadgeMap: Record<string, { label: string; bg: string; text: string }> 
 
 const tabs = [
   { key: "all", label: "Tous" },
-  { key: "SOLAR_PANEL", label: "Panneaux" },
-  { key: "NIGHT_PANEL", label: "Night Panels 🌙" },
+  { key: "SOLAR_PANEL:TOPCON_N_TYPE", label: "TOPCon N-type" },
+  { key: "SOLAR_PANEL:BIFACIAL", label: "Bifacial" },
+  { key: "SOLAR_PANEL:GLASS_GLASS", label: "Biverre" },
+  { key: "NIGHT_PANEL", label: "Night Panel" },
   { key: "INVERTER", label: "Onduleurs" },
   { key: "BATTERY", label: "Batteries" },
   { key: "MOUNTING_SYSTEM", label: "Montage" },
@@ -60,6 +67,7 @@ export function CatalogPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<EquipmentResponse | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -68,21 +76,31 @@ export function CatalogPage() {
     try {
       setLoading(true);
       setLoadError("");
-      const data =
-        activeTab === "all"
-          ? await equipmentService.getAll()
-          : await equipmentService.getByType(activeTab);
-      const mapped: Equipment[] = (Array.isArray(data) ? data : []).map((e: any) => ({
-        id: String(e.id),
-        name: e.name || e.model || "",
-        brand: e.brand || e.manufacturer || "",
-        type: e.type || "SOLAR_PANEL",
-        typeBadge: typeBadgeMap[e.type] || typeBadgeMap.SOLAR_PANEL,
-        power: e.power ? `${e.power}W` : e.capacity ? `${e.capacity} kWh` : "—",
-        efficiency: e.efficiency ? `${e.efficiency}%` : "—",
-        price: e.price ? String(e.price) : "—",
-        warranty: e.warranty ? `${e.warranty} ans` : "—",
-      }));
+      let data;
+      if (activeTab === "all") {
+        data = await equipmentService.getAll();
+      } else if (activeTab.startsWith("SOLAR_PANEL:")) {
+        const category = activeTab.split(":")[1];
+        data = await equipmentService.getByType("SOLAR_PANEL", category as any);
+      } else {
+        data = await equipmentService.getByType(activeTab);
+      }
+      const mapped: Equipment[] = (Array.isArray(data) ? data : []).map((e: any) => {
+        const badgeKey =
+          e.type === "SOLAR_PANEL" && e.panelCategory ? e.panelCategory : e.type;
+        return {
+          id: String(e.id),
+          name: e.name || e.model || "",
+          brand: e.brand || e.manufacturer || "",
+          type: e.type || "SOLAR_PANEL",
+          typeBadge: typeBadgeMap[badgeKey] || typeBadgeMap.SOLAR_PANEL,
+          power: e.nominalPower ? `${e.nominalPower}W` : e.capacity ? `${e.capacity} kWh` : "—",
+          efficiency: e.efficiency ? `${Math.round(e.efficiency * 100)}%` : "—",
+          price: e.price ? String(e.price) : "—",
+          warranty: e.warrantyYears ? `${e.warrantyYears} ans` : "—",
+          image: e.imageUrl || undefined,
+        };
+      });
       setEquipment(mapped);
     } catch (err) {
       console.error("Error fetching equipment:", err);
@@ -100,10 +118,26 @@ export function CatalogPage() {
     if (!confirm("Supprimer cet équipement ?")) return;
     try {
       await equipmentService.delete(Number(id));
+      toast.success("Équipement supprimé");
       fetchEquipment();
     } catch (err) {
       console.error("Error deleting equipment:", err);
+      toast.error("Impossible de supprimer l'équipement");
     }
+  };
+
+  const handleEdit = async (id: string) => {
+    try {
+      const full = await equipmentService.getById(Number(id));
+      setEditingEquipment(full);
+    } catch {
+      toast.error("Impossible de charger l'équipement");
+    }
+  };
+
+  const closeFormModal = () => {
+    setShowAddModal(false);
+    setEditingEquipment(null);
   };
 
   const filtered = equipment.filter((e) => {
@@ -229,14 +263,19 @@ export function CatalogPage() {
                   className="bg-white rounded-xl overflow-hidden group hover:shadow-md transition-shadow"
                   style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
                 >
-                  {/* Image placeholder */}
-                  <div className="h-40 bg-gray-50 flex items-center justify-center border-b border-gray-100">
-                    <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  </div>
+                  {/* Product image — click opens detail page */}
+                  <Link
+                    to={`/catalog/${eq.id}`}
+                    className="block h-40 bg-gray-50 border-b border-gray-100 overflow-hidden cursor-pointer hover:opacity-95 transition-opacity"
+                  >
+                    <EquipmentImage
+                      imageUrl={eq.image}
+                      type={eq.type}
+                      alt={eq.name}
+                      className="w-full h-full object-cover"
+                      containerClassName="h-40"
+                    />
+                  </Link>
                   <div className="p-4">
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"
@@ -262,7 +301,11 @@ export function CatalogPage() {
                         >
                           <Eye className="w-4 h-4" />
                         </Link>
-                        <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(eq.id)}
+                          className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors"
+                        >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
@@ -324,10 +367,14 @@ export function CatalogPage() {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center">
-                            <svg className="w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0 overflow-hidden">
+                            <EquipmentImage
+                              imageUrl={eq.image}
+                              type={eq.type}
+                              alt={eq.name}
+                              className="w-full h-full object-cover"
+                              containerClassName="w-10 h-10"
+                            />
                           </div>
                           <div>
                             <p className="font-semibold text-gray-900">
@@ -366,7 +413,11 @@ export function CatalogPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
-                          <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(eq.id)}
+                            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-500 transition-colors"
+                          >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
@@ -428,8 +479,12 @@ export function CatalogPage() {
       </main>
 
       {/* Add Equipment Modal */}
-      {showAddModal && (
-        <AddEquipmentModal onClose={() => setShowAddModal(false)} onSuccess={fetchEquipment} />
+      {(showAddModal || editingEquipment) && (
+        <AddEquipmentModal
+          equipment={editingEquipment}
+          onClose={closeFormModal}
+          onSuccess={fetchEquipment}
+        />
       )}
     </div>
   );

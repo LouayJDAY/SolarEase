@@ -71,9 +71,29 @@ export function ClientDocumentsPage() {
             status={doc.status as DocumentStatus}
             date={doc.date}
             size={doc.size}
-            onView={() => toast.info("Ouverture du document...")}
-            onDownload={() => toast.success("Téléchargement en cours...")}
-            onShare={() => toast.info("Fonctionnalité de partage à venir")}
+            onView={async () => {
+              try {
+                await documentService.openDocument(doc.id);
+              } catch {
+                toast.error("Impossible d'ouvrir le document");
+              }
+            }}
+            onDownload={async () => {
+              try {
+                await documentService.downloadDocument(doc.id, doc.name);
+                toast.success("Téléchargement démarré");
+              } catch {
+                toast.error("Impossible de télécharger le document");
+              }
+            }}
+            onShare={async () => {
+              try {
+                const result = await documentService.shareDocument(doc);
+                toast.success(result === "shared" ? "Document partagé" : "Lien copié dans le presse-papier");
+              } catch {
+                toast.error("Partage impossible");
+              }
+            }}
           />
         ))}
       </div>

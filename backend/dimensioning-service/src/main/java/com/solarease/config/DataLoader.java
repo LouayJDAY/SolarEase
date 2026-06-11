@@ -1,15 +1,12 @@
 package com.solarease.config;
 
-import com.solarease.entity.Equipment;
-import com.solarease.enums.EquipmentType;
 import com.solarease.repository.EquipmentRepository;
+import com.solarease.enums.EquipmentType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
 
 /**
  * Seeds the {@code equipments} table with the real catalogue of the installer
@@ -19,8 +16,7 @@ import java.math.BigDecimal;
  *   <li>Inverters Solax/Sungrow (mono and three-phase) -- exhaustive list from
  *       the company spreadsheet.</li>
  *   <li>Schneider AC/DC circuit breakers -- standard Acti9/iC60N range.</li>
- *   <li>A few reference solar panels and Night Panels used for compatibility
- *       checks and PVGIS-based dimensioning.</li>
+ *   <li>Reference solar panels (TOPCon N-type, bifacial, biverre).</li>
  * </ul>
  *
  * Cables stay as <em>sizing rules</em> (indexed in {@code knowledge_chunks})
@@ -36,80 +32,22 @@ import java.math.BigDecimal;
 public class DataLoader implements CommandLineRunner {
 
     private final EquipmentRepository equipmentRepository;
+    private final PanelCatalogSeeder panelCatalogSeeder;
 
     @Override
     public void run(String... args) {
         if (equipmentRepository.count() > 0) {
-            log.info("Equipment catalog already seeded ({} rows), skipping.",
+            log.info("Equipment catalog already seeded ({} rows), skipping full seed.",
                     equipmentRepository.count());
             return;
         }
 
-        seedPanels();
-        seedNightPanels();
+        panelCatalogSeeder.seedCompanyPanels();
         seedCompanyInverters();
         seedSchneiderBreakers();
 
         log.info("Seeded {} equipments (panels, inverters, breakers).",
                 equipmentRepository.count());
-    }
-
-    private void seedPanels() {
-        equipmentRepository.save(Equipment.builder()
-                .name("JA Solar JAM72S30")
-                .brand("JA Solar")
-                .model("JAM72S30-540")
-                .type(EquipmentType.SOLAR_PANEL)
-                .nominalPower(540.0)
-                .efficiency(0.209)
-                .area(2.58)
-                .price(BigDecimal.valueOf(450.0))
-                .warrantyYears(25)
-                .build());
-
-        equipmentRepository.save(Equipment.builder()
-                .name("Jinko Solar Tiger Neo")
-                .brand("Jinko Solar")
-                .model("JKM565N-72HL4")
-                .type(EquipmentType.SOLAR_PANEL)
-                .nominalPower(565.0)
-                .efficiency(0.2187)
-                .area(2.27)
-                .price(BigDecimal.valueOf(550.0))
-                .warrantyYears(15)
-                .build());
-    }
-
-    private void seedNightPanels() {
-        equipmentRepository.save(Equipment.builder()
-                .name("SolarNight SN-400 Hybrid")
-                .brand("SolarNight")
-                .model("SN-400-HB")
-                .type(EquipmentType.NIGHT_PANEL)
-                .nominalPower(400.0)
-                .efficiency(0.21)
-                .area(1.85)
-                .storageCapacityKwh(1.2)
-                .price(BigDecimal.valueOf(750.0))
-                .warrantyYears(20)
-                .specifications("{\"technology\":\"Monocrystalline + Integrated LFP Battery\","
-                        + "\"nightOutput\":\"1.2 kWh\",\"cycleLife\":6000}")
-                .build());
-
-        equipmentRepository.save(Equipment.builder()
-                .name("EcoNight EN-550 Pro")
-                .brand("EcoNight Energy")
-                .model("EN-550-PRO")
-                .type(EquipmentType.NIGHT_PANEL)
-                .nominalPower(550.0)
-                .efficiency(0.215)
-                .area(2.30)
-                .storageCapacityKwh(2.0)
-                .price(BigDecimal.valueOf(1100.0))
-                .warrantyYears(25)
-                .specifications("{\"technology\":\"HJT + Solid-State Battery\","
-                        + "\"nightOutput\":\"2.0 kWh\",\"cycleLife\":8000}")
-                .build());
     }
 
     /**
@@ -139,8 +77,8 @@ public class DataLoader implements CommandLineRunner {
 
     private void addInverter(String name, String brand, String model, int powerW,
                              String phase, double minKw, double maxKw) {
-        BigDecimal price = BigDecimal.valueOf(800 + powerW * 0.4);
-        equipmentRepository.save(Equipment.builder()
+        java.math.BigDecimal price = java.math.BigDecimal.valueOf(800 + powerW * 0.4);
+        equipmentRepository.save(com.solarease.entity.Equipment.builder()
                 .name(name)
                 .brand(brand)
                 .model(model)
@@ -177,12 +115,12 @@ public class DataLoader implements CommandLineRunner {
     }
 
     private void addDcBreaker(String name, String ref, int ratingA) {
-        equipmentRepository.save(Equipment.builder()
+        equipmentRepository.save(com.solarease.entity.Equipment.builder()
                 .name(name)
                 .brand("Schneider Electric")
                 .model(ref)
                 .type(EquipmentType.CIRCUIT_BREAKER_DC)
-                .price(BigDecimal.valueOf(40 + ratingA * 1.5))
+                .price(java.math.BigDecimal.valueOf(40 + ratingA * 1.5))
                 .warrantyYears(2)
                 .specifications(String.format(
                         "{\"ratingA\":%d,\"application\":\"DC string protection\","
@@ -192,12 +130,12 @@ public class DataLoader implements CommandLineRunner {
     }
 
     private void addAcBreaker(String name, String ref, int ratingA, String phase) {
-        equipmentRepository.save(Equipment.builder()
+        equipmentRepository.save(com.solarease.entity.Equipment.builder()
                 .name(name)
                 .brand("Schneider Electric")
                 .model(ref)
                 .type(EquipmentType.CIRCUIT_BREAKER_AC)
-                .price(BigDecimal.valueOf(35 + ratingA * 1.2))
+                .price(java.math.BigDecimal.valueOf(35 + ratingA * 1.2))
                 .warrantyYears(2)
                 .specifications(String.format(
                         "{\"ratingA\":%d,\"phase\":\"%s\","

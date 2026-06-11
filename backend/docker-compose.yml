@@ -132,6 +132,8 @@ services:
         condition: service_healthy
     ports:
       - "${PROJECT_PORT:-8082}:8082"
+    volumes:
+      - project_uploads:/app/uploads
     networks:
       - solarease-net
 
@@ -180,6 +182,8 @@ services:
       IDENTITY_SERVICE_URL: http://identity-service:8081
       PROJECT_SERVICE_URL: http://project-service:8082
       DIMENSIONING_SERVICE_URL: http://dimensioning-service:8083
+      PROJECT_SERVICE_HOST: project-service
+      PROJECT_SERVICE_WS_PORT: "8082"
     depends_on:
       - identity-service
       - project-service
@@ -229,6 +233,7 @@ volumes:
   pg_dimensioning_data:
   ollama_data:
   n8n_data:
+  project_uploads:
 
 networks:
   solarease-net:

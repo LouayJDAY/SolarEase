@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageThread } from "../components/client/MessageThread";
 import { ArrowLeft, MessageSquare, Search, Shield, User, Loader2 } from "lucide-react";
 import { Link, useParams } from "react-router";
-import messageService, { Conversation } from "../services/messageService";
+import messageService, { Conversation, messageToAttachments } from "../services/messageService";
 import { useAuth } from "../context/AuthContext";
 import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
@@ -99,17 +99,20 @@ export function ProjectMessagesPage() {
     };
   }, [projectId, user?.userId, user?.role, canViewMessage]);
 
-  const handleSend = async (content: string, recipientRoles?: string[]) => {
+  const handleSend = async (content: string, recipientRoles?: string[], file?: File) => {
     if (!user?.userId || Number.isNaN(projectId)) return;
     try {
       const senderName = `${user.firstName} ${user.lastName}`.trim();
-      const msg = await messageService.sendProjectMessage(projectId, {
+      const payload = {
         senderId: user.userId,
         senderName,
         senderRole: user.role,
         recipientRoles,
         content,
-      });
+      };
+      const msg = file
+        ? await messageService.sendProjectMessageWithAttachment(projectId, payload, file)
+        : await messageService.sendProjectMessage(projectId, payload);
       // Optimistically append; WS echo will be deduped by id guard
       if (!canViewMessage(msg as Conversation["messages"][number])) {
         return;
@@ -123,6 +126,7 @@ export function ProjectMessagesPage() {
       );
     } catch (e) {
       console.error("Error sending message:", e);
+      throw e;
     }
   };
 
@@ -291,10 +295,14 @@ export function ProjectMessagesPage() {
                         content: m.content,
                         timestamp: new Date(m.timestamp).toLocaleString("fr-FR"),
                         read: true,
+                        attachments: messageToAttachments(m),
                       })) || []
                     }
                     onSendMessage={handleSend}
-                    allowRecipientSelection={user?.role === "ADMIN"}
+                    allowRecipientSelection={
+                      user?.role === "ADMIN" || user?.role === "INSTALLER"
+                    }
+                    senderRole={user?.role}
                   />
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center text-gray-500 px-4 md:px-6 text-center gap-4">

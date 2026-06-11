@@ -1,96 +1,93 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
 import authService from "../services/authService";
+import { registerSchema, type RegisterFormValues, usernameSchema } from "../validation/authSchemas";
+import { getApiErrorMessage } from "../utils/apiError";
+import { useAuth } from "../context/AuthContext";
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("token") ?? "";
   const inviteEmail = searchParams.get("email") ?? "";
   const inviteProjectId = searchParams.get("projectId") ?? "";
-
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: inviteEmail,
-    phone: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: inviteEmail,
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
   useEffect(() => {
     if (inviteToken) {
+      logout();
       sessionStorage.setItem("invitationToken", inviteToken);
     }
-    if (inviteProjectId) {
-      sessionStorage.setItem("invitationProjectId", inviteProjectId);
-    }
-  }, [inviteToken, inviteProjectId]);
+    if (inviteProjectId) sessionStorage.setItem("invitationProjectId", inviteProjectId);
+  }, [inviteToken, inviteProjectId, logout]);
 
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.firstName) newErrors.firstName = "Le prénom est requis";
-    if (!formData.lastName) newErrors.lastName = "Le nom est requis";
-    if (!formData.email) {
-      newErrors.email = "L'adresse email est requise";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "L'adresse email n'est pas valide";
-    }
-    if (!formData.phone) newErrors.phone = "Le téléphone est requis";
-    if (!formData.password) {
-      newErrors.password = "Le mot de passe est requis";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Le mot de passe doit faire au moins 8 caractères";
-    }
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Les mots de passe ne correspondent pas";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setErrors({});
+  const onSubmit = handleSubmit(async (data) => {
+    setGeneralError("");
     setIsLoading(true);
-
     try {
-      const username = formData.email ? formData.email.split("@")[0] : `${formData.firstName}.${formData.lastName}`;
+      const usernameCandidate = data.email.split("@")[0] || `${data.firstName}.${data.lastName}`;
+      const usernameCheck = usernameSchema.safeParse(usernameCandidate);
+      if (!usernameCheck.success) {
+        setGeneralError("L'email ne permet pas de générer un identifiant valide (min. 3 caractères).");
+        return;
+      }
+
       const response = await authService.register({
-        username,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        password: formData.password,
+        username: usernameCheck.data,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone?.trim() || undefined,
+        password: data.password,
         userRole: "CLIENT",
       });
 
-      const params = new URLSearchParams({ email: formData.email });
-
-      navigate(`/verify-otp?${params.toString()}`, {
-        state: {
-          message: response.message,
-        },
+      navigate(`/verify-otp?${new URLSearchParams({ email: data.email }).toString()}`, {
+        state: { message: response.message },
       });
-    } catch (err: any) {
-      const message = err.response?.data?.message || "Une erreur est survenue lors de l'inscription.";
-      setErrors({ general: message });
+    } catch (err: unknown) {
+      const apiMessage = getApiErrorMessage(err, "Une erreur est survenue lors de l'inscription.");
+      const isExistingEmail =
+        apiMessage.toLowerCase().includes("already registered") ||
+        apiMessage.toLowerCase().includes("déjà enregistré") ||
+        apiMessage.toLowerCase().includes("installateur");
+      if (isExistingEmail && inviteToken) {
+        const isInstallerConflict = apiMessage.toLowerCase().includes("installateur");
+        setGeneralError(
+          isInstallerConflict
+            ? "Cet email est déjà utilisé par un compte installateur. Demandez à l'administrateur de changer l'email du client ou de supprimer le compte installateur en conflit."
+            : "Cet email possède déjà un compte SolarEase. Connectez-vous pour accepter l'invitation et accéder à votre projet."
+        );
+      } else {
+        setGeneralError(apiMessage);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  });
 
   return (
     <AuthLayout
@@ -103,9 +100,6 @@ export function RegisterPage() {
           <p className="text-muted-foreground">
             Rejoignez SolarEase et prenez le contrôle de votre énergie.
           </p>
-          <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-secondary">
-            Après l’inscription, un code OTP est envoyé par email pour activer votre compte.
-          </div>
           {inviteToken && (
             <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
               Vous avez été invité à créer votre espace client SolarEase
@@ -113,73 +107,76 @@ export function RegisterPage() {
             </div>
           )}
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {errors.general && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-              {errors.general}
+        <form onSubmit={onSubmit} className="space-y-4">
+          {generalError && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm space-y-2">
+              <p>{generalError}</p>
+              {inviteToken &&
+                generalError.includes("Connectez-vous pour accepter l'invitation") && (
+                  <Link
+                    to={`/login?${new URLSearchParams({
+                      token: inviteToken,
+                      email: inviteEmail,
+                      ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
+                    }).toString()}`}
+                    className="inline-block text-primary font-medium hover:underline"
+                  >
+                    Se connecter avec ce compte
+                  </Link>
+                )}
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Prénom"
-              type="text"
-              placeholder="Jean"
-              value={formData.firstName}
-              onChange={(e) => handleChange("firstName", e.target.value)}
-              error={errors.firstName}
-            />
-            <Input
-              label="Nom"
-              type="text"
-              placeholder="Dupont"
-              value={formData.lastName}
-              onChange={(e) => handleChange("lastName", e.target.value)}
-              error={errors.lastName}
-            />
+            <Input label="Prénom" {...register("firstName")} error={errors.firstName?.message} />
+            <Input label="Nom" {...register("lastName")} error={errors.lastName?.message} />
           </div>
           <Input
             label="Adresse email"
             type="email"
-            placeholder="votre@email.com"
-            value={formData.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            error={errors.email}
+            {...register("email")}
+            error={errors.email?.message}
           />
           <Input
-            label="Téléphone"
+            label="Téléphone (optionnel)"
             type="tel"
-            placeholder="06 12 34 56 78"
-            value={formData.phone}
-            onChange={(e) => handleChange("phone", e.target.value)}
-            error={errors.phone}
+            placeholder="+216 98 123 456"
+            {...register("phone")}
+            error={errors.phone?.message}
           />
           <Input
             label="Mot de passe"
             type="password"
-            placeholder="Min. 8 caractères"
-            value={formData.password}
-            onChange={(e) => handleChange("password", e.target.value)}
-            error={errors.password}
+            placeholder="Min. 6 caractères"
+            {...register("password")}
+            error={errors.password?.message}
             showPasswordToggle
           />
           <Input
             label="Confirmer le mot de passe"
             type="password"
-            placeholder="Retapez votre mot de passe"
-            value={formData.confirmPassword}
-            onChange={(e) => handleChange("confirmPassword", e.target.value)}
-            error={errors.confirmPassword}
+            {...register("confirmPassword")}
+            error={errors.confirmPassword?.message}
             showPasswordToggle
           />
           <Button type="submit" fullWidth disabled={isLoading}>
             {isLoading ? "Création du compte..." : "Créer mon compte"}
           </Button>
         </form>
-
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             Vous avez déjà un compte ?{" "}
-            <Link to="/login" className="text-primary font-medium hover:underline">
+            <Link
+              to={
+                inviteToken
+                  ? `/login?${new URLSearchParams({
+                      token: inviteToken,
+                      ...(inviteEmail ? { email: inviteEmail } : {}),
+                      ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
+                    }).toString()}`
+                  : "/login"
+              }
+              className="text-primary font-medium hover:underline"
+            >
               Se connecter
             </Link>
           </p>

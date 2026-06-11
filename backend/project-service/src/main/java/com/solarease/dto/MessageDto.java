@@ -1,5 +1,6 @@
 package com.solarease.dto;
 
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,15 @@ public class MessageDto {
     private String senderName;
     private String senderRole;
     private List<String> recipientRoles;
+
+    @Size(max = 5000, message = "Message must be at most 5000 characters")
     private String content;
+
     private Instant timestamp;
+
+    private String attachmentFileName;
+    private String attachmentOriginalName;
+    private String attachmentContentType;
+    private Long attachmentSizeBytes;
+    private String attachmentUrl;
 }

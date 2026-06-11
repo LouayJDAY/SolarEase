@@ -1,5 +1,6 @@
 package com.solarease.controller;
 
+import com.solarease.dto.ClientMeUpdateRequest;
 import com.solarease.dto.ClientRequest;
 import com.solarease.dto.ClientResponse;
 import com.solarease.dto.ClientStatsResponse;
@@ -38,6 +39,23 @@ public class ClientController {
             @RequestHeader("X-User-Role") String userRole) {
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
         return clientService.getClientStats(userId, userRole);
+    }
+
+    @GetMapping("/me")
+    public ClientResponse getMyClientProfile(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String userRole) {
+        accessControlService.requireAnyRole(userRole, "CLIENT");
+        return clientService.getClientByUserId(userId);
+    }
+
+    @PutMapping("/me")
+    public ClientResponse updateMyClientProfile(
+            @RequestHeader("X-User-Id") String userId,
+            @RequestHeader("X-User-Role") String userRole,
+            @RequestBody @Valid ClientMeUpdateRequest request) {
+        accessControlService.requireAnyRole(userRole, "CLIENT");
+        return clientService.updateClientByUserId(userId, request);
     }
 
     @GetMapping("/{id}")

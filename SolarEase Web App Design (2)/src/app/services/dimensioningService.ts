@@ -9,10 +9,11 @@ export interface DimensioningRequest {
   latitude: number;
   longitude: number;
   panelId?: number;
+  nightPanelId?: number;
   inverterId?: number;
   panelType?: "CLASSIC" | "NIGHT_PANEL";
-  nightPanelId?: number;
   dailyConsumptionKwh?: number;
+  quarterlyBillTnd?: number;
 }
 
 export interface SolarInstallation {
@@ -31,6 +32,8 @@ export interface SolarInstallation {
   nightCoverageRate?: number;
   dailyProductionKwh?: number;
   nightlyConsumptionKwh?: number;
+  sizingConstraint?: "ROOF" | "CONSUMPTION" | "BOTH_EQUAL" | string;
+  dailyConsumptionUsed?: number;
 }
 
 export interface FinancialMetrics {
@@ -89,6 +92,17 @@ export interface InstallerRecommendation {
   fallback?: boolean;
 }
 
+export interface EquipmentSummary {
+  id: number;
+  name: string;
+  brand: string;
+  model: string;
+  equipmentType: string;
+  panelCategory?: string;
+  nominalPower: number;
+  price?: number;
+}
+
 export interface DimensioningResponse {
   id: number;
   projectId: number;
@@ -99,6 +113,8 @@ export interface DimensioningResponse {
   aiRecommendation: string;
   installerRecommendation?: InstallerRecommendation;
   panelType: string;
+  panel?: EquipmentSummary;
+  inverter?: EquipmentSummary;
   financials: FinancialMetrics;
 }
 

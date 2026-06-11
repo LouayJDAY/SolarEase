@@ -15,5 +15,9 @@ public class InvoiceDto {
     private LocalDate date;
     private LocalDate dueDate;
     private double amount;
+    private Double subtotal;
+    private Double discountPercent;
+    private Double discountAmount;
     private String status;
+    private String notes;
 }

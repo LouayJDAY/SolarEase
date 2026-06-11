@@ -3,19 +3,27 @@ import SockJS from "sockjs-client";
 
 const WS_URL =
   import.meta.env.VITE_WS_URL ??
-  (import.meta.env.DEV ? "http://localhost:8080/ws" : `${window.location.origin}/ws`);
+  (import.meta.env.DEV ? `${window.location.origin}/ws` : `${window.location.origin}/ws`);
 
 let stompClient: Client | null = null;
 /** Subscriptions created after STOMP CONNECTED — cleared on disconnect */
 let stompSubscriptions: StompSubscription[] = [];
 
+/** Shared STOMP client: multiple hooks acquire/release instead of hard disconnect. */
+let connectionRefCount = 0;
+
 let notificationUserId: string | null = null;
-let notificationHandler: ((n: NotificationPayload) => void) | null = null;
+const notificationHandlers = new Set<(n: NotificationPayload) => void>();
 let clientCountsHandler: ((p: { clientId: number | string; projectCount: number }) => void) | null = null;
 let adminDemandsHandler: ((event: AdminDemandEvent) => void) | null = null;
+let adminDashboardHandler: ((event: DashboardRefreshEvent) => void) | null = null;
+let installerDashboardHandler: ((event: DashboardRefreshEvent) => void) | null = null;
+let installerDashboardUserId: string | null = null;
 
 /** Map of projectId → per-project message handlers */
 const projectMessageHandlers = new Map<number, (msg: MessagePayload) => void>();
+const fieldUpdateHandlers = new Map<number, (update: FieldUpdatePayload) => void>();
+const projectUpdateHandlers = new Map<number, (event: ProjectLiveUpdateEvent) => void>();
 
 function clearStompSubscriptions(): void {
   stompSubscriptions.forEach((sub) => {
@@ -34,12 +42,12 @@ function attachNotificationSubscriptions(): void {
   }
   clearStompSubscriptions();
 
-  if (notificationUserId && notificationHandler) {
-    const handler = notificationHandler;
+  if (notificationUserId && notificationHandlers.size > 0) {
     const userId = notificationUserId;
     const onFrame = (msg: IMessage) => {
       try {
-        handler(JSON.parse(msg.body));
+        const payload = JSON.parse(msg.body) as NotificationPayload;
+        notificationHandlers.forEach((handler) => handler(payload));
       } catch {
         /* ignore malformed payloads */
       }
@@ -52,7 +60,6 @@ function attachNotificationSubscriptions(): void {
     );
   }
 
-  // subscribe to client project counts if handler is registered
   if (clientCountsHandler) {
     const onCounts = (msg: IMessage) => {
       try {
@@ -64,7 +71,6 @@ function attachNotificationSubscriptions(): void {
     stompSubscriptions.push(stompClient.subscribe(`/topic/client-project-counts`, onCounts));
   }
 
-  // subscribe to the admin demands broadcast topic if a handler is registered
   if (adminDemandsHandler) {
     const onDemand = (msg: IMessage) => {
       try {
@@ -76,7 +82,34 @@ function attachNotificationSubscriptions(): void {
     stompSubscriptions.push(stompClient.subscribe(`/topic/admin/demands`, onDemand));
   }
 
-  // subscribe to per-project message topics
+  if (adminDashboardHandler) {
+    const onDashboard = (msg: IMessage) => {
+      try {
+        if (adminDashboardHandler) adminDashboardHandler(JSON.parse(msg.body));
+      } catch {
+        /* ignore malformed payloads */
+      }
+    };
+    stompSubscriptions.push(stompClient.subscribe(`/topic/admin/dashboard`, onDashboard));
+  }
+
+  if (installerDashboardHandler && installerDashboardUserId) {
+    const handler = installerDashboardHandler;
+    const onInstallerDashboard = (msg: IMessage) => {
+      try {
+        handler(JSON.parse(msg.body));
+      } catch {
+        /* ignore malformed payloads */
+      }
+    };
+    stompSubscriptions.push(
+      stompClient.subscribe(
+        `/topic/installer/${installerDashboardUserId}/dashboard`,
+        onInstallerDashboard
+      )
+    );
+  }
+
   projectMessageHandlers.forEach((msgHandler, projectId) => {
     const onMsg = (msg: IMessage) => {
       try {
@@ -89,6 +122,32 @@ function attachNotificationSubscriptions(): void {
       stompClient!.subscribe(`/topic/project-messages/${projectId}`, onMsg)
     );
   });
+
+  fieldUpdateHandlers.forEach((handler, projectId) => {
+    const onUpdate = (msg: IMessage) => {
+      try {
+        handler(JSON.parse(msg.body));
+      } catch {
+        /* ignore */
+      }
+    };
+    stompSubscriptions.push(
+      stompClient!.subscribe(`/topic/field-updates/${projectId}`, onUpdate)
+    );
+  });
+
+  projectUpdateHandlers.forEach((handler, projectId) => {
+    const onUpdate = (msg: IMessage) => {
+      try {
+        handler(JSON.parse(msg.body));
+      } catch {
+        /* ignore */
+      }
+    };
+    stompSubscriptions.push(
+      stompClient!.subscribe(`/topic/project-updates/${projectId}`, onUpdate)
+    );
+  });
 }
 
 export function connectWebSocket(
@@ -96,6 +155,7 @@ export function connectWebSocket(
   token: string,
   options?: { onConnected?: () => void }
 ): void {
+  connectionRefCount++;
   const onConnected = options?.onConnected;
 
   if (stompClient?.active) {
@@ -130,37 +190,60 @@ export function connectWebSocket(
   stompClient.activate();
 }
 
+/**
+ * Release a shared WebSocket consumer. The connection is torn down only when
+ * no hook still holds a reference (ref count reaches zero).
+ */
+export function releaseWebSocketConnection(): void {
+  connectionRefCount = Math.max(0, connectionRefCount - 1);
+  if (connectionRefCount === 0) {
+    disconnectWebSocket();
+  }
+}
+
 export function disconnectWebSocket(): void {
+  connectionRefCount = 0;
   clearStompSubscriptions();
   notificationUserId = null;
-  notificationHandler = null;
+  notificationHandlers.clear();
   clientCountsHandler = null;
   adminDemandsHandler = null;
+  adminDashboardHandler = null;
+  installerDashboardHandler = null;
+  installerDashboardUserId = null;
   projectMessageHandlers.clear();
+  fieldUpdateHandlers.clear();
+  projectUpdateHandlers.clear();
   if (stompClient?.active) {
     stompClient.deactivate();
   }
   stompClient = null;
 }
 
-/**
- * Register notification handler. Subscriptions are created only after STOMP is connected
- * (in onConnect). Call before or after connectWebSocket — both orders work.
- */
 export function subscribeToNotifications(
   userId: string,
   onMessage: (notification: NotificationPayload) => void
 ): void {
   notificationUserId = userId;
-  notificationHandler = onMessage;
+  notificationHandlers.add(onMessage);
   if (stompClient?.connected) {
     attachNotificationSubscriptions();
   }
 }
 
-/**
- * Subscribe to client project count updates published on /topic/client-project-counts
- */
+export function unsubscribeFromNotifications(
+  onMessage?: (notification: NotificationPayload) => void
+): void {
+  if (onMessage) {
+    notificationHandlers.delete(onMessage);
+  } else {
+    notificationHandlers.clear();
+  }
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
 export function subscribeToClientProjectCounts(
   onMessage: (payload: { clientId: number | string; projectCount: number }) => void
 ): void {
@@ -170,10 +253,6 @@ export function subscribeToClientProjectCounts(
   }
 }
 
-/**
- * Subscribe to the admin demands broadcast topic. Only useful when the current
- * user is an admin -- callers must guard on role themselves.
- */
 export function subscribeToAdminDemands(
   onMessage: (event: AdminDemandEvent) => void
 ): void {
@@ -185,16 +264,54 @@ export function subscribeToAdminDemands(
 
 export function unsubscribeFromAdminDemands(): void {
   adminDemandsHandler = null;
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function subscribeToAdminDashboard(
+  onMessage: (event: DashboardRefreshEvent) => void
+): void {
+  adminDashboardHandler = onMessage;
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function unsubscribeFromAdminDashboard(): void {
+  adminDashboardHandler = null;
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function subscribeToInstallerDashboard(
+  installerId: string,
+  onMessage: (event: DashboardRefreshEvent) => void
+): void {
+  installerDashboardUserId = installerId;
+  installerDashboardHandler = onMessage;
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function unsubscribeFromInstallerDashboard(): void {
+  installerDashboardHandler = null;
+  installerDashboardUserId = null;
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
 }
 
 export function isConnected(): boolean {
   return Boolean(stompClient?.connected);
 }
 
-/**
- * Subscribe to real-time messages for a specific project.
- * Call unsubscribeFromProjectMessages when leaving the page.
- */
+export function getWebSocketRefCount(): number {
+  return connectionRefCount;
+}
+
 export function subscribeToProjectMessages(
   projectId: number,
   onMessage: (msg: MessagePayload) => void
@@ -213,9 +330,65 @@ export function subscribeToProjectMessages(
   }
 }
 
-/** Remove the real-time message subscription for a project. */
 export function unsubscribeFromProjectMessages(projectId: number): void {
   projectMessageHandlers.delete(projectId);
+}
+
+export function subscribeToFieldUpdates(
+  projectId: number,
+  onMessage: (update: FieldUpdatePayload) => void
+): void {
+  fieldUpdateHandlers.set(projectId, onMessage);
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function unsubscribeFromFieldUpdates(projectId: number): void {
+  fieldUpdateHandlers.delete(projectId);
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function subscribeToProjectUpdates(
+  projectId: number,
+  onMessage: (event: ProjectLiveUpdateEvent) => void
+): void {
+  projectUpdateHandlers.set(projectId, onMessage);
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+export function unsubscribeFromProjectUpdates(projectId: number): void {
+  projectUpdateHandlers.delete(projectId);
+  if (stompClient?.connected) {
+    attachNotificationSubscriptions();
+  }
+}
+
+/** Live project status/progress push for client detail pages. */
+export interface ProjectLiveUpdateEvent {
+  event: string;
+  projectId: number;
+  status?: string;
+  currentProgress?: number;
+  currentPhase?: string;
+  currentFieldStatus?: string;
+  timestamp?: string;
+}
+
+/** Field update payload from /topic/field-updates/{projectId}. */
+export interface FieldUpdatePayload {
+  id: number;
+  projectId: number;
+  progressPercent?: number;
+  currentPhase?: string | null;
+  currentPhaseLabel?: string | null;
+  fieldStatus?: string;
+  photoUrl?: string | null;
+  createdAt?: string;
 }
 
 export interface NotificationPayload {
@@ -235,9 +408,13 @@ export interface MessagePayload {
   recipientRoles?: string[];
   content: string;
   timestamp: string;
+  attachmentFileName?: string;
+  attachmentOriginalName?: string;
+  attachmentContentType?: string;
+  attachmentSizeBytes?: number;
+  attachmentUrl?: string;
 }
 
-/** Event broadcast on /topic/admin/demands when a new demand is created. */
 export interface AdminDemandEvent {
   event: "DEMAND_CREATED" | string;
   notificationId: number;
@@ -250,4 +427,18 @@ export interface AdminDemandEvent {
   clientLastName?: string;
   clientEmail?: string;
   createdAt: string;
+}
+
+/** Event broadcast when dashboard KPIs should reload. */
+export interface DashboardRefreshEvent {
+  event:
+    | "PROJECT_CREATED"
+    | "PROJECT_UPDATED"
+    | "PROJECT_DELETED"
+    | "PROJECT_STATUS_CHANGED"
+    | "DEMAND_CREATED"
+    | "DEMAND_STATUS_CHANGED"
+    | string;
+  installerId?: string;
+  timestamp?: string;
 }

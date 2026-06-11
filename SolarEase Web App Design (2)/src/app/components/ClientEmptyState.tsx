@@ -1,6 +1,10 @@
 import React from "react";
 
-export function ClientEmptyState() {
+interface ClientEmptyStateProps {
+  onAddClient?: () => void;
+}
+
+export function ClientEmptyState({ onAddClient }: ClientEmptyStateProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 py-24">
       <div className="max-w-md mx-auto text-center px-6">
@@ -86,6 +90,15 @@ export function ClientEmptyState() {
           Ajoutez votre premier client pour commencer à gérer vos projets
           solaires
         </p>
+        {onAddClient && (
+          <button
+            type="button"
+            onClick={onAddClient}
+            className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium shadow-sm"
+          >
+            Ajouter un client
+          </button>
+        )}
       </div>
     </div>
   );

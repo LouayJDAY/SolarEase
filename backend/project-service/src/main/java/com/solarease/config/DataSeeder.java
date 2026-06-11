@@ -28,6 +28,7 @@ public class DataSeeder implements ApplicationRunner {
     private final DocumentRepository documentRepository;
     private final InvoiceRepository invoiceRepository;
     private final ProjectRepository projectRepository;
+    private final ClientRepository clientRepository;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -51,8 +52,20 @@ public class DataSeeder implements ApplicationRunner {
             c.setProjectId(null);
             c.getParticipants().add(demoClientKey);
             c.getParticipants().add(demoInstallerKey);
-            MessageEntity m1 = new MessageEntity(null, c, demoInstallerKey, "Installateur", "INSTALLER", new java.util.ArrayList<>(), "Bonjour, votre installation est programmée.", Instant.now().minusSeconds(7200));
-            MessageEntity m2 = new MessageEntity(null, c, demoClientKey, "Vous", "CLIENT", new java.util.ArrayList<>(), "Merci, à quelle date ?", Instant.now().minusSeconds(7100));
+            MessageEntity m1 = new MessageEntity();
+            m1.setConversation(c);
+            m1.setSenderId(demoInstallerKey);
+            m1.setSenderName("Installateur");
+            m1.setSenderRole("INSTALLER");
+            m1.setContent("Bonjour, votre installation est programmée.");
+            m1.setTimestamp(Instant.now().minusSeconds(7200));
+            MessageEntity m2 = new MessageEntity();
+            m2.setConversation(c);
+            m2.setSenderId(demoClientKey);
+            m2.setSenderName("Vous");
+            m2.setSenderRole("CLIENT");
+            m2.setContent("Merci, à quelle date ?");
+            m2.setTimestamp(Instant.now().minusSeconds(7100));
             c.getMessages().add(m1);
             c.getMessages().add(m2);
             conversationRepository.save(c);
@@ -62,7 +75,7 @@ public class DataSeeder implements ApplicationRunner {
 
         if (documentRepository.count() == 0 && anyProject.isPresent()) {
             Project project = anyProject.get();
-            String clientId = String.valueOf(project.getClientId());
+            String clientId = resolveClientDocumentKey(project);
             String installerId = project.getInstallerId() == null ? demoInstallerKey : project.getInstallerId();
 
             DocumentEntity d1 = DocumentEntity.builder()
@@ -117,7 +130,7 @@ public class DataSeeder implements ApplicationRunner {
 
         if (invoiceRepository.count() == 0 && anyProject.isPresent()) {
             Project project = anyProject.get();
-            String clientId = String.valueOf(project.getClientId());
+            String clientId = resolveClientDocumentKey(project);
             String installerId = project.getInstallerId() == null ? demoInstallerKey : project.getInstallerId();
 
             InvoiceEntity i1 = InvoiceEntity.builder()
@@ -145,5 +158,15 @@ public class DataSeeder implements ApplicationRunner {
             invoiceRepository.save(i1);
             invoiceRepository.save(i2);
         }
+    }
+
+    private String resolveClientDocumentKey(Project project) {
+        if (project.getClientId() == null) {
+            return DemoProjectSeeder.CLIENT_USER_ID;
+        }
+        return clientRepository.findById(project.getClientId())
+                .map(Client::getUserId)
+                .filter(id -> id != null && !id.isBlank())
+                .orElse(String.valueOf(project.getClientId()));
     }
 }

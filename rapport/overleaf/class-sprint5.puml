@@ -15,6 +15,14 @@ class Client {
     - email : String
     - nom : String
     - prenom : String
+    --
+    + SoumettreDemande()
+    + ConsulterMesDemandes()
+    + ConsulterDevis()
+    + AccepterDevis()
+    + RejeterDevis()
+    + ConsulterFactures()
+    + ModifierProfil()
 }
 
 class Demande {
@@ -27,6 +35,12 @@ class Demande {
     - statut : DemandStatus
     - dateCreation : Date
     - projetId : Long
+    --
+    + MettreAJourStatut()
+    + Assigner()
+    + MettreAJourPriorite()
+    + ConvertirEnProjet()
+    + RenvoyerInvitation()
 }
 
 class Devis {
@@ -37,6 +51,13 @@ class Devis {
     - montantTotal : Double
     - statut : QuoteStatus
     - dateValidite : Date
+    --
+    + Creer()
+    + Envoyer()
+    + Accepter()
+    + Rejeter()
+    + Expirer()
+    + GenererFacture()
 }
 
 class Facture {
@@ -47,11 +68,19 @@ class Facture {
     - dateEmission : Date
     - dateEcheance : Date
     - statut : String
+    --
+    + EnvoyerAuClient()
+    + GenererPDF()
+    + MettreAJourStatut()
+    + EnregistrerPaiement()
 }
 
 class Projet {
     - id : Long
     - nom : String
+    --
+    + ListerDevis()
+    + ListerFactures()
 }
 
 enum DemandStatus {

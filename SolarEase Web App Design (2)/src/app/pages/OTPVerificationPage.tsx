@@ -3,10 +3,20 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/Button";
 import authService from "../services/authService";
+import { verifyOtpSchema } from "../validation/authSchemas";
+import { getApiErrorMessage } from "../utils/apiError";
+import { useAuth } from "../context/AuthContext";
+
+function dashboardPathForRole(role?: string) {
+  if (role === "CLIENT") return "/client/dashboard";
+  if (role === "INSTALLER" || role === "ADMIN") return "/dashboard";
+  return "/dashboard";
+}
 
 export function OTPVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { applyAuthResponse, logout } = useAuth();
   const [otp, setOtp] = useState(new Array(6).fill(""));
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -69,26 +79,35 @@ export function OTPVerificationPage() {
     setInfo("");
 
     const code = otp.join("");
-    if (code.length !== 6) {
-      setError("Le code OTP doit contenir 6 chiffres.");
+    const parsed = verifyOtpSchema.safeParse({ email: email ?? "", otpCode: code });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Code OTP invalide.");
       setIsLoading(false);
       return;
     }
 
     if (!email) {
-      setError("Email manquant. Veuillez recommencer l’inscription.");
+      setError("Email manquant. Veuillez recommencer l'inscription.");
       setIsLoading(false);
       return;
     }
 
     try {
+      logout();
       const invitationToken = sessionStorage.getItem("invitationToken") ?? undefined;
-      await authService.verifyOtp({ email, otpCode: code, invitationToken });
+      const response = await authService.verifyOtp({ email, otpCode: code, invitationToken });
       sessionStorage.removeItem("invitationToken");
       sessionStorage.removeItem("invitationProjectId");
-      navigate("/login");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Code OTP invalide ou expiré.");
+
+      if (response.accessToken && response.user) {
+        applyAuthResponse(response);
+        const target = dashboardPathForRole(response.user.role);
+        navigate(target, { replace: true });
+      } else {
+        navigate("/login", { state: { email, message: response.message } });
+      }
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -177,7 +196,7 @@ export function OTPVerificationPage() {
 
         <div className="text-sm text-muted-foreground">
           <Link to="/register" className="text-primary font-medium hover:underline">
-            Revenir à l’inscription
+            Revenir à l'inscription
           </Link>
         </div>
       </div>

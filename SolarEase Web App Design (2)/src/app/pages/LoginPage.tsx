@@ -1,18 +1,38 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import React from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
 import { useAuth } from "../context/AuthContext";
 import { Sparkles } from "lucide-react";
+import { loginSchema, type LoginFormValues } from "../validation/authSchemas";
+import { getApiErrorMessage } from "../utils/apiError";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("token") ?? sessionStorage.getItem("invitationToken") ?? "";
+  const inviteEmail = searchParams.get("email") ?? "";
+  const inviteProjectId = searchParams.get("projectId") ?? sessionStorage.getItem("invitationProjectId") ?? "";
   const { login, isAuthenticated } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: inviteEmail, password: "" },
+  });
+
+  React.useEffect(() => {
+    if (inviteToken) sessionStorage.setItem("invitationToken", inviteToken);
+    if (inviteProjectId) sessionStorage.setItem("invitationProjectId", inviteProjectId);
+  }, [inviteToken, inviteProjectId]);
 
   const getDashboardPath = (role?: string) => {
     if (role === "CLIENT") return "/client/dashboard";
@@ -20,7 +40,6 @@ export function LoginPage() {
     return "/dashboard";
   };
 
-  // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
       try {
@@ -33,30 +52,14 @@ export function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors: { email?: string; password?: string } = {};
-
-    if (!email) {
-      newErrors.email = "L'adresse email est requise";
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = "L'adresse email n'est pas valide";
-    }
-
-    if (!password) {
-      newErrors.password = "Le mot de passe est requis";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setErrors({});
+  const onSubmit = handleSubmit(async ({ email, password }) => {
+    setGeneralError("");
     setIsLoading(true);
-
     try {
-      await login(email, password);
+      const token = inviteToken || sessionStorage.getItem("invitationToken") || undefined;
+      await login(email, password, token);
+      sessionStorage.removeItem("invitationToken");
+      sessionStorage.removeItem("invitationProjectId");
       try {
         const stored = localStorage.getItem("user");
         const parsed = stored ? JSON.parse(stored) : null;
@@ -64,13 +67,26 @@ export function LoginPage() {
       } catch {
         navigate("/dashboard");
       }
-    } catch (err: any) {
-      const message = err.response?.data?.message || "Email ou mot de passe incorrect";
-      setErrors({ general: message });
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(
+        err,
+        (err as Error)?.message === "Network Error"
+          ? "Impossible de joindre l'API. Verifiez que le backend tourne (docker compose up)."
+          : "Email ou mot de passe incorrect"
+      );
+      setGeneralError(message);
     } finally {
       setIsLoading(false);
     }
-  };
+  });
+
+  const registerLink = inviteToken
+    ? `/register?${new URLSearchParams({
+        token: inviteToken,
+        ...(inviteEmail ? { email: inviteEmail } : {}),
+        ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
+      }).toString()}`
+    : "/register";
 
   return (
     <AuthLayout
@@ -83,18 +99,21 @@ export function LoginPage() {
             <Sparkles className="w-4 h-4" />
             Connexion sécurisée
           </div>
-          <h1 className="text-3xl text-secondary mb-2">
-            Bienvenue sur SolarEase
-          </h1>
-          <p className="text-muted-foreground">
-            Connectez-vous pour accéder à votre espace
-          </p>
+          <h1 className="text-3xl text-secondary mb-2">Bienvenue sur SolarEase</h1>
+          <p className="text-muted-foreground">Connectez-vous pour accéder à votre espace</p>
+          {inviteToken && (
+            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Vous avez été invité à rejoindre votre espace client SolarEase
+              {inviteProjectId ? ` pour le projet #${inviteProjectId}` : ""}.
+              Connectez-vous avec le compte associé à cette invitation.
+            </div>
+          )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {errors.general && (
+        <form onSubmit={onSubmit} className="space-y-5">
+          {generalError && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
-              {errors.general}
+              {generalError}
             </div>
           )}
 
@@ -102,18 +121,16 @@ export function LoginPage() {
             label="Adresse email"
             type="email"
             placeholder="votre@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={errors.email}
+            {...register("email")}
+            error={errors.email?.message}
           />
 
           <Input
             label="Mot de passe"
             type="password"
             placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={errors.password}
+            {...register("password")}
+            error={errors.password?.message}
             showPasswordToggle
           />
 
@@ -125,7 +142,7 @@ export function LoginPage() {
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             Vous n'avez pas de compte ?{" "}
-            <Link to="/register" className="text-primary font-medium hover:underline">
+            <Link to={registerLink} className="text-primary font-medium hover:underline">
               Inscrivez-vous
             </Link>
           </p>

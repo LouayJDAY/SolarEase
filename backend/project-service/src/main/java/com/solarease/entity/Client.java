@@ -37,6 +37,18 @@ public class Client {
 
     private String address;
 
+    @Column(length = 100)
+    private String city;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+
+    @Column(name = "client_type", length = 50)
+    private String clientType;
+
+    @Column(length = 1000)
+    private String notes;
+
     @Column(name = "installer_id")
     private String installerId;
 

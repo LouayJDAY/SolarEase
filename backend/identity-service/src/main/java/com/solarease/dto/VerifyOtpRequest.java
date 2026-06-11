@@ -11,10 +11,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerifyOtpRequest {
 
-    @Email(message = "Email invalide")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
     private String email;
 
-    @NotBlank(message = "OTP code requis")
+    @NotBlank(message = "OTP code is required")
     private String otpCode;
 
     /** Optional invitation token from public demand email link. */

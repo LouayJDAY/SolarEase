@@ -7,14 +7,17 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   showPasswordToggle?: boolean;
 }
 
-export function Input({ 
-  label, 
-  error, 
-  showPasswordToggle = false, 
-  type = "text",
-  className = "",
-  ...props 
-}: InputProps) {
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+  {
+    label,
+    error,
+    showPasswordToggle = false,
+    type = "text",
+    className = "",
+    ...props
+  },
+  ref
+) {
   const [showPassword, setShowPassword] = useState(false);
   const inputType = showPasswordToggle ? (showPassword ? "text" : "password") : type;
 
@@ -27,6 +30,7 @@ export function Input({
       )}
       <div className="relative">
         <input
+          ref={ref}
           type={inputType}
           className={`
             w-full px-4 py-3 rounded-lg border border-gray-300 
@@ -57,4 +61,4 @@ export function Input({
       )}
     </div>
   );
-}
+});

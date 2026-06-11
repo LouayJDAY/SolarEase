@@ -21,6 +21,8 @@ import {
   IRRADIANCE_LABELS,
   SOLAR_REGIONS,
 } from "../constants/solarRegions";
+import { simulateurWizardSchema } from "../validation/projectSchemas";
+import { toast } from "sonner";
 
 export function SimulateurPage() {
   // Paramètres validés entreprise (Tunisie)
@@ -92,6 +94,16 @@ export function SimulateurPage() {
     if (step < 4) {
       setStep(step + 1);
     } else {
+      const parsed = simulateurWizardSchema.safeParse({
+        propertyType: formData.propertyType,
+        quarterlyBill: formData.quarterlyBill,
+        roofArea: formData.roofArea,
+        region: formData.region,
+      });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Complétez toutes les étapes.");
+        return;
+      }
       calculateResults();
     }
   };
