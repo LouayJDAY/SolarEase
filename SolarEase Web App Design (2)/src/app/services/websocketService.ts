@@ -3,7 +3,20 @@ import SockJS from "sockjs-client";
 
 const WS_URL =
   import.meta.env.VITE_WS_URL ??
-  (import.meta.env.DEV ? `${window.location.origin}/ws` : `${window.location.origin}/ws`);
+  `${window.location.origin}/ws`;
+
+/**
+ * Vercel rewrites proxy HTTP to Azure but do not upgrade WebSocket (wss).
+ * Use xhr polling/streaming only unless VITE_WS_URL points to a wss-capable backend.
+ */
+const SOCKJS_OPTIONS: { transports: string[] } | undefined =
+  import.meta.env.VITE_WS_URL
+    ? undefined
+    : { transports: ["xhr-streaming", "xhr-polling"] };
+
+function createSockJsSocket(): WebSocket {
+  return new SockJS(WS_URL, undefined, SOCKJS_OPTIONS) as unknown as WebSocket;
+}
 
 let stompClient: Client | null = null;
 /** Subscriptions created after STOMP CONNECTED — cleared on disconnect */
@@ -167,7 +180,7 @@ export function connectWebSocket(
   }
 
   stompClient = new Client({
-    webSocketFactory: () => new SockJS(WS_URL) as unknown as WebSocket,
+    webSocketFactory: () => createSockJsSocket(),
     connectHeaders: {
       Authorization: `Bearer ${token}`,
       "user-id": userId,
