@@ -7,8 +7,8 @@
       "destination": "http://4.233.29.236:8080/api/:path*"
     },
     {
-      "source": "/ws",
-      "destination": "http://4.233.29.236:8080/ws"
+      "source": "/ws/:path*",
+      "destination": "http://4.233.29.236:8080/ws/:path*"
     },
     {
       "source": "/(.*)",
