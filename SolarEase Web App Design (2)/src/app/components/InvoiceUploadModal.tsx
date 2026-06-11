@@ -103,36 +103,165 @@ export default function InvoiceUploadModal({
     pickFile(e.dataTransfer.files?.[0] ?? null);
   }
 
+  function applyParsedResult(json: InvoiceResponse) {
+    setResult(json);
+    const detected = json.totalTTC != null ? String(json.totalTTC) : "";
+    setAmount(detected);
+    setInvoiceNumber(json.invoiceNumber ?? "");
+    setSupplierName(json.supplierName ?? "");
+    const supplierLower = (json.supplierName ?? "").toLowerCase();
+    if (supplierLower.includes("steg")) {
+      setBillingPeriod("quarterly");
+    }
+    setPhase("review");
+  }
+
+  async function pollParseJob(jobId: string, startedAt: number): Promise<InvoiceResponse | null> {
+    const maxWaitMs = 5 * 60 * 1000;
+    while (Date.now() - startedAt < maxWaitMs) {
+      const statusRes = await fetch(`/api/dimensioning/invoices/parse-jobs/${jobId}`);
+      // #region agent log
+      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+        body: JSON.stringify({
+          sessionId: "34125a",
+          hypothesisId: "B",
+          location: "InvoiceUploadModal.tsx:poll",
+          message: "parse job poll",
+          data: {
+            jobId,
+            statusCode: statusRes.status,
+            elapsedMs: Date.now() - startedAt,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      if (statusRes.status === 404) {
+        return null;
+      }
+      if (!statusRes.ok) {
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
+      }
+      const job = (await statusRes.json()) as {
+        status: string;
+        result?: InvoiceResponse;
+        error?: string;
+      };
+      if (job.status === "COMPLETED" && job.result) {
+        return job.result;
+      }
+      if (job.status === "FAILED") {
+        throw new Error(job.error ?? "OCR failed");
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    throw new Error("timeout");
+  }
+
   async function analyze() {
     if (!file) return;
     setLoading(true);
     setError(null);
     const fd = new FormData();
     fd.append("file", file);
+    const startedAt = Date.now();
+    // #region agent log
+    fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+      body: JSON.stringify({
+        sessionId: "34125a",
+        hypothesisId: "A",
+        location: "InvoiceUploadModal.tsx:analyze:start",
+        message: "invoice parse async start",
+        data: { fileName: file.name, fileSize: file.size, fileType: file.type },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     try {
-      const res = await fetch("/api/dimensioning/invoices/parse", {
+      const res = await fetch("/api/dimensioning/invoices/parse-async", {
         method: "POST",
         body: fd,
       });
+      // #region agent log
+      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+        body: JSON.stringify({
+          sessionId: "34125a",
+          hypothesisId: "B",
+          location: "InvoiceUploadModal.tsx:analyze:upload",
+          message: "parse-async response",
+          data: {
+            status: res.status,
+            ok: res.ok,
+            elapsedMs: Date.now() - startedAt,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!res.ok) {
         setError(
           "Impossible de lire la facture. Vérifiez la qualité de l'image ou saisissez le montant manuellement."
         );
         return;
       }
-      const json: InvoiceResponse = await res.json();
-      setResult(json);
-      const detected = json.totalTTC != null ? String(json.totalTTC) : "";
-      setAmount(detected);
-      setInvoiceNumber(json.invoiceNumber ?? "");
-      setSupplierName(json.supplierName ?? "");
-      const supplierLower = (json.supplierName ?? "").toLowerCase();
-      if (supplierLower.includes("steg")) {
-        setBillingPeriod("quarterly");
+      const { jobId } = (await res.json()) as { jobId?: string };
+      if (!jobId) {
+        setError("Réponse serveur invalide. Réessayez.");
+        return;
       }
-      setPhase("review");
-    } catch {
-      setError("Erreur réseau. Réessayez ou saisissez le montant à la main.");
+      const json = await pollParseJob(jobId, startedAt);
+      if (!json) {
+        setError("Analyse introuvable. Réessayez.");
+        return;
+      }
+      // #region agent log
+      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+        body: JSON.stringify({
+          sessionId: "34125a",
+          hypothesisId: "C",
+          location: "InvoiceUploadModal.tsx:analyze:done",
+          message: "invoice parse completed",
+          data: {
+            totalTTC: json.totalTTC ?? null,
+            elapsedMs: Date.now() - startedAt,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      applyParsedResult(json);
+    } catch (err) {
+      // #region agent log
+      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+        body: JSON.stringify({
+          sessionId: "34125a",
+          hypothesisId: "B",
+          location: "InvoiceUploadModal.tsx:analyze:error",
+          message: "invoice parse failed",
+          data: {
+            error: err instanceof Error ? err.message : "unknown",
+            elapsedMs: Date.now() - startedAt,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      setError(
+        err instanceof Error && err.message === "timeout"
+          ? "L'analyse a pris trop de temps. Réessayez ou saisissez le montant manuellement."
+          : "Erreur réseau. Réessayez ou saisissez le montant à la main."
+      );
     } finally {
       setLoading(false);
     }
@@ -382,7 +511,7 @@ export default function InvoiceUploadModal({
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Analyse en cours…
+                    Analyse en cours… (jusqu&apos;à 2 min)
                   </>
                 ) : (
                   "Analyser ma facture"

@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,18 @@ public class InvoiceService {
             int r;
             while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
         }
+        try {
+            return parseInvoiceFile(uploaded);
+        } finally {
+            safeDelete(uploaded);
+        }
+    }
 
+    public InvoiceDTO parseInvoiceFromPath(Path path) throws Exception {
+        return parseInvoiceFile(path.toFile());
+    }
+
+    private InvoiceDTO parseInvoiceFile(File uploaded) throws Exception {
         File preprocessed = preprocessImage(uploaded);
         File bottomCrop = createCrop(preprocessed, 0.0, 0.45, 1.0, 0.55);
         File bottomRightCrop = createCrop(preprocessed, 0.35, 0.45, 0.65, 0.55);
@@ -50,7 +62,6 @@ public class InvoiceService {
         safeDelete(bottomCrop);
         safeDelete(bottomRightCrop);
         safeDelete(consumptionCrop);
-        safeDelete(uploaded);
         return dto;
     }
 
