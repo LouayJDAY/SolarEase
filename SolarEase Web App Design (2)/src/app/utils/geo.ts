@@ -21,6 +21,11 @@ export function formatCoordinates(lat?: number | null, lon?: number | null): str
   return `${lat!.toFixed(5)}°, ${lon!.toFixed(5)}°`;
 }
 
+export function isWithinTunisiaBounds(lat: number, lon: number): boolean {
+  const [[south, west], [north, east]] = TUNISIA_BOUNDS;
+  return lat >= south && lat <= north && lon >= west && lon <= east;
+}
+
 export function parseCoordinateInput(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

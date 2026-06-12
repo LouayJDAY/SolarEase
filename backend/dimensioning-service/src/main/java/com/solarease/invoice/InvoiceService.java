@@ -1,5 +1,7 @@
 package com.solarease.invoice;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,7 +27,20 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 public class InvoiceService {
+
+    private final GeminiInvoiceExtractor geminiInvoiceExtractor;
+
+    @Autowired
+    public InvoiceService(GeminiInvoiceExtractor geminiInvoiceExtractor) {
+        this.geminiInvoiceExtractor = geminiInvoiceExtractor;
+    }
+
+    /** Unit tests without Spring context. */
+    InvoiceService() {
+        this.geminiInvoiceExtractor = null;
+    }
 
     private static final Pattern STEG_COMMA_AMOUNT = Pattern.compile(
             "([0-9]{1,3}(?:,[0-9]{3})+)"
@@ -57,6 +72,20 @@ public class InvoiceService {
     }
 
     private InvoiceDTO parseInvoiceFile(File uploaded) throws Exception {
+        if (geminiInvoiceExtractor != null && geminiInvoiceExtractor.isEnabled()) {
+            try {
+                long visionStart = System.currentTimeMillis();
+                InvoiceDTO vision = geminiInvoiceExtractor.extract(uploaded);
+                if (vision != null) {
+                    log.info("Invoice extracted via Gemini vision in {} ms", System.currentTimeMillis() - visionStart);
+                    return vision;
+                }
+                log.warn("Gemini vision incomplete, falling back to Tesseract");
+            } catch (Exception e) {
+                log.warn("Gemini vision failed ({}), falling back to Tesseract", e.getMessage());
+            }
+        }
+
         File preprocessed = preprocessImage(uploaded);
         File consumptionCrop = createCrop(preprocessed, 0.0, 0.28, 1.0, 0.42);
         File bottomCrop = createCrop(preprocessed, 0.0, 0.45, 1.0, 0.55);

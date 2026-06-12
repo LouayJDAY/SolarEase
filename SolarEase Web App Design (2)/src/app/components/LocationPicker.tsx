@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMap, useMapEvents } from "react-leaflet";
-import { Loader2, MapPin, Navigation, Search, Sparkles } from "lucide-react";
+import { Loader2, LocateFixed, MapPin, Navigation, Search, Sparkles } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+import { toast } from "sonner";
 import geocodingService, { GeocodingResult } from "../services/geocodingService";
 import {
   TUNISIA_BOUNDS,
@@ -9,6 +10,7 @@ import {
   TUNISIA_ZOOM,
   formatCoordinates,
   isValidProjectCoordinates,
+  isWithinTunisiaBounds,
 } from "../utils/geo";
 
 export interface LocationValue {
@@ -80,6 +82,7 @@ export function LocationPicker({
   const [suggestions, setSuggestions] = useState<GeocodingResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const hasValidCoords = isValidProjectCoordinates(value.latitude, value.longitude);
@@ -145,6 +148,43 @@ export function LocationPicker({
     applyCoordinates(item.latitude, item.longitude, item.displayName);
   };
 
+  const handleGeolocate = () => {
+    if (!("geolocation" in navigator)) {
+      toast.error("Géolocalisation indisponible sur ce navigateur.");
+      return;
+    }
+
+    setGeoLoading(true);
+    setSearchError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const latitude = Number(pos.coords.latitude.toFixed(6));
+        const longitude = Number(pos.coords.longitude.toFixed(6));
+
+        if (!isWithinTunisiaBounds(latitude, longitude)) {
+          toast.error("Position hors Tunisie. Cliquez sur la carte pour ajuster.");
+          setGeoLoading(false);
+          return;
+        }
+
+        void applyCoordinates(latitude, longitude).then(() => {
+          toast.success("Position GPS détectée");
+          setGeoLoading(false);
+        });
+      },
+      (err) => {
+        const message =
+          err.code === err.PERMISSION_DENIED
+            ? "Autorisez l'accès à la position dans votre navigateur."
+            : "Impossible d'obtenir votre position GPS.";
+        toast.error(message);
+        setGeoLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60_000 }
+    );
+  };
+
   const mapHeight = compact ? 220 : 280;
 
   return (
@@ -165,24 +205,41 @@ export function LocationPicker({
                 : "Emplacement requis pour le dimensionnement météo"}
             </p>
             <p className="text-xs mt-0.5 opacity-80">
-              Recherchez une adresse ou cliquez sur la carte pour placer le site d&apos;installation.
+              Utilisez le GPS, recherchez une adresse ou cliquez sur la carte pour placer le site
+              d&apos;installation.
             </p>
           </div>
         </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher : Tunis, Sfax, Sousse…"
-          className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary bg-white"
-        />
-        {(searching || resolving) && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary" />
-        )}
+      <div className="flex gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher : Tunis, Sfax, Sousse…"
+            className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary bg-white"
+          />
+          {(searching || resolving) && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary" />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleGeolocate}
+          disabled={geoLoading || resolving}
+          title="Localiser ma position GPS"
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50 transition-colors"
+        >
+          {geoLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <LocateFixed className="w-4 h-4" />
+          )}
+          <span className="hidden sm:inline">Ma position</span>
+        </button>
       </div>
 
       {searchError && (
@@ -276,7 +333,7 @@ export function LocationPicker({
 
       {(error || !hasValidCoords) && (
         <p className={`text-xs ${error ? "text-red-600" : "text-muted-foreground"}`}>
-          {error || "Sélectionnez un point sur la carte ou via la recherche d'adresse."}
+          {error || "Utilisez « Ma position », la carte ou la recherche d'adresse."}
         </p>
       )}
     </div>
