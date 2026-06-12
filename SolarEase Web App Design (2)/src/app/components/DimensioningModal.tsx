@@ -529,9 +529,9 @@ export function DimensioningModal({
                 ) : (
                   <input
                     type="number"
-                    step="1"
+                    step="0.001"
                     min="0"
-                    placeholder="Ex: 450 TND / trimestre"
+                    placeholder="Ex: 118.912 TND / trimestre (STEG)"
                     value={formData.quarterlyBillTnd}
                     onChange={(e) =>
                       setFormData({ ...formData, quarterlyBillTnd: e.target.value })

@@ -489,6 +489,8 @@ export function SimulateurPage() {
                         </label>
                         <input
                           type="number"
+                          step="0.001"
+                          min="0"
                           value={formData.quarterlyBill}
                           onChange={(e) =>
                             handleInputChange("quarterlyBill", e.target.value)
