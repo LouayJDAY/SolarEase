@@ -31,6 +31,13 @@ public class InvoiceService {
             "([0-9]{1,3}(?:,[0-9]{3})+)"
     );
 
+    /** Cap image width to keep Tesseract fast on phone photos. */
+    private static final int MAX_OCR_WIDTH = 1200;
+    private static final int MIN_OCR_WIDTH = 800;
+
+    private static final String[] FAST_PSM = {"6"};
+    private static final String[] FALLBACK_PSM = {"6", "11"};
+
     public InvoiceDTO parseInvoice(MultipartFile file) throws Exception {
         File uploaded = Files.createTempFile("invoice-upload-", getTempExtension(file)).toFile();
         try (InputStream in = file.getInputStream(); FileOutputStream out = new FileOutputStream(uploaded)) {
@@ -51,18 +58,58 @@ public class InvoiceService {
 
     private InvoiceDTO parseInvoiceFile(File uploaded) throws Exception {
         File preprocessed = preprocessImage(uploaded);
+        File consumptionCrop = createCrop(preprocessed, 0.0, 0.28, 1.0, 0.42);
         File bottomCrop = createCrop(preprocessed, 0.0, 0.45, 1.0, 0.55);
         File bottomRightCrop = createCrop(preprocessed, 0.35, 0.45, 0.65, 0.55);
-        File consumptionCrop = createCrop(preprocessed, 0.0, 0.28, 1.0, 0.42);
-        String ocr = runTesseractMerged(uploaded, preprocessed, bottomCrop, bottomRightCrop, consumptionCrop);
 
-        InvoiceDTO dto = parseInvoiceFromOcr(ocr);
+        try {
+            // Phase 1 — STEG fast path: consumption table + header, single PSM, early exit
+            String ocr = runTesseractScan(FAST_PSM, true, consumptionCrop, preprocessed, bottomCrop);
 
-        safeDelete(preprocessed);
-        safeDelete(bottomCrop);
-        safeDelete(bottomRightCrop);
-        safeDelete(consumptionCrop);
-        return dto;
+            if (!isParseComplete(ocr)) {
+                // Phase 2 — fallback: extra crops / PSM only when fast path is insufficient
+                ocr = runTesseractScan(
+                        FALLBACK_PSM,
+                        false,
+                        preprocessed,
+                        consumptionCrop,
+                        bottomCrop,
+                        bottomRightCrop,
+                        uploaded
+                );
+            }
+
+            return parseInvoiceFromOcr(ocr);
+        } finally {
+            safeDelete(preprocessed);
+            safeDelete(consumptionCrop);
+            safeDelete(bottomCrop);
+            safeDelete(bottomRightCrop);
+        }
+    }
+
+    /** True when reference + amount are extracted (STEG or generic invoice). */
+    private boolean isParseComplete(String ocr) {
+        if (ocr == null || ocr.isBlank()) {
+            return false;
+        }
+        InvoiceDTO probe = parseInvoiceFromOcr(ocr);
+        return probe.invoiceNumber != null
+                && !probe.invoiceNumber.isBlank()
+                && probe.totalTTC != null;
+    }
+
+    private boolean isStegParseComplete(String ocr) {
+        if (ocr == null || ocr.isBlank()) {
+            return false;
+        }
+        if (!isStegBill(ocr) && findStegReference(ocr) == null) {
+            return false;
+        }
+        InvoiceDTO probe = parseInvoiceFromOcr(ocr);
+        return probe.invoiceNumber != null
+                && !probe.invoiceNumber.isBlank()
+                && probe.totalTTC != null;
     }
 
     InvoiceDTO parseInvoiceFromOcr(String ocr) {
@@ -141,8 +188,17 @@ public class InvoiceService {
                 return source;
             }
 
-            int targetWidth = Math.max(input.getWidth() * 2, 1600);
-            int targetHeight = Math.max(input.getHeight() * 2, 1200);
+            int targetWidth = input.getWidth();
+            int targetHeight = input.getHeight();
+            if (targetWidth > MAX_OCR_WIDTH) {
+                double ratio = (double) MAX_OCR_WIDTH / targetWidth;
+                targetWidth = MAX_OCR_WIDTH;
+                targetHeight = Math.max(1, (int) Math.round(input.getHeight() * ratio));
+            } else if (targetWidth < MIN_OCR_WIDTH) {
+                double ratio = Math.min(2.0, (double) MIN_OCR_WIDTH / targetWidth);
+                targetWidth = Math.max(1, (int) Math.round(input.getWidth() * ratio));
+                targetHeight = Math.max(1, (int) Math.round(input.getHeight() * ratio));
+            }
 
             BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
             Graphics2D g = scaled.createGraphics();
@@ -163,45 +219,53 @@ public class InvoiceService {
         }
     }
 
-    private String runTesseractMerged(File... files) {
-        String[] psms = {"6", "4", "11", "3"};
+    private String runTesseractScan(String[] psms, boolean earlyStegExit, File... files) {
         String bestText = "";
         int bestScore = Integer.MIN_VALUE;
         List<String> collectedTexts = new ArrayList<>();
+        StringBuilder merged = new StringBuilder();
 
         for (File file : files) {
-            if (file == null) continue;
+            if (file == null) {
+                continue;
+            }
             for (String psm : psms) {
                 String text = runTesseract(file, psm);
                 if (text != null && !text.isBlank()) {
                     collectedTexts.add(text);
+                    appendUniqueLines(merged, text);
                 }
                 int score = scoreOcrText(text);
                 if (score > bestScore) {
                     bestScore = score;
                     bestText = text;
                 }
-            }
-        }
-
-        if (collectedTexts.isEmpty()) {
-            return bestText;
-        }
-
-        StringBuilder merged = new StringBuilder(bestText == null ? "" : bestText.trim());
-        for (String text : collectedTexts) {
-            for (String line : text.split("\\r?\\n")) {
-                String normalized = line.trim().replaceAll("\\s+", " ");
-                if (normalized.isBlank()) continue;
-                if (merged.indexOf(normalized) < 0) {
-                    if (merged.length() > 0) {
-                        merged.append('\n');
-                    }
-                    merged.append(normalized);
+                if (earlyStegExit && isStegParseComplete(merged.toString())) {
+                    return merged.toString();
                 }
             }
         }
-        return merged.toString();
+
+        if (merged.length() > 0) {
+            return merged.toString();
+        }
+        return bestText == null ? "" : bestText.trim();
+    }
+
+    private void appendUniqueLines(StringBuilder merged, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        for (String line : text.split("\\r?\\n")) {
+            String normalized = line.trim().replaceAll("\\s+", " ");
+            if (normalized.isBlank() || merged.indexOf(normalized) >= 0) {
+                continue;
+            }
+            if (merged.length() > 0) {
+                merged.append('\n');
+            }
+            merged.append(normalized);
+        }
     }
 
     private File createCrop(File source, double xRatio, double yRatio, double wRatio, double hRatio) {
