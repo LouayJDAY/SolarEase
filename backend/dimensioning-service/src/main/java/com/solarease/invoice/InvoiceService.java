@@ -63,8 +63,8 @@ public class InvoiceService {
         File bottomRightCrop = createCrop(preprocessed, 0.35, 0.45, 0.65, 0.55);
 
         try {
-            // Phase 1 — STEG fast path: consumption table + header, single PSM, early exit
-            String ocr = runTesseractScan(FAST_PSM, true, consumptionCrop, preprocessed, bottomCrop);
+            // Phase 1 — STEG fast path: full page (ref) then consumption row, single PSM, early exit
+            String ocr = runTesseractScan(FAST_PSM, true, preprocessed, consumptionCrop, bottomCrop);
 
             if (!isParseComplete(ocr)) {
                 // Phase 2 — fallback: extra crops / PSM only when fast path is insufficient
