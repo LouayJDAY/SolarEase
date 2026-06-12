@@ -11,6 +11,10 @@
       "destination": "http://4.233.29.236:8080/ws/:path*"
     },
     {
+      "source": "/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
