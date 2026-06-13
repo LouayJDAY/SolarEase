@@ -222,6 +222,9 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - N8N_DB_TYPE=${N8N_DB_TYPE:-sqlite}
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_PRUNE=false
     volumes:
       - n8n_data:/home/node/.n8n
     restart: unless-stopped

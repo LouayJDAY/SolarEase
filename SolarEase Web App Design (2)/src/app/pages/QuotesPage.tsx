@@ -122,8 +122,10 @@ export function QuotesPage() {
   useEffect(() => {
     let mounted = true;
     setLoadingProjects(true);
-    projectService
-      .getAllProjects({ page: 0, size: 200 })
+    const load = user?.role === "ADMIN"
+      ? projectService.getAllProjects({ page: 0, size: 200 })
+      : projectService.getProjects({ page: 0, size: 200 });
+    load
       .then((p) => {
         if (mounted) setProjects(p.content || []);
       })
@@ -136,7 +138,23 @@ export function QuotesPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user?.role]);
+
+  useEffect(() => {
+    const pid = form.projectId;
+    if (!pid || pid <= 0 || projects.some((p) => p.id === pid)) return;
+    let mounted = true;
+    projectService
+      .getProject(pid)
+      .then((p) => {
+        if (!mounted) return;
+        setProjects((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [form.projectId, projects]);
 
   const applyPrefillFromProject = async (
     projectId: number,

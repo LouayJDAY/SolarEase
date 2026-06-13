@@ -9,6 +9,7 @@ import {
   buildQuotePrefillFromDimensioning,
   getLatestDimensioning,
 } from "../utils/quoteFromDimensioning";
+import { useAuth } from "../context/AuthContext";
 import { quoteFormSchema } from "../validation/commerceSchemas";
 import { toast } from "sonner";
 
@@ -41,6 +42,7 @@ interface AddedItem {
 }
 
 export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
+  const { user } = useAuth();
   const [form, setForm] = useState<QuoteCreateRequest>({
     projectId,
     description: "",
@@ -71,13 +73,28 @@ export function QuoteForm({ projectId, onSubmit, onClose, isLoading }: Props) {
   useEffect(() => {
     let mounted = true;
     setLoadingProjects(true);
-    projectService
-      .getAllProjects({ page: 0, size: 100 })
+    const load = user?.role === "ADMIN"
+      ? projectService.getAllProjects({ page: 0, size: 100 })
+      : projectService.getProjects({ page: 0, size: 100 });
+    load
       .then((p) => { if (mounted) setProjects(p.content || []); })
       .catch(() => { if (mounted) setProjects([]); })
       .finally(() => { if (mounted) setLoadingProjects(false); });
     return () => { mounted = false; };
-  }, []);
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (!projectId || projectId <= 0) return;
+    let mounted = true;
+    projectService
+      .getProject(projectId)
+      .then((p) => {
+        if (!mounted) return;
+        setProjects((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId || projectId <= 0) return;

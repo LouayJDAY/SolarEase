@@ -26,7 +26,7 @@
           "conditions": [
             {
               "id": "cond-email",
-              "leftValue": "={{ $json.body.clientEmail }}",
+              "leftValue": "={{ ($json.body && $json.body.clientEmail) || $json.clientEmail }}",
               "rightValue": "",
               "operator": {
                 "type": "string",
@@ -53,7 +53,7 @@
           "parameters": [
             {
               "name": "X-Internal-Secret",
-              "value": "327d34405c218ca03d7ce852f0c41948"
+              "value": "REPLACE_WITH_N8N_INTERNAL_SECRET"
             }
           ]
         },
@@ -75,7 +75,7 @@
     {
       "parameters": {
         "fromEmail": "jdalouay@gmail.com",
-        "toEmail": "={{ $json.body.clientEmail }}",
+        "toEmail": "={{ $('Webhook Facture').item.json.body.clientEmail || $('Webhook Facture').item.json.clientEmail }}",
         "subject": "=SolarEase — Facture {{ $('Webhook Facture').item.json.body.invoiceNumber }} ({{ $('Webhook Facture').item.json.body.projectName }})",
         "emailFormat": "text",
         "text": "=Bonjour,\n\nVotre projet « {{ $('Webhook Facture').item.json.body.projectName }} » a été validé.\n\nVeuillez trouver ci-joint la facture {{ $('Webhook Facture').item.json.body.invoiceNumber }}.\nMontant : {{ $('Webhook Facture').item.json.body.amount }} TND\nÉchéance : {{ $('Webhook Facture').item.json.body.dueDate }}\n\nCordialement,\nL'équipe SolarEase",
