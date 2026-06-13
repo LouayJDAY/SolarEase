@@ -1,0 +1,42 @@
+name: Deploy Frontend (Vercel)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SolarEase Web App Design (2)/**"
+      - ".github/workflows/vercel-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-vercel
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_kJY7zmdToNiY03uCExszIe0B
+  VERCEL_PROJECT_ID: prj_Y1AVJam8ujk8IWqtgiBGG3LKooeE
+
+jobs:
+  deploy:
+    name: Deploy solar-ease-sxyy to production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@54
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: .
+
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: .
+
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: .
