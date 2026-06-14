@@ -60,7 +60,14 @@ export function LoginPage() {
         setCheckingInvite(false);
       })
       .catch(() => {
-        if (!cancelled) setCheckingInvite(false);
+        if (!cancelled) {
+          const params = new URLSearchParams({
+            token: inviteToken,
+            email: inviteEmail,
+          });
+          if (inviteProjectId) params.set("projectId", inviteProjectId);
+          navigate(`/register?${params.toString()}`, { replace: true });
+        }
       });
     return () => {
       cancelled = true;
@@ -101,6 +108,23 @@ export function LoginPage() {
         navigate("/dashboard");
       }
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number; data?: { message?: string } } })?.response?.status;
+      const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "";
+      const notFound =
+        status === 404 ||
+        apiMessage.toLowerCase().includes("not found") ||
+        apiMessage.toLowerCase().includes("introuvable");
+
+      if (inviteToken && notFound) {
+        const params = new URLSearchParams({
+          token: inviteToken,
+          email: inviteEmail || email,
+        });
+        if (inviteProjectId) params.set("projectId", inviteProjectId);
+        navigate(`/register?${params.toString()}`, { replace: true });
+        return;
+      }
+
       const message = getApiErrorMessage(
         err,
         (err as Error)?.message === "Network Error"

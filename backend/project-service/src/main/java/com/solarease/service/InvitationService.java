@@ -125,7 +125,7 @@ public class InvitationService {
                 .build();
         invitationRepository.save(invitation);
 
-        boolean hasPortalAccount = identityServiceClient.emailHasPortalAccount(normalizedEmail);
+        boolean hasPortalAccount = resolveHasPortalAccount(clientId, normalizedEmail);
         String invitationLink = generateInvitationLink(token, normalizedEmail, projectId, hasPortalAccount);
 
         try {
@@ -185,6 +185,19 @@ public class InvitationService {
 
     private boolean isMailConfigured() {
         return mailSender.isPresent() && mailFrom != null && !mailFrom.isBlank();
+    }
+
+    private boolean resolveHasPortalAccount(Long clientId, String normalizedEmail) {
+        if (clientId != null) {
+            Optional<Client> client = clientRepository.findById(clientId);
+            if (client.isPresent()) {
+                String userId = client.get().getUserId();
+                if (userId != null && !userId.isBlank()) {
+                    return true;
+                }
+            }
+        }
+        return identityServiceClient.emailHasPortalAccount(normalizedEmail);
     }
 
     private String generateInvitationLink(String token, String email, Long projectId, boolean hasPortalAccount) {
