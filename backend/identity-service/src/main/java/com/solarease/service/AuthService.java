@@ -83,9 +83,16 @@ public class AuthService {
                 .build();
     }
 
+    public boolean emailExists(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        return userRepository.existsByEmail(email.trim());
+    }
+
     public AuthResponse register(RegisterRequest request) {
         log.info("Register attempt for email: {}", request.getEmail());
-        
+
         if (userRepository.existsByEmail(request.getEmail())) {
             User existing = userRepository.findByEmail(request.getEmail())
                     .orElseThrow();
@@ -300,6 +307,31 @@ public class AuthService {
         otpTokenRepository.deleteByUser(installer);
         userRepository.delete(installer);
         log.info("Installer deleted by admin: {} ({})", installer.getEmail(), installer.getUuid());
+    }
+
+    /**
+     * Supprime le compte portail CLIENT (identity) lors de la suppression d'une fiche client.
+     * Appelé en interne par project-service — idempotent si aucun compte ne correspond.
+     */
+    public void deleteClientPortalAccount(String uuid, String email) {
+        User clientUser = null;
+        if (uuid != null && !uuid.isBlank()) {
+            clientUser = userRepository.findByUuid(uuid.trim()).orElse(null);
+        }
+        if (clientUser == null && email != null && !email.isBlank()) {
+            clientUser = userRepository.findByEmail(email.trim()).orElse(null);
+        }
+        if (clientUser == null) {
+            log.info("No portal account to delete (uuid={}, email={})", uuid, email);
+            return;
+        }
+        if (clientUser.getRole() != User.UserRole.CLIENT) {
+            log.warn("Skipping portal delete — user {} is role {}, not CLIENT", clientUser.getEmail(), clientUser.getRole());
+            return;
+        }
+        otpTokenRepository.deleteByUser(clientUser);
+        userRepository.delete(clientUser);
+        log.info("Client portal account deleted: {} ({})", clientUser.getEmail(), clientUser.getUuid());
     }
 
     private String generateUniqueUsername(String email, String firstName, String lastName) {

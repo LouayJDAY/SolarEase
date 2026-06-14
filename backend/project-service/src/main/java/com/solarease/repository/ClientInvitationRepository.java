@@ -13,4 +13,8 @@ public interface ClientInvitationRepository extends JpaRepository<ClientInvitati
     Optional<ClientInvitation> findTopByDemandIdOrderBySentAtDesc(Long demandId);
 
     List<ClientInvitation> findByEmailAndUsedAtIsNullOrderBySentAtDesc(String email);
+
+    List<ClientInvitation> findByClientId(Long clientId);
+
+    void deleteByClientId(Long clientId);
 }

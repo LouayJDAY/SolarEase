@@ -17,6 +17,8 @@ public interface DemandRepository extends JpaRepository<DemandEntity, Long> {
 
     java.util.List<DemandEntity> findByClientEmailIgnoreCase(String clientEmail);
 
+    void deleteByClientUserId(String clientUserId);
+
     Page<DemandEntity> findByStatus(DemandStatus status, Pageable pageable);
 
     long countByStatus(DemandStatus status);

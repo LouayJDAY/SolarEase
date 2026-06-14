@@ -77,13 +77,16 @@ public class InvoiceService {
                 long visionStart = System.currentTimeMillis();
                 InvoiceDTO vision = geminiInvoiceExtractor.extract(uploaded);
                 if (vision != null) {
-                    log.info("Invoice extracted via Gemini vision in {} ms", System.currentTimeMillis() - visionStart);
+                    log.info("Invoice extracted via Gemini vision in {} ms totalTTC={}",
+                            System.currentTimeMillis() - visionStart, vision.totalTTC);
                     return vision;
                 }
                 log.warn("Gemini vision incomplete, falling back to Tesseract");
             } catch (Exception e) {
                 log.warn("Gemini vision failed ({}), falling back to Tesseract", e.getMessage());
             }
+        } else {
+            log.debug("Gemini disabled — using Tesseract OCR only");
         }
 
         File preprocessed = preprocessImage(uploaded);

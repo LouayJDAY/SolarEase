@@ -21,6 +21,7 @@ public class JwtAuthenticationGatewayFilterFactory extends AbstractGatewayFilter
             "/api/auth/refresh",
             "/api/auth/resend-otp",
             "/api/auth/health",
+            "/api/auth/email-exists",
             "/api/demands/public",
             "/api/dimensioning/invoices/parse",
             "/health"

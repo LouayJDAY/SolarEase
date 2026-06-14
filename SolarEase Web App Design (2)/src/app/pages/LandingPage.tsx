@@ -17,16 +17,12 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 
 export function LandingPage() {
-  const sequenceFrames = useMemo(
-    () =>
-      Array.from({ length: 240 }, (_, i) => {
-        const n = String(i + 1).padStart(3, "0");
-        return `/about/sequence/ezgif-frame-${n}.jpg`;
-      }),
-    []
-  );
+  const FRAME_COUNT = 240;
+  const FRAME_INTERVAL_MS = 20; // ~4,8 s pour une boucle complète
 
-  const [activeFrame, setActiveFrame] = useState(0);
+  const [frameIndex, setFrameIndex] = useState(0);
+
+  const heroImage = `/about/sequence/ezgif-frame-${String(frameIndex + 1).padStart(3, "0")}.jpg`;
 
   const componentHighlights = useMemo(
     () => [
@@ -58,28 +54,23 @@ export function LandingPage() {
     []
   );
 
-  const activeHighlight =
-    Math.floor((activeFrame / sequenceFrames.length) * componentHighlights.length) %
-    componentHighlights.length;
-
-  const framesPerState = Math.max(
-    1,
-    Math.floor(sequenceFrames.length / componentHighlights.length)
+  const activeHighlight = useMemo(
+    () => Math.floor((frameIndex / FRAME_COUNT) * componentHighlights.length) % componentHighlights.length,
+    [frameIndex, componentHighlights.length]
   );
-  const stateProgress = (activeFrame % framesPerState) / framesPerState;
 
   const calloutStyles = useMemo(() => {
-    const highlightBoost = 0.35 + stateProgress * 0.65;
+    const highlightBoost = 0.7;
     const isStructureActive = activeHighlight === 0;
     const isFluxActive = activeHighlight === 1 || activeHighlight === 3;
     const isStorageActive = activeHighlight === 2;
 
     const buildStyle = (isActive: boolean, color: string) => ({
       opacity: isActive ? 0.7 + 0.3 * highlightBoost : 0.35,
-      scale: isActive ? 1.03 + 0.03 * stateProgress : 1,
+      scale: isActive ? 1.05 : 1,
       color: isActive ? color : "rgba(255,255,255,0.65)",
       textShadow: isActive
-        ? `0 0 ${Math.round(10 + stateProgress * 18)}px ${color}`
+        ? `0 0 18px ${color}`
         : "0 0 0px transparent",
       lineOpacity: isActive ? 0.95 : 0.35,
     });
@@ -89,7 +80,7 @@ export function LandingPage() {
       flux: buildStyle(isFluxActive, "#a7f3d0"),
       storage: buildStyle(isStorageActive, "#34d399"),
     };
-  }, [activeHighlight, stateProgress]);
+  }, [activeHighlight]);
 
   const activeTheme = useMemo(
     () => [
@@ -119,11 +110,11 @@ export function LandingPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setActiveFrame((prev) => (prev + 1) % sequenceFrames.length);
-    }, 25);
+      setFrameIndex((prev) => (prev + 1) % FRAME_COUNT);
+    }, FRAME_INTERVAL_MS);
 
     return () => window.clearInterval(timer);
-  }, [sequenceFrames.length]);
+  }, []);
 
   const features = [
     {
@@ -273,7 +264,6 @@ export function LandingPage() {
               <div className={`relative overflow-hidden rounded-[2rem] border bg-white/75 backdrop-blur-xl shadow-[0_24px_70px_rgba(15,23,42,0.10)] ${activeTheme.border} ${activeTheme.glow}`}>
                 <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-slate-500">
                   <span>Système solaire — contexte projet SolarEase</span>
-                  <span>Frame {activeFrame + 1}/{sequenceFrames.length}</span>
                 </div>
                 <div className="h-0.5 w-full bg-slate-200/70 overflow-hidden">
                   <motion.div
@@ -285,9 +275,10 @@ export function LandingPage() {
 
                 <div className="relative aspect-[16/10] bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.85),transparent_28%),radial-gradient(circle_at_80%_80%,rgba(34,197,94,0.12),transparent_35%),#04070f]">
                   <img
-                    src={sequenceFrames[activeFrame]}
-                    alt="Animation cinématique composants solaires"
+                    src={heroImage}
+                    alt="Installation solaire SolarEase"
                     className="absolute inset-0 h-full w-full object-cover"
+                    draggable={false}
                   />
 
                  

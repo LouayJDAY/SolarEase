@@ -120,24 +120,6 @@ export default function InvoiceUploadModal({
     const maxWaitMs = 5 * 60 * 1000;
     while (Date.now() - startedAt < maxWaitMs) {
       const statusRes = await fetch(`/api/dimensioning/invoices/parse-jobs/${jobId}`);
-      // #region agent log
-      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
-        body: JSON.stringify({
-          sessionId: "34125a",
-          hypothesisId: "B",
-          location: "InvoiceUploadModal.tsx:poll",
-          message: "parse job poll",
-          data: {
-            jobId,
-            statusCode: statusRes.status,
-            elapsedMs: Date.now() - startedAt,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (statusRes.status === 404) {
         return null;
       }
@@ -168,43 +150,11 @@ export default function InvoiceUploadModal({
     const fd = new FormData();
     fd.append("file", file);
     const startedAt = Date.now();
-    // #region agent log
-    fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
-      body: JSON.stringify({
-        sessionId: "34125a",
-        hypothesisId: "A",
-        location: "InvoiceUploadModal.tsx:analyze:start",
-        message: "invoice parse async start",
-        data: { fileName: file.name, fileSize: file.size, fileType: file.type },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     try {
       const res = await fetch("/api/dimensioning/invoices/parse-async", {
         method: "POST",
         body: fd,
       });
-      // #region agent log
-      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
-        body: JSON.stringify({
-          sessionId: "34125a",
-          hypothesisId: "B",
-          location: "InvoiceUploadModal.tsx:analyze:upload",
-          message: "parse-async response",
-          data: {
-            status: res.status,
-            ok: res.ok,
-            elapsedMs: Date.now() - startedAt,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (!res.ok) {
         setError(
           "Impossible de lire la facture. Vérifiez la qualité de l'image ou saisissez le montant manuellement."
@@ -221,42 +171,8 @@ export default function InvoiceUploadModal({
         setError("Analyse introuvable. Réessayez.");
         return;
       }
-      // #region agent log
-      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
-        body: JSON.stringify({
-          sessionId: "34125a",
-          hypothesisId: "C",
-          location: "InvoiceUploadModal.tsx:analyze:done",
-          message: "invoice parse completed",
-          data: {
-            totalTTC: json.totalTTC ?? null,
-            elapsedMs: Date.now() - startedAt,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       applyParsedResult(json);
     } catch (err) {
-      // #region agent log
-      fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
-        body: JSON.stringify({
-          sessionId: "34125a",
-          hypothesisId: "B",
-          location: "InvoiceUploadModal.tsx:analyze:error",
-          message: "invoice parse failed",
-          data: {
-            error: err instanceof Error ? err.message : "unknown",
-            elapsedMs: Date.now() - startedAt,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setError(
         err instanceof Error && err.message === "timeout"
           ? "L'analyse a pris trop de temps. Réessayez ou saisissez le montant manuellement."

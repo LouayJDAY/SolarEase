@@ -100,6 +100,9 @@ const authService = {
   register: (data: RegisterRequest) =>
     api.post<AuthResponse>("/auth/register", data).then((r) => r.data),
 
+  emailExists: (email: string) =>
+    api.get<{ exists: boolean }>("/auth/email-exists", { params: { email } }).then((r) => r.data),
+
   verifyOtp: (data: VerifyOtpRequest) =>
     api.post<AuthResponse>("/auth/verify-otp", data).then((r) => r.data),
 

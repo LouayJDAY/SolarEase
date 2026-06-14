@@ -128,3 +128,4 @@ build/
 # Misc
 .eslintcache
 .stylelintcache
+.vercel

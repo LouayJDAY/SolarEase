@@ -32,6 +32,7 @@ public class DemandService {
     private final ClientRepository clientRepository;
     private final NotificationWebSocketService notificationService;
     private final InvitationService invitationService;
+    private final IdentityServiceClient identityServiceClient;
 
     // ── CLIENT: submit a new demand ──────────────────────────────────────────
 
@@ -279,7 +280,10 @@ public class DemandService {
                     .orElseThrow(() -> new ResourceNotFoundException("Demand not found: " + demandId));
             invitationService.sendInvitationForDemand(refreshed, client, project.getId());
             project.setInvitationSent(true);
-            project.setInvitationMessage("Invitation envoyée à " + client.getEmail());
+            boolean hasAccount = identityServiceClient.emailHasPortalAccount(client.getEmail());
+            project.setInvitationMessage(hasAccount
+                    ? "Lien de connexion envoyé à " + client.getEmail() + " (compte existant)"
+                    : "Invitation inscription envoyée à " + client.getEmail());
         } else {
             project.setInvitationSent(false);
             project.setInvitationMessage("Le client possède déjà un compte portail");

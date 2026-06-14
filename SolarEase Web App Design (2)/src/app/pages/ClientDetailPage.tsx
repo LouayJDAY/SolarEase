@@ -68,7 +68,9 @@ export function ClientDetailPage() {
 
   const handleDelete = async () => {
     if (!client) return;
-    if (!window.confirm(`Supprimer le client ${client.firstName} ${client.lastName} ?`)) return;
+    if (!window.confirm(
+      `Supprimer le client ${client.firstName} ${client.lastName} ?\n\nTous ses projets, documents, devis, factures et son compte portail seront supprimés définitivement.`
+    )) return;
     try {
       await clientService.deleteClient(client.id);
       toast.success("Client supprimé avec succès.");

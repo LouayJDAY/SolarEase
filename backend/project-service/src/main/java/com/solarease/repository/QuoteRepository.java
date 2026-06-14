@@ -29,6 +29,8 @@ public interface QuoteRepository extends JpaRepository<QuoteEntity, Long> {
      */
     Page<QuoteEntity> findByClientId(Long clientId, Pageable pageable);
 
+    List<QuoteEntity> findAllByClientId(Long clientId);
+
     /**
      * Find all quotes for a specific installer (paginated)
      */

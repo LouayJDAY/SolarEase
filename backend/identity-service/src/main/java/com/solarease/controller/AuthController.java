@@ -29,6 +29,13 @@ public class AuthController {
         return ResponseEntity.ok("Identity Service is running");
     }
 
+    /** Public — used by invitation register page to detect existing portal accounts. */
+    @GetMapping("/email-exists")
+    public ResponseEntity<java.util.Map<String, Boolean>> emailExists(@RequestParam String email) {
+        boolean exists = authService.emailExists(email);
+        return ResponseEntity.ok(java.util.Map.of("exists", exists));
+    }
+
     // ==================== AUTHENTICATION ====================
 
     @PostMapping("/register")

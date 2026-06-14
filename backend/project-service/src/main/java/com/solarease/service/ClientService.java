@@ -5,15 +5,29 @@ import com.solarease.dto.ClientRequest;
 import com.solarease.dto.ClientResponse;
 import com.solarease.dto.ClientStatsResponse;
 import com.solarease.entity.Client;
+import com.solarease.entity.ConversationEntity;
+import com.solarease.entity.Project;
+import com.solarease.exception.AuthorizationException;
 import com.solarease.exception.ResourceNotFoundException;
+import com.solarease.repository.ClientInvitationRepository;
 import com.solarease.repository.ClientRepository;
+import com.solarease.repository.ConversationRepository;
+import com.solarease.repository.DemandRepository;
+import com.solarease.repository.DocumentRepository;
+import com.solarease.repository.FieldUpdateRepository;
+import com.solarease.repository.InvoiceRepository;
+import com.solarease.repository.NotificationRepository;
 import com.solarease.repository.ProjectRepository;
+import com.solarease.repository.QuoteRepository;
+import com.solarease.repository.SupportTicketRepository;
 import org.springframework.data.domain.PageImpl;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +43,16 @@ public class ClientService {
 
     private final ClientRepository clientRepository;
     private final ProjectRepository projectRepository;
+    private final QuoteRepository quoteRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final DocumentRepository documentRepository;
+    private final FieldUpdateRepository fieldUpdateRepository;
+    private final ConversationRepository conversationRepository;
+    private final NotificationRepository notificationRepository;
+    private final ClientInvitationRepository clientInvitationRepository;
+    private final DemandRepository demandRepository;
+    private final SupportTicketRepository supportTicketRepository;
+    private final IdentityServiceClient identityServiceClient;
 
     public ClientResponse createClient(String installerId, ClientRequest request) {
         if (clientRepository.existsByEmail(request.getEmail())) {
@@ -170,12 +194,67 @@ public class ClientService {
                 .build();
     }
 
-    public void deleteClient(Long id) {
-        if (!clientRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Client not found with id: " + id);
+    @Transactional
+    public void deleteClient(Long id, String requesterId, String userRole) {
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+
+        if (!"ADMIN".equalsIgnoreCase(userRole)) {
+            if (client.getInstallerId() == null || !client.getInstallerId().equals(requesterId)) {
+                throw new AuthorizationException("Installer can delete only own clients");
+            }
         }
-        clientRepository.deleteById(id);
-        log.info("Deleted client {}", id);
+
+        Set<String> clientKeys = resolveClientKeys(id, client.getUserId());
+        List<Project> projects = projectRepository.findByClientId(id);
+
+        for (Project project : projects) {
+            Long projectId = project.getId();
+            quoteRepository.deleteAll(quoteRepository.findByProject_Id(projectId));
+            invoiceRepository.deleteAll(invoiceRepository.findByProject_Id(projectId));
+            documentRepository.deleteAll(documentRepository.findByProject_Id(projectId));
+            fieldUpdateRepository.deleteAll(fieldUpdateRepository.findByProjectIdOrderByCreatedAtDesc(projectId));
+            for (String key : clientKeys) {
+                List<ConversationEntity> conversations =
+                        conversationRepository.findByClientIdAndProjectId(key, projectId);
+                conversationRepository.deleteAll(conversations);
+            }
+        }
+
+        quoteRepository.deleteAll(quoteRepository.findAllByClientId(id));
+        for (String key : clientKeys) {
+            invoiceRepository.deleteAll(invoiceRepository.findByClientId(key));
+            documentRepository.deleteAll(documentRepository.findByClientId(key));
+            conversationRepository.deleteAll(conversationRepository.findByClientId(key));
+            notificationRepository.deleteByClientId(key);
+        }
+
+        clientInvitationRepository.deleteByClientId(id);
+
+        String userId = client.getUserId();
+        if (userId != null && !userId.isBlank()) {
+            demandRepository.deleteByClientUserId(userId);
+            supportTicketRepository.deleteByClientUserId(userId);
+        }
+        if (client.getEmail() != null && !client.getEmail().isBlank()) {
+            demandRepository.deleteAll(demandRepository.findByClientEmailIgnoreCase(client.getEmail()));
+        }
+
+        projectRepository.deleteAll(projects);
+        clientRepository.delete(client);
+
+        identityServiceClient.deleteClientPortalAccount(userId, client.getEmail());
+
+        log.info("Deleted client {} with {} project(s) and portal account cleanup", id, projects.size());
+    }
+
+    private Set<String> resolveClientKeys(Long clientId, String userId) {
+        Set<String> keys = new LinkedHashSet<>();
+        if (userId != null && !userId.isBlank()) {
+            keys.add(userId);
+        }
+        keys.add(String.valueOf(clientId));
+        return keys;
     }
 
     private ClientResponse mapToResponse(Client client) {

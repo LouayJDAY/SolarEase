@@ -16,9 +16,20 @@ export function RegisterPage() {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("token") ?? "";
   const inviteEmail = searchParams.get("email") ?? "";
-  const inviteProjectId = searchParams.get("projectId") ?? "";
+  const inviteProjectId =
+    searchParams.get("projectId") ?? searchParams.get("projectid") ?? "";
   const [generalError, setGeneralError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [accountAlreadyExists, setAccountAlreadyExists] = useState(false);
+
+  const loginInviteUrl =
+    inviteToken
+      ? `/login?${new URLSearchParams({
+          token: inviteToken,
+          ...(inviteEmail ? { email: inviteEmail } : {}),
+          ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
+        }).toString()}`
+      : "/login";
 
   const {
     register,
@@ -43,6 +54,16 @@ export function RegisterPage() {
     }
     if (inviteProjectId) sessionStorage.setItem("invitationProjectId", inviteProjectId);
   }, [inviteToken, inviteProjectId, logout]);
+
+  useEffect(() => {
+    if (!inviteToken || !inviteEmail) return;
+    authService
+      .emailExists(inviteEmail)
+      .then(({ exists }) => {
+        setAccountAlreadyExists(exists);
+      })
+      .catch(() => setAccountAlreadyExists(false));
+  }, [inviteToken, inviteEmail, inviteProjectId]);
 
   const onSubmit = handleSubmit(async (data) => {
     setGeneralError("");
@@ -69,13 +90,19 @@ export function RegisterPage() {
         state: { message: response.message },
       });
     } catch (err: unknown) {
+      const rawMessage =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "";
       const apiMessage = getApiErrorMessage(err, "Une erreur est survenue lors de l'inscription.");
+      const rawLower = rawMessage.toLowerCase();
+      const apiLower = apiMessage.toLowerCase();
       const isExistingEmail =
-        apiMessage.toLowerCase().includes("already registered") ||
-        apiMessage.toLowerCase().includes("déjà enregistré") ||
-        apiMessage.toLowerCase().includes("installateur");
+        rawLower.includes("already registered") ||
+        apiLower.includes("déjà enregistré") ||
+        apiLower.includes("possède déjà un compte") ||
+        apiLower.includes("installateur");
       if (isExistingEmail && inviteToken) {
-        const isInstallerConflict = apiMessage.toLowerCase().includes("installateur");
+        const isInstallerConflict =
+          rawLower.includes("installer") || apiLower.includes("installateur");
         setGeneralError(
           isInstallerConflict
             ? "Cet email est déjà utilisé par un compte installateur. Demandez à l'administrateur de changer l'email du client ou de supprimer le compte installateur en conflit."
@@ -102,11 +129,28 @@ export function RegisterPage() {
           </p>
           {inviteToken && (
             <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-              Vous avez été invité à créer votre espace client SolarEase
-              {inviteProjectId ? ` pour le projet #${inviteProjectId}` : ""}.
+              {accountAlreadyExists
+                ? `Votre fiche client a été créée pour le projet #${inviteProjectId || "…"}. Connectez-vous pour activer votre espace portail.`
+                : `Vous avez été invité à créer votre espace client SolarEase${inviteProjectId ? ` pour le projet #${inviteProjectId}` : ""}.`}
+            </div>
+          )}
+          {accountAlreadyExists && inviteToken && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-3">
+              <p>
+                Cet email possède déjà un compte SolarEase. La conversion admin a créé votre
+                fiche projet — il reste à <strong>vous connecter</strong> pour lier le projet
+                {inviteProjectId ? ` #${inviteProjectId}` : ""}.
+              </p>
+              <Link
+                to={loginInviteUrl}
+                className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:opacity-95"
+              >
+                Se connecter et accéder au projet
+              </Link>
             </div>
           )}
         </div>
+        {!accountAlreadyExists && (
         <form onSubmit={onSubmit} className="space-y-4">
           {generalError && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm space-y-2">
@@ -114,11 +158,7 @@ export function RegisterPage() {
               {inviteToken &&
                 generalError.includes("Connectez-vous pour accepter l'invitation") && (
                   <Link
-                    to={`/login?${new URLSearchParams({
-                      token: inviteToken,
-                      email: inviteEmail,
-                      ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
-                    }).toString()}`}
+                    to={loginInviteUrl}
                     className="inline-block text-primary font-medium hover:underline"
                   >
                     Se connecter avec ce compte
@@ -162,19 +202,12 @@ export function RegisterPage() {
             {isLoading ? "Création du compte..." : "Créer mon compte"}
           </Button>
         </form>
+        )}
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             Vous avez déjà un compte ?{" "}
             <Link
-              to={
-                inviteToken
-                  ? `/login?${new URLSearchParams({
-                      token: inviteToken,
-                      ...(inviteEmail ? { email: inviteEmail } : {}),
-                      ...(inviteProjectId ? { projectId: inviteProjectId } : {}),
-                    }).toString()}`
-                  : "/login"
-              }
+              to={loginInviteUrl}
               className="text-primary font-medium hover:underline"
             >
               Se connecter

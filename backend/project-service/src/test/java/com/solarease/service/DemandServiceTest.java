@@ -47,6 +47,7 @@ class DemandServiceTest {
     @Mock private ClientRepository clientRepository;
     @Mock private NotificationWebSocketService notificationService;
     @Mock private InvitationService invitationService;
+    @Mock private IdentityServiceClient identityServiceClient;
 
     @InjectMocks private DemandService demandService;
 

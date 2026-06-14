@@ -103,8 +103,9 @@ public class ClientController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteClient(
             @PathVariable Long id,
+            @RequestHeader("X-User-Id") String userId,
             @RequestHeader("X-User-Role") String userRole) {
         accessControlService.requireAnyRole(userRole, "INSTALLER", "ADMIN");
-        clientService.deleteClient(id);
+        clientService.deleteClient(id, userId, userRole);
     }
 }

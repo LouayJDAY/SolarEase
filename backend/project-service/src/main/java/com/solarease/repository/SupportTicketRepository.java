@@ -15,4 +15,6 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, Lo
     long countByStatus(com.solarease.enums.SupportTicketStatus status);
 
     Optional<SupportTicket> findByIdAndClientUserId(Long id, String clientUserId);
+
+    void deleteByClientUserId(String clientUserId);
 }

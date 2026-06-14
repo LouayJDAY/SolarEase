@@ -198,7 +198,9 @@ export function ClientsPage() {
       toast.error("Impossible de supprimer : fiche client absente.");
       return;
     }
-    if (!window.confirm(`Supprimer ${client.firstName} ${client.lastName} ?`)) return;
+    if (!window.confirm(
+      `Supprimer ${client.firstName} ${client.lastName} ?\n\nTous ses projets, documents, devis, factures et son compte portail seront supprimés définitivement.`
+    )) return;
     try {
       await clientService.deleteClient(client.clientProfileId);
       toast.success("Client supprimé.");

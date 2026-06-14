@@ -30,6 +30,7 @@ public class InvitationService {
     private final ClientInvitationRepository invitationRepository;
     private final ClientRepository clientRepository;
     private final DemandRepository demandRepository;
+    private final IdentityServiceClient identityServiceClient;
 
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
@@ -44,11 +45,13 @@ public class InvitationService {
     public InvitationService(JavaMailSender mailSenderInput,
                            ClientInvitationRepository invitationRepository,
                            ClientRepository clientRepository,
-                           DemandRepository demandRepository) {
+                           DemandRepository demandRepository,
+                           IdentityServiceClient identityServiceClient) {
         this.mailSender = Optional.ofNullable(mailSenderInput);
         this.invitationRepository = invitationRepository;
         this.clientRepository = clientRepository;
         this.demandRepository = demandRepository;
+        this.identityServiceClient = identityServiceClient;
     }
 
     /**
@@ -122,14 +125,18 @@ public class InvitationService {
                 .build();
         invitationRepository.save(invitation);
 
-        String registrationLink = generateRegistrationLink(token, normalizedEmail, projectId);
+        boolean hasPortalAccount = identityServiceClient.emailHasPortalAccount(normalizedEmail);
+        String invitationLink = generateInvitationLink(token, normalizedEmail, projectId, hasPortalAccount);
 
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
             mailMessage.setFrom(mailFrom);
             mailMessage.setTo(normalizedEmail);
-            mailMessage.setSubject("SolarEase - Créez votre espace client ☀️");
-            mailMessage.setText(buildInvitationEmailBody(clientName, projectId, registrationLink, adminMessage));
+            mailMessage.setSubject(hasPortalAccount
+                    ? "SolarEase - Accédez à votre projet ☀️"
+                    : "SolarEase - Créez votre espace client ☀️");
+            mailMessage.setText(buildInvitationEmailBody(
+                    clientName, projectId, invitationLink, adminMessage, hasPortalAccount));
             mailSender.get().send(mailMessage);
             log.info("Invitation email sent to {} for project {}", normalizedEmail, projectId);
             return invitation;
@@ -180,9 +187,9 @@ public class InvitationService {
         return mailSender.isPresent() && mailFrom != null && !mailFrom.isBlank();
     }
 
-    private String generateRegistrationLink(String token, String email, Long projectId) {
-        String base = String.format("%s/register?token=%s&email=%s",
-                frontendUrl, token, email);
+    private String generateInvitationLink(String token, String email, Long projectId, boolean hasPortalAccount) {
+        String path = hasPortalAccount ? "login" : "register";
+        String base = String.format("%s/%s?token=%s&email=%s", frontendUrl, path, token, email);
         return projectId != null ? base + "&projectId=" + projectId : base;
     }
 
@@ -196,16 +203,22 @@ public class InvitationService {
 
     private String buildInvitationEmailBody(String clientName,
                                             Long projectId,
-                                            String registrationLink,
-                                            String adminMessage) {
+                                            String invitationLink,
+                                            String adminMessage,
+                                            boolean hasPortalAccount) {
         String projectRef = projectId != null ? "PRJ-" + projectId : "à définir";
+        String actionSection = hasPortalAccount
+                ? "=== ACCÉDER À VOTRE PROJET ===\n"
+                + "Votre fiche client a été créée. Connectez-vous avec votre compte SolarEase existant "
+                + "pour lier ce projet à votre espace :\n\n"
+                : "=== CRÉER VOTRE COMPTE CLIENT ===\n"
+                + "Pour consulter votre projet, recevoir vos devis et suivre l'installation :\n\n";
         return "Bonjour " + clientName + ",\n\n"
                 + "Votre demande solaire a été validée et votre projet est prêt sur SolarEase.\n\n"
                 + "=== VOTRE PROJET ===\n"
                 + "Référence : " + projectRef + "\n\n"
-                + "=== CRÉER VOTRE COMPTE CLIENT ===\n"
-                + "Pour consulter votre projet, recevoir vos devis et suivre l'installation :\n\n"
-                + registrationLink + "\n\n"
+                + actionSection
+                + invitationLink + "\n\n"
                 + (adminMessage != null && !adminMessage.isBlank()
                 ? "=== MESSAGE DE L'ÉQUIPE ===\n" + adminMessage + "\n\n" : "")
                 + "Ce lien est valable " + INVITATION_VALIDITY_DAYS + " jours.\n\n"
