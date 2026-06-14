@@ -43,22 +43,34 @@ public class IdentityServiceClient {
     }
 
     public void deleteClientPortalAccount(String userId, String email) {
-        if ((userId == null || userId.isBlank()) && (email == null || email.isBlank())) {
+        if (email == null || email.isBlank()) {
             return;
         }
+        String normalized = email.trim().toLowerCase(java.util.Locale.ROOT);
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(identityServiceUrl + "/api/internal/users/client");
         if (userId != null && !userId.isBlank()) {
             builder.queryParam("uuid", userId.trim());
         }
-        if (email != null && !email.isBlank()) {
-            builder.queryParam("email", email.trim());
-        }
+        builder.queryParam("email", normalized);
         String url = builder.toUriString();
         try {
             delete(url);
+            if (emailHasPortalAccount(normalized)) {
+                log.error("Portal account still exists after delete for {}", normalized);
+                // #region agent log
+                com.solarease.debug.DebugTrace.log("H1", "IdentityServiceClient.deleteClientPortalAccount",
+                        "delete completed but user still exists",
+                        java.util.Map.of("emailDomain", normalized.substring(normalized.indexOf('@'))));
+                // #endregion
+            }
         } catch (RestClientException ex) {
-            log.warn("Could not delete portal account (uuid={}, email={}): {}", userId, email, ex.getMessage());
+            log.warn("Could not delete portal account (uuid={}, email={}): {}", userId, normalized, ex.getMessage());
+            // #region agent log
+            com.solarease.debug.DebugTrace.log("H1", "IdentityServiceClient.deleteClientPortalAccount",
+                    "delete failed",
+                    java.util.Map.of("error", ex.getMessage() != null ? ex.getMessage() : "unknown"));
+            // #endregion
         }
     }
 

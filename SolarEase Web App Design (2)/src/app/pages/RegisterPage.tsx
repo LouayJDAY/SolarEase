@@ -61,6 +61,21 @@ export function RegisterPage() {
       .emailExists(inviteEmail)
       .then(({ exists }) => {
         setAccountAlreadyExists(exists);
+        // #region agent log
+        fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+          body: JSON.stringify({
+            sessionId: "34125a",
+            runId: "invite-flow",
+            hypothesisId: "H2",
+            location: "RegisterPage.tsx:emailExists",
+            message: "register page email probe",
+            data: { exists, hasInviteToken: true, projectId: inviteProjectId || null },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
       })
       .catch(() => setAccountAlreadyExists(false));
   }, [inviteToken, inviteEmail, inviteProjectId]);
@@ -101,6 +116,21 @@ export function RegisterPage() {
         apiLower.includes("possède déjà un compte") ||
         apiLower.includes("installateur");
       if (isExistingEmail && inviteToken) {
+        // #region agent log
+        fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+          body: JSON.stringify({
+            sessionId: "34125a",
+            runId: "invite-flow",
+            hypothesisId: "H3",
+            location: "RegisterPage.tsx:onSubmit",
+            message: "register blocked existing email",
+            data: { rawMessage, apiMessage, isExistingEmail },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         const isInstallerConflict =
           rawLower.includes("installer") || apiLower.includes("installateur");
         setGeneralError(

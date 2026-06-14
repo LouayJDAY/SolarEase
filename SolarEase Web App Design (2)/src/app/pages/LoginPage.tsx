@@ -48,6 +48,21 @@ export function LoginPage() {
       .emailExists(inviteEmail)
       .then(({ exists }) => {
         if (cancelled) return;
+        // #region agent log
+        fetch("http://127.0.0.1:7481/ingest/a2021df7-c138-4bb1-b24c-c5adc0b4a923", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "34125a" },
+          body: JSON.stringify({
+            sessionId: "34125a",
+            runId: "invite-flow",
+            hypothesisId: "H2",
+            location: "LoginPage.tsx:emailExists",
+            message: "login invite email probe",
+            data: { exists, projectId: inviteProjectId || null },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (!exists) {
           const params = new URLSearchParams({
             token: inviteToken,

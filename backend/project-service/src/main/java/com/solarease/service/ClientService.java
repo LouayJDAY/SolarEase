@@ -4,7 +4,9 @@ import com.solarease.dto.ClientMeUpdateRequest;
 import com.solarease.dto.ClientRequest;
 import com.solarease.dto.ClientResponse;
 import com.solarease.dto.ClientStatsResponse;
+import com.solarease.debug.DebugTrace;
 import com.solarease.entity.Client;
+import com.solarease.enums.DemandStatus;
 import com.solarease.entity.ConversationEntity;
 import com.solarease.entity.Project;
 import com.solarease.exception.AuthorizationException;
@@ -232,20 +234,59 @@ public class ClientService {
         clientInvitationRepository.deleteByClientId(id);
 
         String userId = client.getUserId();
+        String normalizedEmail = client.getEmail() != null
+                ? client.getEmail().trim().toLowerCase(java.util.Locale.ROOT)
+                : null;
+
         if (userId != null && !userId.isBlank()) {
-            demandRepository.deleteByClientUserId(userId);
             supportTicketRepository.deleteByClientUserId(userId);
         }
-        if (client.getEmail() != null && !client.getEmail().isBlank()) {
-            demandRepository.deleteAll(demandRepository.findByClientEmailIgnoreCase(client.getEmail()));
+        if (normalizedEmail != null && !normalizedEmail.isBlank()) {
+            resetDemandsForRetest(normalizedEmail, userId);
         }
 
         projectRepository.deleteAll(projects);
         clientRepository.delete(client);
 
-        identityServiceClient.deleteClientPortalAccount(userId, client.getEmail());
+        // #region agent log
+        DebugTrace.log("H1", "ClientService.deleteClient", "before portal delete",
+                Map.of(
+                        "clientId", id,
+                        "hadUserId", userId != null && !userId.isBlank(),
+                        "emailDomain", normalizedEmail != null && normalizedEmail.contains("@")
+                                ? normalizedEmail.substring(normalizedEmail.indexOf('@')) : "unknown"
+                ));
+        // #endregion
+        identityServiceClient.deleteClientPortalAccount(userId, normalizedEmail != null ? normalizedEmail : client.getEmail());
+        boolean stillExists = identityServiceClient.emailHasPortalAccount(
+                normalizedEmail != null ? normalizedEmail : client.getEmail());
+        // #region agent log
+        DebugTrace.log("H1", "ClientService.deleteClient", "after portal delete",
+                Map.of("clientId", id, "identityStillExists", stillExists));
+        // #endregion
+        if (stillExists) {
+            log.error("Portal account still exists after client {} deletion — check N8N_INTERNAL_SECRET alignment", id);
+        }
 
         log.info("Deleted client {} with {} project(s) and portal account cleanup", id, projects.size());
+    }
+
+    /** Keep demand rows so admin can re-promote the same public demand after a reset. */
+    private void resetDemandsForRetest(String normalizedEmail, String previousUserId) {
+        List<com.solarease.entity.DemandEntity> demands =
+                demandRepository.findByClientEmailIgnoreCase(normalizedEmail);
+        for (com.solarease.entity.DemandEntity demand : demands) {
+            demand.setProjectId(null);
+            demand.setStatus(DemandStatus.NOUVELLE);
+            if (previousUserId != null && !previousUserId.isBlank()
+                    && previousUserId.equals(demand.getClientUserId())) {
+                demand.setClientUserId("PUBLIC:" + normalizedEmail);
+            }
+        }
+        if (!demands.isEmpty()) {
+            demandRepository.saveAll(demands);
+            log.info("Reset {} demand(s) for email {} — ready for re-conversion", demands.size(), normalizedEmail);
+        }
     }
 
     private Set<String> resolveClientKeys(Long clientId, String userId) {

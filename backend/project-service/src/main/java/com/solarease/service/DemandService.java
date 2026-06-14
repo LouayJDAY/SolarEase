@@ -253,14 +253,20 @@ public class DemandService {
         if (email == null || email.isBlank()) {
             throw new IllegalStateException("Cannot promote a public demand without a client email");
         }
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
 
-        Long clientId = clientRepository.findByEmail(email)
+        java.util.Optional<Client> existingClient = clientRepository.findByEmail(normalizedEmail);
+        if (existingClient.isEmpty()) {
+            existingClient = clientRepository.findByEmail(email);
+        }
+
+        Long clientId = existingClient
                 .map(Client::getId)
                 .orElseGet(() -> {
                     Client created = Client.builder()
                             .firstName(safe(demand.getClientFirstName(), "Prospect"))
                             .lastName(safe(demand.getClientLastName(), "Public"))
-                            .email(email)
+                            .email(normalizedEmail)
                             .phoneNumber(demand.getClientPhone())
                             .address(demand.getLocation())
                             .installerId(adminId)
@@ -281,6 +287,17 @@ public class DemandService {
             invitationService.sendInvitationForDemand(refreshed, client, project.getId());
             project.setInvitationSent(true);
             boolean hasAccount = identityServiceClient.emailHasPortalAccount(client.getEmail());
+            // #region agent log
+            com.solarease.debug.DebugTrace.log("H1-H4", "DemandService.promotePublicAndConvert",
+                    "after invitation send",
+                    java.util.Map.of(
+                            "clientId", clientId,
+                            "clientUserId", "null",
+                            "identityHasAccount", hasAccount,
+                            "projectId", project.getId(),
+                            "emailDomain", email.contains("@") ? email.substring(email.indexOf('@')) : "unknown"
+                    ));
+            // #endregion
             project.setInvitationMessage(hasAccount
                     ? "Lien de connexion envoyé à " + client.getEmail() + " (compte existant)"
                     : "Invitation inscription envoyée à " + client.getEmail());

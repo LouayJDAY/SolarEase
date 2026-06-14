@@ -1,6 +1,7 @@
 package com.solarease.service;
 
 import com.solarease.dto.*;
+import com.solarease.debug.DebugTrace;
 import com.solarease.entity.User;
 import com.solarease.exception.BadRequestException;
 import com.solarease.exception.ResourceNotFoundException;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -87,7 +89,17 @@ public class AuthService {
         if (email == null || email.isBlank()) {
             return false;
         }
-        return userRepository.existsByEmail(email.trim());
+        String normalized = email.trim().toLowerCase(Locale.ROOT);
+        boolean exists = userRepository.existsByEmail(normalized)
+                || (!email.trim().equals(normalized) && userRepository.existsByEmail(email.trim()));
+        // #region agent log
+        DebugTrace.log("H2-H3", "AuthService.emailExists", "checked identity users",
+                Map.of(
+                        "exists", exists,
+                        "emailDomain", normalized.contains("@") ? normalized.substring(normalized.indexOf('@')) : "unknown"
+                ));
+        // #endregion
+        return exists;
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -96,6 +108,13 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail())) {
             User existing = userRepository.findByEmail(request.getEmail())
                     .orElseThrow();
+            // #region agent log
+            DebugTrace.log("H3", "AuthService.register", "email already in identity",
+                    Map.of(
+                            "role", existing.getRole().name(),
+                            "emailVerified", existing.getIsEmailVerified() != null && existing.getIsEmailVerified()
+                    ));
+            // #endregion
             if (existing.getRole() != User.UserRole.CLIENT) {
                 throw new BadRequestException(
                         "Email already registered as " + existing.getRole().name().toLowerCase(Locale.ROOT));
@@ -319,19 +338,35 @@ public class AuthService {
             clientUser = userRepository.findByUuid(uuid.trim()).orElse(null);
         }
         if (clientUser == null && email != null && !email.isBlank()) {
-            clientUser = userRepository.findByEmail(email.trim()).orElse(null);
+            String normalized = email.trim().toLowerCase(Locale.ROOT);
+            clientUser = userRepository.findByEmail(normalized).orElse(null);
+            if (clientUser == null && !normalized.equals(email.trim())) {
+                clientUser = userRepository.findByEmail(email.trim()).orElse(null);
+            }
         }
         if (clientUser == null) {
             log.info("No portal account to delete (uuid={}, email={})", uuid, email);
+            // #region agent log
+            DebugTrace.log("H1", "AuthService.deleteClientPortalAccount", "no user found",
+                    Map.of("hadUuid", uuid != null && !uuid.isBlank()));
+            // #endregion
             return;
         }
         if (clientUser.getRole() != User.UserRole.CLIENT) {
             log.warn("Skipping portal delete — user {} is role {}, not CLIENT", clientUser.getEmail(), clientUser.getRole());
             return;
         }
+        String deletedEmail = clientUser.getEmail();
         otpTokenRepository.deleteByUser(clientUser);
         userRepository.delete(clientUser);
-        log.info("Client portal account deleted: {} ({})", clientUser.getEmail(), clientUser.getUuid());
+        log.info("Client portal account deleted: {} ({})", deletedEmail, clientUser.getUuid());
+        // #region agent log
+        DebugTrace.log("H1", "AuthService.deleteClientPortalAccount", "portal user deleted",
+                Map.of(
+                        "emailDomain", deletedEmail.contains("@") ? deletedEmail.substring(deletedEmail.indexOf('@')) : "unknown",
+                        "stillExists", userRepository.existsByEmail(deletedEmail)
+                ));
+        // #endregion
     }
 
     private String generateUniqueUsername(String email, String firstName, String lastName) {
