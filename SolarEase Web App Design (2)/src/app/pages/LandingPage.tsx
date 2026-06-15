@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { PublicHeader } from "../components/PublicHeader";
 import { PublicFooter } from "../components/PublicFooter";
@@ -14,15 +14,20 @@ import {
   Users,
   Award,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 
 export function LandingPage() {
   const FRAME_COUNT = 240;
-  const FRAME_INTERVAL_MS = 20; // ~4,8 s pour une boucle complète
+  const FRAME_INTERVAL_MS = 33; // ~30 fps, ~8 s par boucle
+
+  const frameSrc = (index: number) =>
+    `/about/sequence/ezgif-frame-${String(index + 1).padStart(3, "0")}.jpg`;
 
   const [frameIndex, setFrameIndex] = useState(0);
+  const [framesReady, setFramesReady] = useState(false);
+  const preloadedRef = useRef<HTMLImageElement[]>([]);
 
-  const heroImage = `/about/sequence/ezgif-frame-${String(frameIndex + 1).padStart(3, "0")}.jpg`;
+  const heroImage = frameSrc(frameIndex);
 
   const componentHighlights = useMemo(
     () => [
@@ -109,12 +114,52 @@ export function LandingPage() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    let loaded = 0;
+
+    const images = Array.from({ length: FRAME_COUNT }, (_, i) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = frameSrc(i);
+      img.onload = () => {
+        loaded += 1;
+        if (!cancelled && loaded >= FRAME_COUNT) {
+          setFramesReady(true);
+        }
+      };
+      img.onerror = () => {
+        loaded += 1;
+        if (!cancelled && loaded >= FRAME_COUNT) {
+          setFramesReady(true);
+        }
+      };
+      return img;
+    });
+
+    preloadedRef.current = images;
+
+    return () => {
+      cancelled = true;
+      preloadedRef.current = [];
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!framesReady) return;
+
     const timer = window.setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % FRAME_COUNT);
+      setFrameIndex((prev) => {
+        const next = (prev + 1) % FRAME_COUNT;
+        const nextImg = preloadedRef.current[next];
+        if (nextImg && !nextImg.complete) {
+          return prev;
+        }
+        return next;
+      });
     }, FRAME_INTERVAL_MS);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [framesReady]);
 
   const features = [
     {
@@ -279,6 +324,8 @@ export function LandingPage() {
                     alt="Installation solaire SolarEase"
                     className="absolute inset-0 h-full w-full object-cover"
                     draggable={false}
+                    decoding="async"
+                    fetchPriority="high"
                   />
 
                  
@@ -334,15 +381,13 @@ export function LandingPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#050816]/72 via-transparent to-transparent" />
                 </div>
 
-                <div className={`m-4 rounded-2xl border border-slate-200/70 bg-gradient-to-br ${activeTheme.panel} p-4`}>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={componentHighlights[activeHighlight].title}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.32 }}
-                    >
+                <div className={`m-4 rounded-2xl border border-slate-200/70 bg-gradient-to-br ${activeTheme.panel} p-4 min-h-[148px]`}>
+                  <motion.div
+                    key={componentHighlights[activeHighlight].title}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.28 }}
+                  >
                       <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mb-2">
                         {componentHighlights[activeHighlight].label}
                       </p>
@@ -356,7 +401,6 @@ export function LandingPage() {
                         Déroulement en temps réel aligné avec l'identité verte SolarEase.
                       </p>
                     </motion.div>
-                  </AnimatePresence>
 
                   <div className="mt-4 flex items-center gap-2">
                     {componentHighlights.map((item, idx) => (

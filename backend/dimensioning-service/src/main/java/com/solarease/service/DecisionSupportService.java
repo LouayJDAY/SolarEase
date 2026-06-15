@@ -66,6 +66,23 @@ public class DecisionSupportService {
     public Result generate(DimensioningResponse dimensioning,
                            Equipment usedPanel,
                            Equipment usedInverter) {
+        return generate(dimensioning, usedPanel, usedInverter, true);
+    }
+
+    /**
+     * Fast path for {@code /calculate}: deterministic kit + narrative only.
+     * Skips Ollama embedding/LLM so the HTTP response stays under Vercel's proxy limit.
+     */
+    public Result generateDeterministic(DimensioningResponse dimensioning,
+                                        Equipment usedPanel,
+                                        Equipment usedInverter) {
+        return generate(dimensioning, usedPanel, usedInverter, false);
+    }
+
+    private Result generate(DimensioningResponse dimensioning,
+                            Equipment usedPanel,
+                            Equipment usedInverter,
+                            boolean withLlmAugmentation) {
         SolarInstallation installation = dimensioning.getInstallation();
         if (installation == null || installation.getTotalCapacityKw() == null) {
             InstallerRecommendationDto empty = InstallerRecommendationDto.builder()
@@ -94,18 +111,22 @@ public class DecisionSupportService {
                 .ragSources(new ArrayList<>())
                 .build();
 
-        // Augment with semantic retrieval and LLM narrative when available.
-        try {
-            List<KnowledgeChunk> chunks = retrieveChunks(installation, selected.kit());
-            dto.getRagSources().addAll(toSourceLabels(chunks));
+        if (withLlmAugmentation) {
+            try {
+                List<KnowledgeChunk> chunks = retrieveChunks(installation, selected.kit());
+                dto.getRagSources().addAll(toSourceLabels(chunks));
 
-            String prompt = buildPrompt(installation, dimensioning.getFinancials(),
-                    selected.kit(), dto, chunks);
-            String llmAnswer = ollamaService.generate(prompt);
-            applyLlmAnswer(dto, llmAnswer);
-        } catch (Exception e) {
-            log.warn("RAG augmentation skipped, returning deterministic kit only: {}",
-                    e.getMessage());
+                String prompt = buildPrompt(installation, dimensioning.getFinancials(),
+                        selected.kit(), dto, chunks);
+                String llmAnswer = ollamaService.generate(prompt);
+                applyLlmAnswer(dto, llmAnswer);
+            } catch (Exception e) {
+                log.warn("RAG augmentation skipped, returning deterministic kit only: {}",
+                        e.getMessage());
+                dto.setFallback(true);
+                applyDeterministicNarrative(dto, installation, dimensioning.getFinancials());
+            }
+        } else {
             dto.setFallback(true);
             applyDeterministicNarrative(dto, installation, dimensioning.getFinancials());
         }

@@ -287,17 +287,6 @@ public class DemandService {
             invitationService.sendInvitationForDemand(refreshed, client, project.getId());
             project.setInvitationSent(true);
             boolean hasAccount = identityServiceClient.emailHasPortalAccount(client.getEmail());
-            // #region agent log
-            com.solarease.debug.DebugTrace.log("H1-H4", "DemandService.promotePublicAndConvert",
-                    "after invitation send",
-                    java.util.Map.of(
-                            "clientId", clientId,
-                            "clientUserId", "null",
-                            "identityHasAccount", hasAccount,
-                            "projectId", project.getId(),
-                            "emailDomain", email.contains("@") ? email.substring(email.indexOf('@')) : "unknown"
-                    ));
-            // #endregion
             project.setInvitationMessage(hasAccount
                     ? "Lien de connexion envoyé à " + client.getEmail() + " (compte existant)"
                     : "Invitation inscription envoyée à " + client.getEmail());

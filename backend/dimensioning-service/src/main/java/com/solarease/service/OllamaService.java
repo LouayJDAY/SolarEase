@@ -19,7 +19,7 @@ public class OllamaService {
     @Value("${ollama.base-url:http://localhost:11434}")
     private String ollamaBaseUrl;
 
-    @Value("${ollama.model:mistral}")
+    @Value("${ollama.model:qwen2:0.5b}")
     private String ollamaModel;
 
     public String generate(String prompt) {

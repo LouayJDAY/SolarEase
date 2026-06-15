@@ -43,34 +43,28 @@ public class IdentityServiceClient {
     }
 
     public void deleteClientPortalAccount(String userId, String email) {
-        if (email == null || email.isBlank()) {
+        if ((userId == null || userId.isBlank()) && (email == null || email.isBlank())) {
             return;
         }
-        String normalized = email.trim().toLowerCase(java.util.Locale.ROOT);
+        String normalized = email != null && !email.isBlank()
+                ? email.trim().toLowerCase(java.util.Locale.ROOT)
+                : null;
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(identityServiceUrl + "/api/internal/users/client");
         if (userId != null && !userId.isBlank()) {
             builder.queryParam("uuid", userId.trim());
         }
-        builder.queryParam("email", normalized);
+        if (normalized != null) {
+            builder.queryParam("email", normalized);
+        }
         String url = builder.toUriString();
         try {
             delete(url);
-            if (emailHasPortalAccount(normalized)) {
+            if (normalized != null && emailHasPortalAccount(normalized)) {
                 log.error("Portal account still exists after delete for {}", normalized);
-                // #region agent log
-                com.solarease.debug.DebugTrace.log("H1", "IdentityServiceClient.deleteClientPortalAccount",
-                        "delete completed but user still exists",
-                        java.util.Map.of("emailDomain", normalized.substring(normalized.indexOf('@'))));
-                // #endregion
             }
         } catch (RestClientException ex) {
             log.warn("Could not delete portal account (uuid={}, email={}): {}", userId, normalized, ex.getMessage());
-            // #region agent log
-            com.solarease.debug.DebugTrace.log("H1", "IdentityServiceClient.deleteClientPortalAccount",
-                    "delete failed",
-                    java.util.Map.of("error", ex.getMessage() != null ? ex.getMessage() : "unknown"));
-            // #endregion
         }
     }
 

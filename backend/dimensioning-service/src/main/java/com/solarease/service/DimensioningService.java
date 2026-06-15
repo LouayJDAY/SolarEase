@@ -96,7 +96,7 @@ public class DimensioningService {
                     .financials(metrics)
                     .panelType(panelTypeCode)
                     .build();
-            DecisionSupportService.Result rag = decisionSupportService.generate(
+            DecisionSupportService.Result rag = decisionSupportService.generateDeterministic(
                     tempResponse, panel, inverter);
             installerRecommendation = rag.recommendation();
             aiRecommendation = rag.narrativeSummary();

@@ -25,8 +25,9 @@ for i in $(seq 1 18); do
   sleep 5
 done
 
-echo "==> Ollama (modèle tinyllama)..."
-docker exec ollama ollama pull tinyllama:latest 2>/dev/null || echo "(ollama pull ignoré si déjà présent)"
+echo "==> Ollama (modèles qwen2:0.5b + nomic-embed-text)..."
+docker exec ollama ollama pull qwen2:0.5b 2>/dev/null || echo "(ollama pull qwen2 ignoré si déjà présent)"
+docker exec ollama ollama pull nomic-embed-text 2>/dev/null || echo "(ollama pull embedding ignoré si déjà présent)"
 
 echo ""
 echo "==> Statut conteneurs"

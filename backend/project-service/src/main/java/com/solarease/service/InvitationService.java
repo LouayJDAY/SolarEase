@@ -3,7 +3,6 @@ package com.solarease.service;
 import com.solarease.entity.Client;
 import com.solarease.entity.ClientInvitation;
 import com.solarease.entity.DemandEntity;
-import com.solarease.debug.DebugTrace;
 import com.solarease.exception.ResourceNotFoundException;
 import com.solarease.repository.ClientInvitationRepository;
 import com.solarease.repository.ClientRepository;
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -129,17 +127,6 @@ public class InvitationService {
 
         boolean hasPortalAccount = resolveHasPortalAccount(clientId, normalizedEmail);
         String invitationLink = generateInvitationLink(token, normalizedEmail, projectId, hasPortalAccount);
-        // #region agent log
-        DebugTrace.log("H1-H4", "InvitationService.sendInvitationEmail",
-                "invitation link generated",
-                Map.of(
-                        "clientId", clientId != null ? clientId : -1,
-                        "hasPortalAccount", hasPortalAccount,
-                        "linkPath", hasPortalAccount ? "login" : "register",
-                        "projectId", projectId != null ? projectId : -1,
-                        "emailDomain", normalizedEmail.contains("@") ? normalizedEmail.substring(normalizedEmail.indexOf('@')) : "unknown"
-                ));
-        // #endregion
 
         try {
             SimpleMailMessage mailMessage = new SimpleMailMessage();
@@ -201,33 +188,16 @@ public class InvitationService {
     }
 
     private boolean resolveHasPortalAccount(Long clientId, String normalizedEmail) {
-        String clientUserId = null;
         if (clientId != null) {
             Optional<Client> client = clientRepository.findById(clientId);
             if (client.isPresent()) {
-                clientUserId = client.get().getUserId();
+                String clientUserId = client.get().getUserId();
                 if (clientUserId != null && !clientUserId.isBlank()) {
-                    // #region agent log
-                    DebugTrace.log("H4", "InvitationService.resolveHasPortalAccount",
-                            "portal account via client.userId",
-                            Map.of("clientId", clientId, "hasPortalAccount", true));
-                    // #endregion
                     return true;
                 }
             }
         }
-        boolean identityExists = identityServiceClient.emailHasPortalAccount(normalizedEmail);
-        // #region agent log
-        DebugTrace.log("H1-H5", "InvitationService.resolveHasPortalAccount",
-                "portal account via identity email-exists",
-                Map.of(
-                        "clientId", clientId != null ? clientId : -1,
-                        "clientUserId", clientUserId != null ? "set" : "null",
-                        "identityExists", identityExists,
-                        "emailDomain", normalizedEmail.contains("@") ? normalizedEmail.substring(normalizedEmail.indexOf('@')) : "unknown"
-                ));
-        // #endregion
-        return identityExists;
+        return identityServiceClient.emailHasPortalAccount(normalizedEmail);
     }
 
     private String generateInvitationLink(String token, String email, Long projectId, boolean hasPortalAccount) {
