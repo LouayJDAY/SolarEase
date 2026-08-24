@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn clean package -Dmaven.test.skip=true
 
 # Run stage
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:24-jre
 WORKDIR /app
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fra \
